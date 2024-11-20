@@ -15,8 +15,13 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->string('firstname', 30);    // Nombre real del usuario
+            $table->string('lastname', 30);     // Apellido real del usuario
+            $table->enum('role', ['admin','student', 'teacher', 'director', 'administrative', 'treasurer', 'user'])->default('user');
+            $table->string('phone', 20)->nullable();
+            $table->boolean('enabled')->default(true);
+            $table->timestamp('email_verified_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
