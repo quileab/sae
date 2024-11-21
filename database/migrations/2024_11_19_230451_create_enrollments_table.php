@@ -16,7 +16,9 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('subject_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
             $table->enum('status', ['active', 'completed', 'withdrawn'])->default('active'); // Estado de la inscripción.
-            $table->string('modality', 20)->default('in-person'); // Presencial, virtual, etc.
+            $table->foreignId('modalities_id')->nullable()->constrained()->onUpdate('cascade')->onDelete('set null');
+            $table->text('observations')->nullable();
+            $table->integer('attendance_percentage')->default(0);
             $table->timestamps();
         });
     }

@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // add CheckPermission middleware
-        $middleware->append(CheckPermission::class);
+        // $middleware->append(CheckPermission::class);
 
     })
     ->withExceptions(function (Exceptions $exceptions) {

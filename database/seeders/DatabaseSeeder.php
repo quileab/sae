@@ -24,8 +24,8 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
             'firstname' => 'admin',
             'lastname' => 'admin',
-            // password admin123
-            'password'=>'$12$8M/ERONr0BR6oIaMVULnZenvM7kPV9rOBMh7j9hnxckas00VhDEc.'
+            'password' => 'admin123',
+            //'password'=>'$12$8M/ERONr0BR6oIaMVULnZenvM7kPV9rOBMh7j9hnxckas00VhDEc.'
 
         ]);
 

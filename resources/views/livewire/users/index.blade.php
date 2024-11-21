@@ -31,30 +31,26 @@ new class extends Component {
     public function headers(): array
     {
         return [
-            ['key' => 'id', 'label' => '#', 'class' => 'w-1'],
-            ['key' => 'name', 'label' => 'Name', 'class' => 'w-64'],
-            ['key' => 'age', 'label' => 'Age', 'class' => 'w-20'],
+            ['key' => 'id', 'label' => '#', 'class' => 'w-10'],
+            ['key' => 'lastname', 'label' => 'Apellido', 'class' => 'w-64'],
+            ['key' => 'firstname', 'label' => 'Nombre', 'class' => 'w-full'],
+            ['key' => 'phone', 'label' => 'Tel.', 'sortable' => false],
             ['key' => 'email', 'label' => 'E-mail', 'sortable' => false],
         ];
     }
 
-    /**
-     * For demo purpose, this is a static collection.
-     *
-     * On real projects you do it with Eloquent collections.
-     * Please, refer to maryUI docs to see the eloquent examples.
-     */
     public function users(): Collection
     {
-        return collect([
-            ['id' => 1, 'name' => 'Mary', 'email' => 'mary@mary-ui.com', 'age' => 23],
-            ['id' => 2, 'name' => 'Giovanna', 'email' => 'giovanna@mary-ui.com', 'age' => 7],
-            ['id' => 3, 'name' => 'Marina', 'email' => 'marina@mary-ui.com', 'age' => 5],
-        ])
-            ->sortBy([[...array_values($this->sortBy)]])
-            ->when($this->search, function (Collection $collection) {
-                return $collection->filter(fn(array $item) => str($item['name'])->contains($this->search, true));
+        return User::get()
+        ->sortBy($this->sortBy) // Asegúrate de que $this->sortBy sea válido
+        ->when($this->search, function (Collection $collection) {
+            $search = strtolower($this->search); // Convertir la búsqueda a minúsculas para hacerlo insensible a mayúsculas
+            return $collection->filter(function ($item) use ($search) {
+                // Concatenar lastname y firstname y comparar con la búsqueda
+                $fullName = strtolower($item['lastname'] . ', ' . $item['firstname'].$item['id']);
+                return str_contains($fullName, $search);
             });
+        })->take(20);
     }
 
     public function with(): array
@@ -68,7 +64,7 @@ new class extends Component {
 
 <div>
     <!-- HEADER -->
-    <x-header title="Hello" separator progress-indicator>
+    <x-header title="Usuarios" separator progress-indicator>
         <x-slot:middle class="!justify-end">
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
