@@ -46,12 +46,17 @@
                     <x-menu-separator />
                 @endif
 
-                <x-menu-item title="Sitio Principal" icon="o-sparkles" link="/" />
+                <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
                 <x-menu-item title="Usuarios" icon="o-users" link="/users" />
-                <x-menu-item title="Pedidos" icon="o-clipboard-document-list" link="/orders" />
-                <x-menu-sub title="Settings" icon="o-cog-6-tooth">
-                    <x-menu-item title="Wifi" icon="o-wifi" link="####" />
-                    <x-menu-item title="Archives" icon="o-archive-box" link="####" />
+                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/users" />
+                <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
+                    <x-menu-item title="Carreras" icon="o-academic-cap" link="/careers" />
+                    <x-menu-item title="Materias" icon="o-rectangle-stack" link="####" />
+                    <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="####" />
+                </x-menu-sub>
+                <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
+                    <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="####" />
+                    <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="####" />
                 </x-menu-sub>
             </x-menu>
         </x-slot:sidebar>

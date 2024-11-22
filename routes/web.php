@@ -43,4 +43,6 @@ Route::get('/clear/{option?}', function ($option = null) {
     return "<pre>".print_r($logs,true)."</pre><hr />";
   });
   
+  Volt::route('/dashboard', 'dashboard');
   Volt::route('/users', 'users.index');
+  Volt::route('/careers', 'careers.index');
