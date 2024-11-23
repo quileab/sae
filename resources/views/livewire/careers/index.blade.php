@@ -12,7 +12,7 @@ new class extends Component {
 
     public bool $drawer = false;
 
-    public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
+    public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
 
     // Clear filters
     public function clear(): void
@@ -39,15 +39,15 @@ new class extends Component {
         ];
     }
 
-    public function users(): Collection
+    public function careers(): Collection
     {
+        $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
         return Career::get()
         ->sortBy($this->sortBy) // Asegúrate de que $this->sortBy sea válido
-        ->when($this->search, function (Collection $collection) {
-            $search = strtolower($this->search); // Convertir la búsqueda a minúsculas para hacerlo insensible a mayúsculas
+        ->when($this->search, function (Collection $collection) use ($search) {
             return $collection->filter(function ($item) use ($search) {
-                // Concatenar lastname y firstname y comparar con la búsqueda
-                $fullSearch = strtolower($item['name'] . ' ' . $item['id']);
+                // Normalizar los caracteres latinos y convertir a minúsculas
+                $fullSearch = Str::of($item['name'] . ' ' . $item['id'])->lower()->ascii();
                 return str_contains($fullSearch, $search);
             });
         })->take(20);
@@ -56,9 +56,14 @@ new class extends Component {
     public function with(): array
     {
         return [
-            'users' => $this->users(),
+            'careers' => $this->careers(),
             'headers' => $this->headers()
         ];
+    }
+
+    public function bookmark($id): void
+    {
+        $this->dispatch('bookmarked', ['type' => 'career_id', 'value' => $id]);
     }
 }; ?>
 
@@ -75,9 +80,16 @@ new class extends Component {
 
     <!-- TABLE  -->
     <x-card>
-        <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy">
-            @scope('actions', $user)
-            <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+        <x-table :headers="$headers" :rows="$careers" :sort-by="$sortBy">
+            @scope('actions', $career)
+            <x-dropdown>
+                <x-slot:trigger>
+                    <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
+                </x-slot:trigger>
+
+                <x-button icon="o-bookmark" wire:click="bookmark({{ $career['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
+                <x-button icon="o-trash" wire:click="delete({{ $career['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+            </x-dropdown>
             @endscope
         </x-table>
     </x-card>

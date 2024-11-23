@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($title) ? $title.' - '.config('app.name') : config('app.name') }}</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
-
     {{-- NAVBAR mobile only --}}
     <x-nav sticky class="lg:hidden">
         <x-slot:brand>
@@ -47,12 +47,13 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
+                <livewire:bookmarks />
                 <x-menu-item title="Usuarios" icon="o-users" link="/users" />
                 <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/users" />
                 <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
                     <x-menu-item title="Carreras" icon="o-academic-cap" link="/careers" />
-                    <x-menu-item title="Materias" icon="o-rectangle-stack" link="####" />
-                    <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="####" />
+                    <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
+                    <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
                 </x-menu-sub>
                 <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
                     <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="####" />

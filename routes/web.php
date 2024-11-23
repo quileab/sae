@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Volt;
 use Illuminate\Support\Facades\Artisan;
+use App\Http\Controllers\BookmarkController;
 
 Route::get('/', function () {
   return view('dashboard');
@@ -42,7 +43,15 @@ Route::get('/clear/{option?}', function ($option = null) {
     }
     return "<pre>".print_r($logs,true)."</pre><hr />";
   });
+
+  Route::prefix('bookmark')->group(function () {
+    Route::get('/', [BookmarkController::class, 'index']);        // Ver el bookmark actual
+    Route::post('/update', [BookmarkController::class, 'update']); // Actualizar un bookmark
+    Route::post('/clear', [BookmarkController::class, 'clear']);  // Limpiar los bookmarks
+  });
   
   Volt::route('/dashboard', 'dashboard');
   Volt::route('/users', 'users.index');
   Volt::route('/careers', 'careers.index');
+  Volt::route('/subjects', 'subjects.index');
+  Volt::route('/enrollments', 'enrollment');

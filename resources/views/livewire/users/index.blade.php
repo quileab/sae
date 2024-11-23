@@ -41,16 +41,18 @@ new class extends Component {
 
     public function users(): Collection
     {
+        $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
+
         return User::get()
-        ->sortBy($this->sortBy) // Asegúrate de que $this->sortBy sea válido
-        ->when($this->search, function (Collection $collection) {
-            $search = strtolower($this->search); // Convertir la búsqueda a minúsculas para hacerlo insensible a mayúsculas
-            return $collection->filter(function ($item) use ($search) {
-                // Concatenar lastname y firstname y comparar con la búsqueda
-                $fullName = strtolower($item['lastname'] . ', ' . $item['firstname'].$item['id']);
-                return str_contains($fullName, $search);
-            });
-        })->take(20);
+            ->sortBy($this->sortBy) // Ordenar por el campo especificado
+            ->when($this->search, function (Collection $collection) use ($search) {
+                return $collection->filter(function ($item) use ($search) {
+                    // Normalizar los caracteres latinos y convertir a minúsculas
+                    $fullSearch = Str::of($item['lastname'] . ', ' . $item['firstname'].$item['id'])->lower()->ascii();
+                    // Comparar la búsqueda normalizada con el texto del item
+                    return $fullSearch->contains($search);
+                });
+            })->take(20);
     }
 
     public function with(): array
@@ -59,6 +61,12 @@ new class extends Component {
             'users' => $this->users(),
             'headers' => $this->headers()
         ];
+    }
+
+    public function bookmark($id): void
+    {
+        // Notifica al componente Bookmarks
+        $this->dispatch('bookmarked', ['type' => 'user_id', 'value' => $id]);
     }
 }; ?>
 
@@ -77,7 +85,14 @@ new class extends Component {
     <x-card>
         <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy">
             @scope('actions', $user)
-            <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+            <x-dropdown>
+                <x-slot:trigger>
+                    <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
+                </x-slot:trigger>
+
+                <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
+                <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+            </x-dropdown>
             @endscope
         </x-table>
     </x-card>
