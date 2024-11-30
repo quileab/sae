@@ -7,16 +7,19 @@ use App\Models\Career;
 
 new class extends Component {
     public $careerId; // Carrera seleccionada
+    public $careers;
     public $userType; // Tipo de usuario (student o teacher)
     public $enrolledSubjects = []; // Materias en las que está matriculado
     public $subjects = []; // Todas las materias de la carrera seleccionada
 
     public function mount()
     {
-        if(session('career_id')) {
+        $this->careers = Career::all();
+
+        if(session()->has('career_id')) {
             $careerId = session('career_id');
         } else {
-            $careerId = Career::first()->id;
+            $careerId = $this->careers->first()->id;
         }
         if(session()->has('user_id')) {
             $user=\App\Models\User::find(session('user_id'));
@@ -68,26 +71,32 @@ new class extends Component {
         }
     }
 
+    public function updated(){
+        $this->loadSubjects();
+        $this->loadEnrollments();
+    }
+
 }; ?>
 
 <div>
-    <h3>Materias de la Carrera Seleccionada</h3>
+    <x-select label="Carrera" icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
 
-    <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+    <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
 
         @foreach($subjects as $subject)
+        <div class="border border-white/50 rounded-md text-black dark:text-white">
 
+            <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
+                <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong></p>
 
-        <x-card subtitle="{{ $subject->name }}" separator progress-indicator
-            class="{{ in_array($subject->id, $enrolledSubjects) ? 'bg-lime-500/20 text-white' : '' }}">
-            <x-slot:menu>
-                <x-button icon="o-share" class="btn-circle btn-sm" />
-                <x-icon name="o-heart" class="cursor-pointer" />
-            </x-slot:menu>
+            <div class="justify-end flex p-2">
             <x-button label="{{ in_array($subject->id, $enrolledSubjects) ? 'Desmatricularse' : 'Matricularse' }}" wire:click="save" 
                 wire:click="toggleEnrollment({{ $subject->id }})"
+                class="btn-sm {{ in_array($subject->id, $enrolledSubjects) ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}"
                 />
-        </x-card>
+            </div>
+
+        </div>
         @endforeach
 
     </div>
