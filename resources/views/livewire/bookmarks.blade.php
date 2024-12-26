@@ -41,10 +41,17 @@ new class extends Component {
 }; ?>
 
 <div class="grid gap-0">
+    <x-menu-sub title="Bookmarks" 
+        icon="{{ session()->has('user_id') || session()->has('career_id') || session()->has('subject_id') ? 's-bookmark' : 'o-bookmark'}}"
+        >
     @foreach (['user_id', 'career_id', 'subject_id'] as $key)
         @if(session()->get($key,false))
-        <x-button label="{{ session($key.'_name') }}" icon-right="o-bookmark" class="bg-blue-500/20 btn-sm"
-            wire:click="clearBookmark('{{ $key }}')" />
+        <div class="w-full">
+            <x-button label="{{ session($key.'_name') }}" icon="o-bookmark-slash" 
+                class="btn-xs text-primary"
+                wire:click="clearBookmark('{{ $key }}')" />
+        </div>
         @endif
     @endforeach
+    </x-menu-sub>
 </div>

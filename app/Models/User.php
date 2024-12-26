@@ -3,9 +3,11 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -46,24 +48,46 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'enabled' => 'boolean',
         ];
     }
-    public function roles()
-    {
-        return $this->belongsToMany(Role::class, 'role_user');
-    }
-    public function hasRole($role)
-    {
-        return $this->roles->contains('name', $role);
+
+    public static $roles = [
+        ['id'=>'admin','name'=>'ADMIN'],
+        ['id'=>'student','name'=>'Estudiante'],
+        ['id'=>'teacher','name'=>'Profesor'],
+        ['id'=>'director','name'=>'Director'],
+        ['id'=>'administrative','name'=>'Administrativo'],
+        ['id'=>'treasurer','name'=>'Tesorero'],
+        ['id'=>'user','name'=>'Usuario']
+    ];
+    // users may have multiple careers
+    public function careers(): BelongsToMany {
+        return $this->belongsToMany(Career::class);
     }
 
-    public function hasPermission($permission)
-    {
-        foreach ($this->roles as $role) {
-            if ($role->permissions->contains('name', $permission)) {
-                return true;
-            }
-        }
-        return false;
+    public function book():HasMany {
+        return $this->hasMany('App\Models\Books');
     }
+
+    public function subjects(): BelongsToMany {
+        return $this->belongsToMany(Subject::class);
+    }
+
+    // TODO: create grades table, model and add relationship
+    // public function grades() {
+    //     return $this->belongsToMany(Grades::class);
+    // }
+
+    public function payments(): HasMany {
+        return $this->hasMany('App\Models\PaymentRecord');
+    }
+
+    // return true if the user has grade approved on date=2000-01-01
+    public function enrolled($subject_id): bool{
+        return \App\Models\Grade::where('subject_id', $subject_id)->
+            //where('user_id', $user_id)->
+            where('date_id','2000-01-01')->count() ? true : false;
+    }
+
 }

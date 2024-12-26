@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('career_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
-            $table->enum('role', ['student', 'teacher'])->default('student'); // Rol dentro de la carrera.
+            //$table->enum('role', ['student', 'teacher'])->default('student'); // Rol dentro de la carrera.
             $table->timestamps();
         });
     }

@@ -80,7 +80,9 @@ new class extends Component {
 
     <!-- TABLE  -->
     <x-card>
-        <x-table :headers="$headers" :rows="$careers" :sort-by="$sortBy">
+        <x-table :headers="$headers" :rows="$careers" :sort-by="$sortBy"
+            striped link="/career/{id}"
+            >
             @scope('actions', $career)
             <x-dropdown>
                 <x-slot:trigger>

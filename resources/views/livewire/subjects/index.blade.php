@@ -13,7 +13,7 @@ new class extends Component {
 
     public bool $drawer = false;
 
-    public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
+    public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
 
     public $career_id;
     public $careers;
@@ -93,43 +93,40 @@ new class extends Component {
     <!-- HEADER -->
     <x-header title="Materias" separator progress-indicator>
         <x-slot:middle class="!justify-end">
-            <x-choices-offline
-                label="Carrera"
-                wire:model.live="career_id"
-                :options="$careers"
-                placeholder="Buscar..."
-                single
-                searchable />
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
         <x-slot:actions>
-            <x-button label="Filters" @click="$wire.drawer = true" responsive icon="o-funnel" />
+            <x-button label="Opciones" @click="$wire.drawer = true" responsive icon="o-bars-3" />
         </x-slot:actions>
     </x-header>
 
     <!-- TABLE  -->
-    <x-card>
-        <x-table :headers="$headers" :rows="$subjects" :sort-by="$sortBy">
-            @scope('actions', $subject)
-            <x-dropdown>
-                <x-slot:trigger>
-                    <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
-                </x-slot:trigger>
+    <x-table :headers="$headers" :rows="$subjects" :sort-by="$sortBy"
+        striped link="/subject/{id}"
+        >
+        @scope('actions', $subject)
+        <x-dropdown>
+            <x-slot:trigger>
+                <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
+            </x-slot:trigger>
 
-                <x-button icon="o-bookmark" wire:click="bookmark({{ $subject['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
-                <x-button icon="o-trash" wire:click="delete({{ $subject['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
-            </x-dropdown>
-            @endscope
-        </x-table>
-    </x-card>
+            <x-button icon="o-bookmark" wire:click="bookmark({{ $subject['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
+            <x-button icon="o-trash" wire:click="delete({{ $subject['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+        </x-dropdown>
+        @endscope
+    </x-table>
 
-    <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Filters" right separator with-close-button class="lg:w-1/3">
-        <x-input placeholder="Search..." wire:model.live.debounce="search" icon="o-magnifying-glass" @keydown.enter="$wire.drawer = false" />
+    <x-drawer wire:model="drawer" title="Opciones" right separator with-close-button class="lg:w-1/3">
+        <x-choices-offline 
+        label="Carrera"
+        wire:model.live="career_id"
+        :options="$careers"
+        placeholder="Buscar..."
+        single
+        searchable />
 
         <x-slot:actions>
-            <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
-            <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
+            <x-button label="Cerrar" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
         </x-slot:actions>
     </x-drawer>
 </div>

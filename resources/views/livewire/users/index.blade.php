@@ -9,9 +9,8 @@ new class extends Component {
     use Toast;
 
     public string $search = '';
-
+    public string $filterRole = '';
     public bool $drawer = false;
-
     public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
 
     // Clear filters
@@ -82,25 +81,23 @@ new class extends Component {
     </x-header>
 
     <!-- TABLE  -->
-    <x-card>
-        <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy">
-            @scope('actions', $user)
-            <x-dropdown>
-                <x-slot:trigger>
-                    <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
-                </x-slot:trigger>
+    <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy"
+        striped link="/user/{id}">
+        @scope('actions', $user)
+        <x-dropdown>
+            <x-slot:trigger>
+                <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
+            </x-slot:trigger>
 
-                <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
-                <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
-            </x-dropdown>
-            @endscope
-        </x-table>
-    </x-card>
+            <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
+            <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+        </x-dropdown>
+        @endscope
+    </x-table>
 
     <!-- FILTER DRAWER -->
     <x-drawer wire:model="drawer" title="Filters" right separator with-close-button class="lg:w-1/3">
-        <x-input placeholder="Search..." wire:model.live.debounce="search" icon="o-magnifying-glass" @keydown.enter="$wire.drawer = false" />
-
+        <x-choices label="Single" wire:model="user_id" :options="$users" single />
         <x-slot:actions>
             <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
             <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />

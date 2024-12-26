@@ -52,6 +52,9 @@ Route::get('/clear/{option?}', function ($option = null) {
   
   Volt::route('/dashboard', 'dashboard');
   Volt::route('/users', 'users.index');
+  Volt::route('/user/{id?}', 'users.crud');
   Volt::route('/careers', 'careers.index');
+  Volt::route('/career/{id?}', 'careers.crud');
   Volt::route('/subjects', 'subjects.index');
+  Volt::route('/subject/{id?}', 'subjects.crud');
   Volt::route('/enrollments', 'enrollment');
