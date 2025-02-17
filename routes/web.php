@@ -10,19 +10,21 @@ Route::get('/', function () {
 
 // Users will be redirected to this route if not logged in
 Volt::route('/login', 'login')->name('login');
-Volt::route('/register', 'register'); 
+// Volt::route('/register', 'register'); 
 
-Route::get('/logout', function () {
-  auth()->logout();
-  request()->session()->invalidate();
-  request()->session()->regenerateToken();
-  return redirect('/');
-});
+Route::middleware('auth')->group(function () {
 
-Route::get('/clear/{option?}', function ($option = null) {
-  $logs = [];
-  $maintenance = ($option == "cache") ? [
-    'Flush' => 'cache:flush',
+  Route::get('/logout', function () {
+    auth()->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect('/');
+  });
+
+  Route::get('/clear/{option?}', function ($option = null) {
+    $logs = [];
+    $maintenance = ($option == "cache") ? [
+      'Flush' => 'cache:flush',
     ] : [
       //'DebugBar'=>'debugbar:clear',
       //'Storage Link'=>'storage:link',
@@ -32,16 +34,16 @@ Route::get('/clear/{option?}', function ($option = null) {
       'Route Clear' => 'route:clear',
       'Cache' => 'cache:clear',
     ];
-    
+
     foreach ($maintenance as $key => $value) {
       try {
         Artisan::call($value);
-        $logs[$key]='✔️';
+        $logs[$key] = '✔️';
       } catch (\Exception $e) {
-        $logs[$key]='❌'.$e->getMessage();
+        $logs[$key] = '❌' . $e->getMessage();
       }
     }
-    return "<pre>".print_r($logs,true)."</pre><hr />";
+    return "<pre>" . print_r($logs, true) . "</pre><hr />";
   });
 
   Route::prefix('bookmark')->group(function () {
@@ -49,7 +51,7 @@ Route::get('/clear/{option?}', function ($option = null) {
     Route::post('/update', [BookmarkController::class, 'update']); // Actualizar un bookmark
     Route::post('/clear', [BookmarkController::class, 'clear']);  // Limpiar los bookmarks
   });
-  
+
   Volt::route('/dashboard', 'dashboard');
   Volt::route('/users', 'users.index');
   Volt::route('/user/{id?}', 'users.crud');
@@ -58,3 +60,4 @@ Route::get('/clear/{option?}', function ($option = null) {
   Volt::route('/subjects', 'subjects.index');
   Volt::route('/subject/{id?}', 'subjects.crud');
   Volt::route('/enrollments', 'enrollment');
+});

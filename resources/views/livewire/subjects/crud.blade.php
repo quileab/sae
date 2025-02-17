@@ -15,6 +15,7 @@ new class extends Component {
 
     public $careers;
     public $subjects;
+    public $drawer = false;
 
     public $subjectsToStudy = [];
     public $subjectsToExam = [];
@@ -36,6 +37,13 @@ new class extends Component {
     public function save() {
         $subject = \App\Models\Subject::updateOrCreate(['id' => $this->data['id']], $this->data);
         $this->success('Mareria guardada.');
+        return redirect('/subjects');
+    }
+
+    public function delete() {
+        $item = \App\Models\Subject::find($this->data['id']);
+        $item->delete();
+        $this->success('Registro Eliminado.');
         return redirect('/subjects');
     }
 
@@ -79,8 +87,14 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-header title="Materia" separator />
-    <x-form wire:submit="save">
+    <!-- HEADER -->
+    <x-card title="Materia" shadow separator>
+        <x-slot:menu>
+            <x-button @click="$wire.drawer = true" responsive 
+            icon="o-ellipsis-vertical"
+            class="btn-ghost btn-circle btn-outline btn-sm" />
+        </x-slot:menu>
+    <x-form wire:submit="save">    
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
             <x-input label="ID" type="number" wire:model="data.id" />
             <x-select label="Carrera" icon="o-academic-cap" :options="$careers" wire:model.lazy="data.career_id" />
@@ -126,4 +140,17 @@ new class extends Component {
             <x-button label="Guardar" class="btn-primary" type="submit" spinner="save" />
         </x-slot:actions>
     </x-form>
+    </x-card>
+
+    <!-- DRAWER -->
+    <x-drawer wire:model="drawer" title="Acciones" right with-close-button 
+        separator with-close-button close-on-escape
+        class="lg:w-1/3">
+
+        <x-slot:actions>
+            <x-dropdown label="ELIMINAR REGISTRO" class="btn-error w-full mt-1">
+                <x-menu-item title="Confirmar" wire:click.stop="delete" spinner="delete" icon="o-trash" class="bg-error text-white" />
+            </x-dropdown>
+        </x-slot:actions>
+    </x-drawer>
 </div>

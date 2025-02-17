@@ -90,7 +90,7 @@ new class extends Component {
             </x-slot:trigger>
 
             <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
-            <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" />
+            {{-- <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" /> --}}
         </x-dropdown>
         @endscope
     </x-table>

@@ -56,7 +56,7 @@ class User extends Authenticatable
         ['id'=>'admin','name'=>'ADMIN'],
         ['id'=>'student','name'=>'Estudiante'],
         ['id'=>'teacher','name'=>'Profesor'],
-        ['id'=>'director','name'=>'Director'],
+        ['id'=>'principal','name'=>'Director'],
         ['id'=>'administrative','name'=>'Administrativo'],
         ['id'=>'treasurer','name'=>'Tesorero'],
         ['id'=>'user','name'=>'Usuario']
@@ -88,6 +88,10 @@ class User extends Authenticatable
         return \App\Models\Grade::where('subject_id', $subject_id)->
             //where('user_id', $user_id)->
             where('date_id','2000-01-01')->count() ? true : false;
+    }
+
+    public static function hasRole($role){
+        return in_array($role, array_column(self::$roles, 'id'));        
     }
 
 }

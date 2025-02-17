@@ -4,32 +4,36 @@ use Livewire\Volt\Component;
 use App\Models\Enrollment;
 use App\Models\Subject;
 use App\Models\Career;
+use Mary\Traits\Toast;
 
 new class extends Component {
+    use Toast;
+    public $modal = false;
     public $careerId; // Carrera seleccionada
     public $careers;
-    public $userType; // Tipo de usuario (student o teacher)
     public $enrolledSubjects = []; // Materias en las que está matriculado
     public $subjects = []; // Todas las materias de la carrera seleccionada
 
     public function mount()
     {
-        $this->careers = Career::all();
-
-        if(session()->has('career_id')) {
-            $careerId = session('career_id');
-        } else {
-            $careerId = $this->careers->first()->id;
-        }
         if(session()->has('user_id')) {
             $user=\App\Models\User::find(session('user_id'));
-            $userType = $user->hasRole('teacher') ? 'teacher' : 'student';
+            $this->careers = $user->careers;
         } else {
-            $userType = 'student';
+            $user = auth()->user();
+            $this->careers = Career::all();
+            // display error message
+            $this->warning('No se ha seleccionado Usuario.');
+            $this->modal = true;
+        }
+        //if user is admin, principal, administrative, get all careers 
+        if($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
+            $this->careers = Career::all();
         }
 
+        $careerId = (session()->has('career_id')) ? session('career_id') : $this->careers->first()->id;
+
         $this->careerId = $careerId;
-        $this->userType = $userType;
 
         // Cargar las materias de la carrera
         $this->loadSubjects();
@@ -79,17 +83,17 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-select label="Carrera" icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
+    <x-select label="Carrera para: {{ session()->get('user_id') }}" icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
 
-    <div class="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+    <div class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
 
         @foreach($subjects as $subject)
-        <div class="border border-white/50 rounded-md text-black dark:text-white">
+        <div class="border border-white/10 rounded-md text-black dark:text-white">
 
             <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
                 <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong></p>
 
-            <div class="justify-end flex p-2">
+            <div class="justify-end flex p-2 bg-gray-500/40">
             <x-button label="{{ in_array($subject->id, $enrolledSubjects) ? 'Desmatricularse' : 'Matricularse' }}" wire:click="save" 
                 wire:click="toggleEnrollment({{ $subject->id }})"
                 class="btn-sm {{ in_array($subject->id, $enrolledSubjects) ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}"
@@ -100,5 +104,8 @@ new class extends Component {
         @endforeach
 
     </div>
-
+    <x-modal wire:model="modal" class="backdrop-blur" persistent>
+        <div class="mb-5">Haga click para ser redirigido</div>
+        <x-button label="CONTINUAR" link="/users" class="btn-primary" />
+    </x-modal>
 </div>
