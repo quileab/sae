@@ -13,6 +13,8 @@ new class extends Component {
     public bool $drawer = false;
     public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
 
+    public $row_decoration;
+
     // Clear filters
     public function clear(): void
     {
@@ -47,7 +49,7 @@ new class extends Component {
             ->when($this->search, function (Collection $collection) use ($search) {
                 return $collection->filter(function ($item) use ($search) {
                     // Normalizar los caracteres latinos y convertir a minúsculas
-                    $fullSearch = Str::of($item['lastname'] . ', ' . $item['firstname'].$item['id'])->lower()->ascii();
+                    $fullSearch = Str::of($item['lastname'] . ', ' . $item['firstname'] . $item['id'])->lower()->ascii();
                     // Comparar la búsqueda normalizada con el texto del item
                     return $fullSearch->contains($search);
                 });
@@ -81,16 +83,23 @@ new class extends Component {
     </x-header>
 
     <!-- TABLE  -->
-    <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy"
-        striped link="/user/{id}">
+    @php
+        $row_decoration = [
+            'text-red-500' => fn(User $user) => $user->enabled === false,
+        ];
+    @endphp
+    <x-table :headers="$headers" :rows="$users" :sort-by="$sortBy" striped :row-decoration="$row_decoration"
+        link="/user/{id}">
         @scope('actions', $user)
         <x-dropdown>
             <x-slot:trigger>
                 <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
             </x-slot:trigger>
 
-            <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
-            {{-- <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" /> --}}
+            <x-button icon="o-bookmark" wire:click="bookmark({{ $user['id'] }})" spinner
+                class="btn-ghost btn-sm text-lime-500" />
+            {{-- <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" wire:confirm="Are you sure?" spinner
+                class="btn-ghost btn-sm text-red-500" /> --}}
         </x-dropdown>
         @endscope
     </x-table>

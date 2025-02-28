@@ -20,6 +20,9 @@ class extends Component {
         if (auth()->user()) {
             return redirect('/');
         }
+        // set cycle_id cycle_id_name session to current year
+        session()->put('cycle_id', date('Y'));
+        session()->put('cycle_id_name', date('Y'));
     }
  
     public function login()

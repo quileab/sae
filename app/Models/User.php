@@ -53,45 +53,53 @@ class User extends Authenticatable
     }
 
     public static $roles = [
-        ['id'=>'admin','name'=>'ADMIN'],
-        ['id'=>'student','name'=>'Estudiante'],
-        ['id'=>'teacher','name'=>'Profesor'],
-        ['id'=>'principal','name'=>'Director'],
-        ['id'=>'administrative','name'=>'Administrativo'],
-        ['id'=>'treasurer','name'=>'Tesorero'],
-        ['id'=>'user','name'=>'Usuario']
+        ['id' => 'admin', 'name' => 'ADMIN'],
+        ['id' => 'student', 'name' => 'Estudiante'],
+        ['id' => 'teacher', 'name' => 'Profesor'],
+        ['id' => 'principal', 'name' => 'Director'],
+        ['id' => 'administrative', 'name' => 'Administrativo'],
+        ['id' => 'treasurer', 'name' => 'Tesorero'],
+        ['id' => 'user', 'name' => 'Usuario']
     ];
     // users may have multiple careers
-    public function careers(): BelongsToMany {
+    public function careers(): BelongsToMany
+    {
         return $this->belongsToMany(Career::class);
     }
 
-    public function book():HasMany {
+    public function book(): HasMany
+    {
         return $this->hasMany('App\Models\Books');
     }
 
-    public function subjects(): BelongsToMany {
-        return $this->belongsToMany(Subject::class);
+    // enrolled table has user_id and subject_id and means that user is enrolled in subject
+    public function subjects()
+    {
+        return $this->belongsToMany('App\Models\Subject', 'enrollments', 'user_id', 'subject_id')
+            ->orderBy('id', 'asc');
     }
 
-    // TODO: create grades table, model and add relationship
-    // public function grades() {
-    //     return $this->belongsToMany(Grades::class);
-    // }
+    // user has many grades
+    public function grades(): HasMany
+    {
+        return $this->hasMany('App\Models\Grade');
+    }
 
-    public function payments(): HasMany {
+    public function payments(): HasMany
+    {
         return $this->hasMany('App\Models\PaymentRecord');
     }
 
     // return true if the user has grade approved on date=2000-01-01
-    public function enrolled($subject_id): bool{
+    public function enrolled($subject_id): bool
+    {
         return \App\Models\Grade::where('subject_id', $subject_id)->
             //where('user_id', $user_id)->
-            where('date_id','2000-01-01')->count() ? true : false;
+            where('date_id', '2000-01-01')->count() ? true : false;
     }
 
-    public static function hasRole($role){
-        return in_array($role, array_column(self::$roles, 'id'));        
+    public static function hasRole($role)
+    {
+        return in_array($role, array_column(self::$roles, 'id'));
     }
-
 }

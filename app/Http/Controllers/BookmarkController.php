@@ -12,6 +12,7 @@ class BookmarkController extends Controller
             'user_id' => 0,
             'career_id' => 0,
             'subject_id' => 0,
+            'cycle_id' => date('Y'),
         ]);
 
         return response()->json($bookmarks);
@@ -20,10 +21,10 @@ class BookmarkController extends Controller
     // Actualizar un bookmark (marcar una entidad)
     public function update(Request $request)
     {
-        $type = $request->input('type'); // 'user_id', 'career_id', 'subject_id'
+        $type = $request->input('type'); // 'user_id', 'career_id', 'subject_id', 'cycle_id'
         $id = $request->input('id');    // ID del elemento marcado
 
-        if (!in_array($type, ['user_id', 'career_id', 'subject_id'])) {
+        if (!in_array($type, ['user_id', 'career_id', 'subject_id', 'cycle_id'])) {
             return response()->json(['error' => 'Tipo inválido'], 400);
         }
 
@@ -32,6 +33,7 @@ class BookmarkController extends Controller
             'user_id' => 0,
             'career_id' => 0,
             'subject_id' => 0,
+            'cycle_id' => date('Y'),
         ]);
 
         // Actualizar el bookmark para el tipo específico

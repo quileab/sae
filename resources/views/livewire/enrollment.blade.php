@@ -16,8 +16,8 @@ new class extends Component {
 
     public function mount()
     {
-        if(session()->has('user_id')) {
-            $user=\App\Models\User::find(session('user_id'));
+        if (session()->has('user_id')) {
+            $user = \App\Models\User::find(session('user_id'));
             $this->careers = $user->careers;
         } else {
             $user = auth()->user();
@@ -27,7 +27,7 @@ new class extends Component {
             $this->modal = true;
         }
         //if user is admin, principal, administrative, get all careers 
-        if($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
+        if ($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
             $this->careers = Career::all();
         }
 
@@ -57,7 +57,7 @@ new class extends Component {
 
     public function toggleEnrollment($subjectId)
     {
-        $user_id=session()->get('user_id');
+        $user_id = session()->get('user_id');
         if (in_array($subjectId, $this->enrolledSubjects)) {
             // Si ya está matriculado, eliminar la inscripción
             Enrollment::where('user_id', $user_id)
@@ -75,7 +75,8 @@ new class extends Component {
         }
     }
 
-    public function updated(){
+    public function updated()
+    {
         $this->loadSubjects();
         $this->loadEnrollments();
     }
@@ -83,24 +84,25 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-select label="Carrera para: {{ session()->get('user_id') }}" icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
+    <x-select label="Carrera para: {{ session()->get('user_id_name') }}" icon="o-academic-cap" :options="$careers"
+        wire:model.lazy="careerId" />
 
     <div class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
 
         @foreach($subjects as $subject)
-        <div class="border border-white/10 rounded-md text-black dark:text-white">
+            <div class="border border-white/10 rounded-md text-black dark:text-white">
 
-            <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
-                <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong></p>
+                <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
+                    <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong>
+                </p>
 
-            <div class="justify-end flex p-2 bg-gray-500/40">
-            <x-button label="{{ in_array($subject->id, $enrolledSubjects) ? 'Desmatricularse' : 'Matricularse' }}" wire:click="save" 
-                wire:click="toggleEnrollment({{ $subject->id }})"
-                class="btn-sm {{ in_array($subject->id, $enrolledSubjects) ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}"
-                />
+                <div class="justify-end flex p-2 bg-gray-500/40">
+                    <x-button label="{{ in_array($subject->id, $enrolledSubjects) ? 'Desmatricularse' : 'Matricularse' }}"
+                        wire:click="save" wire:click="toggleEnrollment({{ $subject->id }})"
+                        class="btn-sm {{ in_array($subject->id, $enrolledSubjects) ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}" />
+                </div>
+
             </div>
-
-        </div>
         @endforeach
 
     </div>

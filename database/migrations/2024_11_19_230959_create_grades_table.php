@@ -4,30 +4,34 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+class CreateConfigsTable extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * @return void
      */
-    public function up(): void
+    public function up()
     {
-        Schema::create('grades', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
-            $table->foreignId('subject_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
-            $table->unsignedTinyInteger('grade')->default(0); // Calificación.
-            $table->boolean('approved')->default(false); // Aprobado o no.
-            $table->unsignedTinyInteger('attendance')->default(0); // Asistencia (%).
-            $table->text('comments')->nullable(); // Comentarios.
+        Schema::create('configs', function (Blueprint $table) {
+            $table->string('id', 30);
+            $table->string('group', 30);
+            $table->string('description', 250);
+            $table->string('type', 5); // text, bool, int, radio, check, csv
+            $table->string('value', 250);
             $table->timestamps();
+            $table->primary('id');
+            $table->index('group')->unique();
         });
     }
 
     /**
      * Reverse the migrations.
+     *
+     * @return void
      */
-    public function down(): void
+    public function down()
     {
-        Schema::dropIfExists('grades');
+        Schema::dropIfExists('configs');
     }
-};
+}
