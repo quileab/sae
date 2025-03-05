@@ -16,4 +16,10 @@ class Subject extends Model
     {
         return $this->hasMany(Enrollment::class);
     }
+
+    // add attribute full_name
+    public function getFullNameAttribute()
+    {
+        return $this->name . ' / ' . $this->career->name;
+    }
 }

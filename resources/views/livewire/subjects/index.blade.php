@@ -20,12 +20,11 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->careers=\App\Models\Career::all();
+        $this->careers = \App\Models\Career::all();
         // if session career_id is set, use it
         if (session()->has('career_id')) {
             $this->career_id = session('career_id');
-        }
-        else {
+        } else {
             $this->career_id = $this->careers->first()->id;
         }
     }
@@ -101,29 +100,25 @@ new class extends Component {
     </x-header>
 
     <!-- TABLE  -->
-    <x-table :headers="$headers" :rows="$subjects" :sort-by="$sortBy"
-        striped link="/subject/{id}"
-        >
-        @scope('actions', $subject)
-        <x-dropdown>
-            <x-slot:trigger>
-                <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
-            </x-slot:trigger>
+    <x-card>
+        <x-table :headers="$headers" :rows="$subjects" :sort-by="$sortBy" striped link="/subject/{id}">
+            @scope('actions', $subject)
+            <x-dropdown>
+                <x-slot:trigger>
+                    <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
+                </x-slot:trigger>
 
-            <x-button icon="o-bookmark" wire:click="bookmark({{ $subject['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
-            {{-- <x-button icon="o-trash" wire:click="delete({{ $subject['id'] }})" wire:confirm="Are you sure?" spinner class="btn-ghost btn-sm text-red-500" /> --}}
-        </x-dropdown>
-        @endscope
-    </x-table>
-
+                <x-button icon="o-bookmark" label="Recordar" wire:click="bookmark({{ $subject['id'] }})" spinner
+                    class="btn-ghost btn-sm text-lime-500" />
+                {{-- <x-button icon="o-trash" wire:click="delete({{ $subject['id'] }})" wire:confirm="Are you sure?"
+                    spinner class="btn-ghost btn-sm text-red-500" /> --}}
+            </x-dropdown>
+            @endscope
+        </x-table>
+    </x-card>
     <x-drawer wire:model="drawer" title="Opciones" right separator with-close-button class="lg:w-1/3">
-        <x-choices-offline 
-        label="Carrera"
-        wire:model.live="career_id"
-        :options="$careers"
-        placeholder="Buscar..."
-        single
-        searchable />
+        <x-choices-offline label="Carrera" wire:model.live="career_id" :options="$careers" placeholder="Buscar..."
+            single searchable />
 
         <x-slot:actions>
             <x-button label="Cerrar" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />

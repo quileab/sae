@@ -36,8 +36,7 @@ new class extends Component {
 
     public function clearBookmark($type): void
     {
-        if ($type == 'cycle_id') {
-            
+        if ($type == 'cycle_id' || Auth::user()->hasAnyRole(['student', 'teacher', 'basic_user'])) {
             return;
         }
         session()->forget($type);
@@ -54,7 +53,7 @@ new class extends Component {
         @foreach (['user_id', 'career_id', 'subject_id', 'cycle_id'] as $key)
             @if(session()->get($key, false))
                 <div class="w-full">
-                    <x-button label="{{ session($key . '_name') }}" icon="o-bookmark-slash" class="btn-xs text-primary"
+                    <x-button label="{{ session($key . '_name') }}" icon="o-bookmark" class="btn-xs text-primary" responsive
                         wire:click="clearBookmark('{{ $key }}')" />
                 </div>
             @endif

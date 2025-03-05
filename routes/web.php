@@ -63,4 +63,5 @@ Route::middleware('auth')->group(function () {
   Volt::route('/configs', 'configs');
   Volt::route('/class-sessions', 'class_sessions.index');
   Volt::route('/class-session/{id?}', 'class_sessions.crud');
+  Volt::route('/class-sessions/students/{id?}', 'class_sessions.students');
 });

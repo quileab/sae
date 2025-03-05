@@ -102,4 +102,9 @@ class User extends Authenticatable
     {
         return in_array($role, array_column(self::$roles, 'id'));
     }
+
+    public function hasAnyRole($roles)
+    {
+        return in_array($this->role, $roles);
+    }
 }

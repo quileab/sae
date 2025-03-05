@@ -37,6 +37,7 @@ new class extends Component {
             ['key' => 'firstname', 'label' => 'Nombre', 'class' => 'w-full'],
             ['key' => 'phone', 'label' => 'Tel.', 'sortable' => false],
             ['key' => 'email', 'label' => 'E-mail', 'sortable' => false],
+            ['key' => 'role', 'label' => 'Rol', 'sortable' => false],
         ];
     }
 

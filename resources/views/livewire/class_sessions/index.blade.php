@@ -21,16 +21,11 @@ new class extends Component {
     public function mount(): void
     {
         $this->user = \App\Models\User::find(session('user_id')) ?: auth()->user();
-        $this->subjects = $this->user->subjects;
         $this->cycle = session('cycle_id');
+        $this->subjects = $this->user->subjects;
 
-        // prepend to subjects->name the career name
-        $this->subjects->transform(function ($subject) {
-            $subject->name = $subject->career->name . ': ' . $subject->name;
-            return $subject;
-        });
         try {
-            $this->subject_id = $this->subjects->first()->id;
+            $this->subject_id = session('subject_id') ?: $this->subject_id = $this->subjects->first()->id;
         } catch (\Exception $e) {
             $this->subject_id = null;
         }
@@ -39,7 +34,8 @@ new class extends Component {
     public function updatedSubjectId($value): void
     {
         $this->items();
-        $this->info('Materia cambiada.');
+        $this->info('Materia Seleccionada.' . $value);
+        $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $value]);
     }
 
     // Clear filters
@@ -57,11 +53,13 @@ new class extends Component {
             ['key' => 'type', 'label' => 'Clase', 'class' => 'w-10'],
             ['key' => 'content', 'label' => 'Contenido', 'class' => 'w-full'],
             ['key' => 'unit', 'label' => 'Unidad', 'sortable' => false],
+            ['key' => 'students', 'label' => 'Asistencia/Notas', 'sortable' => false],
         ];
     }
 
     public function items(): Collection
     {
+        $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $this->subject_id]);
         $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
         // return collection of items that belongs to user, subject and content matches search
         return ClassSession::whereYear('date', $this->cycle)
@@ -77,7 +75,6 @@ new class extends Component {
             ->sortBy($this->sortBy['column'], SORT_REGULAR, $this->sortBy['direction'])
             //->take(20)
         ;
-
     }
 
     public function with(): array
@@ -90,7 +87,7 @@ new class extends Component {
 
 }; ?>
 
-<div>
+<div wire:init="items">
     <!-- HEADER -->
     <x-header title="Libro de Temas">
         <x-slot:middle class="!justify-end">
@@ -107,14 +104,19 @@ new class extends Component {
                 <x-alert title="Sin materias" description="No tienes materias asignadas." icon="o-exclamation-triangle"
                     class="alert-warning" />
             @else
-                <x-select label="Materia" icon="o-queue-list" :options="$subjects" wire:model.lazy="subject_id" inline />
-                <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />
+                <x-select label="Materia" icon="o-queue-list" :options="$subjects" option-label="fullname"
+                    wire:model.lazy="subject_id" inline />
+                <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/class-session" />
             @endif
         </div>
 
         <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped link="/class-session/{id}">
             @scope('cell_date', $item)
             {{ Carbon\Carbon::parse($item->date)->format('d/m/Y') }}
+            @endscope
+            @scope('cell_students', $item)
+            <x-button label="Reg." icon="o-user-group" link="/class-sessions/students/{{ $item->id }}"
+                class="btn-primary btn-sm" />
             @endscope
         </x-table>
     </x-card>

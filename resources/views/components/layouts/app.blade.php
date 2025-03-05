@@ -55,9 +55,9 @@
                     <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
                     <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
                 </x-menu-sub>
-                <x-menu-sub title="Profesores" icon="o-user">
+                <x-menu-sub title="Clases" icon="o-document-duplicate">
                     <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
-                    <x-menu-item title="Mis Estudiantes" icon="o-user-group" link="#" />
+                    <x-menu-item title="Mis Estudiantes" icon="o-user-group" link="/class-sessions/students" />
                 </x-menu-sub>
                 <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
                     <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
