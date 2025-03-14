@@ -94,7 +94,7 @@ new class extends Component {
             icon="o-ellipsis-vertical"
             class="btn-ghost btn-circle btn-outline btn-sm" />
         </x-slot:menu>
-    <x-form wire:submit="save">    
+    <x-form wire:submit="save" no-separator>    
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
             <x-input label="ID" type="number" wire:model="data.id" />
             <x-select label="Carrera" icon="o-academic-cap" :options="$careers" wire:model.lazy="data.career_id" />

@@ -78,7 +78,7 @@ new class extends Component {
             <x-button @click="$wire.drawer = true" responsive icon="o-ellipsis-vertical"
                 class="btn-ghost btn-circle btn-outline btn-sm" />
         </x-slot:menu>
-        <x-form wire:submit="save">
+        <x-form wire:submit="save" no-separator>
             <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
                 <x-input label="Fecha" type="date" wire:model="data.date" />
                 <x-input label="Clase #" type="number" wire:model="data.class_number" />

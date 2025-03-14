@@ -60,6 +60,7 @@
                     <x-menu-item title="Mis Estudiantes" icon="o-user-group" link="/class-sessions/students" />
                 </x-menu-sub>
                 <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
+                    <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/configs/inscriptions" />
                     <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
                     <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="####" />
                 </x-menu-sub>

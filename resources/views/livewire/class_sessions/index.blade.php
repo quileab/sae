@@ -62,19 +62,19 @@ new class extends Component {
         $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $this->subject_id]);
         $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
         // return collection of items that belongs to user, subject and content matches search
-        return ClassSession::whereYear('date', $this->cycle)
-            ->where('subject_id', $this->subject_id)
-            ->when($this->search, function (Collection $collection) use ($search) {
-                return $collection->filter(function ($item) use ($search) {
-                    // Normalizar los caracteres latinos y convertir a minúsculas
-                    $fullSearch = Str::of($item['content'])->lower()->ascii();
-                    return str_contains($fullSearch, $search);
-                });
-            })
-            ->get()
-            ->sortBy($this->sortBy['column'], SORT_REGULAR, $this->sortBy['direction'])
-            //->take(20)
-        ;
+        $query = ClassSession::whereYear('date', $this->cycle)
+        ->where('subject_id', $this->subject_id);
+
+        if ($this->search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('content', 'like', '%' . $search . '%')
+                ->orWhere('activities', 'like', '%' . $search . '%');
+            });
+        }
+
+        return $query->orderBy($this->sortBy['column'], $this->sortBy['direction'])
+            ->get();
+
     }
 
     public function with(): array

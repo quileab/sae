@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Enrollment;
 
 class User extends Authenticatable
 {
@@ -56,11 +57,18 @@ class User extends Authenticatable
         ['id' => 'admin', 'name' => 'ADMIN'],
         ['id' => 'student', 'name' => 'Estudiante'],
         ['id' => 'teacher', 'name' => 'Profesor'],
-        ['id' => 'principal', 'name' => 'Director'],
+        ['id' => 'director', 'name' => 'Director'],
         ['id' => 'administrative', 'name' => 'Administrativo'],
         ['id' => 'treasurer', 'name' => 'Tesorero'],
         ['id' => 'user', 'name' => 'Usuario']
     ];
+
+    //public static function that reurns role name from id
+    public static function getRoleName(string $id): string
+    {
+        // return "name" from asociative array $roles[id=>'', name=>''], use id to return name
+        return array_column(self::$roles, 'name', 'id')[$id] ?? 'error';
+    }
     // users may have multiple careers
     public function careers(): BelongsToMany
     {
@@ -84,6 +92,10 @@ class User extends Authenticatable
     {
         return $this->hasMany('App\Models\Grade');
     }
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(Enrollment::class);
+    }
 
     public function payments(): HasMany
     {
@@ -93,10 +105,11 @@ class User extends Authenticatable
     // return true if the user has grade approved on date=2000-01-01
     public function enrolled($subject_id): bool
     {
-        return \App\Models\Grade::where('subject_id', $subject_id)->
-            //where('user_id', $user_id)->
-            where('date_id', '2000-01-01')->count() ? true : false;
+        return Enrollment::where('user_id', $this->id)
+            ->where('subject_id', $subject_id)
+            ->exists();
     }
+
 
     public static function hasRole($role)
     {

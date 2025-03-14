@@ -13,7 +13,7 @@ new class extends Component {
     public bool $drawer = false;
     public array $sortBy = ['column' => 'lastname', 'direction' => 'asc'];
 
-    public $role_student = 'student';
+    private $role_student = 'student';
     public $class_session;
     public $grades = [];
     public $data = [];
@@ -27,6 +27,15 @@ new class extends Component {
         }
         if ($id !== null) {
             $this->class_session = \App\Models\ClassSession::find($id);
+        } else {
+            $this->class_session = new \App\Models\ClassSession();
+            $this->class_session->id = null;
+            $this->class_session->subject_id = session('subject_id');
+            $this->class_session->teacher_id = session('user_id');
+            $this->class_session->date = now();
+            $this->class_session->class_number = 0;
+            $this->class_session->unit = '';
+            $this->class_session->content = '';
         }
     }
 
@@ -43,37 +52,35 @@ new class extends Component {
             ['key' => 'row_id', 'label' => '#', 'class' => 'w-10'],
             ['key' => 'lastname', 'label' => 'Apellido', 'class' => 'w-64'],
             ['key' => 'firstname', 'label' => 'Nombre', 'class' => 'w-full'],
-            ['key' => 'grades_attendance', 'label' => 'Asistencia', 'sortable' => false],
+            ['key' => 'attendance', 'label' => 'Asistencia', 'sortable' => false],
         ];
     }
 
     public function items(): Collection
     {
         $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
-        // return Users enrolled in subjects
-        $return = User::select(
-            'users.id',
-            'users.lastname',
-            'users.firstname',
-            'users.email',
-            'users.phone'
-        )
-            ->withAggregate('grades', 'attendance')
-            ->join('enrollments', 'users.id', '=', 'enrollments.user_id')
-            ->where([
-                ['enrollments.subject_id', '=', session('subject_id')],
-                ['enrollments.status', '=', 'active'],
-                ['users.role', '=', $this->role_student]
-            ])
-            ->where(function ($query) use ($search) {
-                $query->where('users.lastname', 'like', "%$search%")
-                    ->orWhere('users.firstname', 'like', "%$search%")
-                    ->orWhere('users.email', 'like', "%$search%");
+        $subjectId = session('subject_id');
+
+        // return collection of users enrolled in the subject and their grades filtered by search and ordered by column
+        $query = User::query()
+            ->select('users.id', 'users.lastname', 'users.firstname', 'users.email', 'users.phone')
+            ->leftJoin('enrollments', 'users.id', '=', 'enrollments.user_id')
+            ->leftJoin('grades', function ($join) {
+                $join->on('users.id', '=', 'grades.user_id')
+                    ->where('grades.class_session_id', '=', $this->class_session->id);
             })
+            ->where('enrollments.subject_id', $subjectId)
+            ->where('enrollments.status', 'active')
+            ->where('users.role', $this->role_student)
+
+            // ->where('users.lastname', 'like', "%{$search}%")
+            // ->orWhere('users.firstname', 'like', "%{$search}%")
+            // ->orWhere('users.email', 'like', "%{$search}%")
+
             ->orderBy($this->sortBy['column'], $this->sortBy['direction'])
-            ->get();
-        //dd($return, $this->role_student);
-        return $return;
+            ->addSelect('grades.grade as grade', 'grades.attendance as attendance');
+        //dd($query->get()->toArray());
+        return $query->get();
     }
 
     public function with(): array
@@ -86,6 +93,10 @@ new class extends Component {
 
     public function attendance($item): void
     {
+        if (isset($this->class_session->id) == false) {
+            $this->error('No se ha seleccionado una clase.');
+            return;
+        }
         $this->data = $item;
         try {
             $this->grades = \App\Models\Grade::where('user_id', $item['id'])
@@ -101,7 +112,31 @@ new class extends Component {
                 'comments' => ''
             ];
         }
+        $this->grades['approved'] = $this->grades['grade'] >= 6 ? true : false;
         $this->drawer = true;
+    }
+
+    public function saveGrade(): void
+    {
+        $this->validate([
+            'grades.attendance' => ['required', 'integer', 'min:0', 'max:100'],
+            'grades.grade' => ['required', 'integer', 'min:0', 'max:10'],
+            'grades.comments' => ['nullable', 'string', 'max:255']
+        ]);
+
+        \App\Models\Grade::updateOrCreate(
+            ['user_id' => $this->data['id'], 'class_session_id' => $this->class_session->id],
+            [
+                'user_id' => $this->data['id'],
+                'class_session_id' => $this->class_session->id,
+                'attendance' => $this->grades['attendance'],
+                'grade' => $this->grades['grade'],
+                'approved' => $this->grades['grade'] >= 6 ? 1 : 0,
+                'comments' => $this->grades['comments']
+            ]
+        );
+        $this->drawer = false;
+        $this->success('Calificación guardada.');
     }
 
     public function bookmark($id): void
@@ -169,21 +204,23 @@ new class extends Component {
 
         <x-input label="Asistencia" wire:model="grades.attendance" type="number" min="0" max="100" inline
             class="w-full" />
-        <div class="grid grid-cols-3 items-center gap-4 mt-4">
-            <x-button label="Ausente" icon="o-x-mark" class="btn-outline" wire:click="$set('grades.attendance', 0)" />
-            <x-button label="50" icon="o-check" class="btn-outline" wire:click="$set('grades.attendance', 50)" />
-            <x-button label="100" icon="o-check" class="btn-outline" wire:click="$set('grades.attendance', 100)" />
+        <div class="grid grid-cols-3 items-center gap-4 mt-2">
+            <x-button label="Ausente" icon="o-x-mark" class="btn-error btn-outline btn-sm"
+                wire:click="$set('grades.attendance', 0)" />
+            <x-button label="50" icon="o-check" class="btn-warning btn-outline btn-sm"
+                wire:click="$set('grades.attendance', 50)" />
+            <x-button label="100" icon="o-check" class="btn-success btn-outline btn-sm"
+                wire:click="$set('grades.attendance', 100)" />
         </div>
         <div class="grid grid-cols-2 items-center gap-4 mt-4">
             <x-input label="Calificación" wire:model="grades.grade" type="number" min="0" max="100" inline />
-            <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Es automático" readonly />
+            <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Es automático" disabled />
         </div>
         <div class="grid items-center gap-4 mt-4">
             <x-input label="Observaciones" wire:model="grades.comments" type="text" inline class="w-full" />
         </div>
         <x-slot:actions>
-            <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
-            <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
+            <x-button label="GUARDAR" icon="o-check" class="btn-primary" wire:click="saveGrade" spinner="saveGrade" />
         </x-slot:actions>
     </x-drawer>
 </div>

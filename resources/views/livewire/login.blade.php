@@ -41,7 +41,7 @@ class extends Component {
 
 <div>
     <x-header title="LOGIN" separator />
-        <x-form wire:submit="login">
+        <x-form wire:submit="login" no-separator>
             <x-input label="E-mail" wire:model="email" icon="o-envelope" inline />
             <x-input label="Password" wire:model="password" type="password" icon="o-key" inline />
      

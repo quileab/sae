@@ -20,6 +20,6 @@ class Subject extends Model
     // add attribute full_name
     public function getFullNameAttribute()
     {
-        return $this->name . ' / ' . $this->career->name;
+        return $this->career->name . '» ' . $this->name;
     }
 }

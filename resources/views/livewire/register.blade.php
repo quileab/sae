@@ -50,7 +50,7 @@ class extends Component {
 }; ?>
 
 <div>
-    <x-form wire:submit="register">
+    <x-form wire:submit="register" no-separator>
         <x-input label="Apellido" wire:model="lastname" icon="o-user" inline />
         <x-input label="Nombre/s" wire:model="name" icon="o-user" inline />
         <x-input label="Dirección" wire:model="address" icon="o-map-pin" inline />
