@@ -10,7 +10,6 @@ new class extends Component {
 
     public string $search = '';
     public string $filterRole = '';
-    public bool $drawer = false;
     public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
 
     public $row_decoration;
@@ -74,12 +73,12 @@ new class extends Component {
 
 <div>
     <!-- HEADER -->
-    <x-header title="Usuarios" separator progress-indicator>
+    <x-header title="Usuarios">
         <x-slot:middle class="!justify-end">
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
         <x-slot:actions>
-            <x-button label="Filters" @click="$wire.drawer = true" responsive icon="o-funnel" />
+            <x-button label="NUEVO" link="/user/" responsive icon="o-user-plus" class="btn-success" />
         </x-slot:actions>
     </x-header>
 
@@ -110,12 +109,4 @@ new class extends Component {
         </x-table>
     </x-card>
 
-    <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Filters" right separator with-close-button class="lg:w-1/3">
-        <x-choices label="Single" wire:model="user_id" :options="$users" single />
-        <x-slot:actions>
-            <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
-            <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
-        </x-slot:actions>
-    </x-drawer>
 </div>

@@ -21,30 +21,37 @@ class PrintInscriptionsController extends Controller
         $this->config += \App\Models\Configs::where('group', 'inscriptions')->get()->pluck('description', 'id')->toArray();
     }
 
+    public function inscriptions($student, $insc_conf_id)
+    { 
+        return \App\Models\Inscriptions::where('user_id', $student->id)
+        ->where('configs_id', $insc_conf_id)->orderBy('subject_id')->get();
+    }
+
     public function index(User $student, Career $career, string $insc_conf_id)
     {
-        $inscriptions = \App\Models\Inscriptions::where('user_id', $student->id)->
-          where('name', $insc_conf_id)->get();
+        $inscriptions = $this->inscriptions($student, $insc_conf_id);
         $config = $this->config;
 
-        //dd($inscriptions,$config);
         // this enables static method calls on the PDF class
         $pdf = app('dompdf.wrapper');
-        $pdf->loadView('pdf.inscriptionsPDF',
-            compact('inscriptions', 'student', 'career', 'config', 'insc_conf_id'));
+        $pdf->loadView(
+            'pdf.inscriptionsPDF',
+            compact('inscriptions', 'student', 'career', 'config', 'insc_conf_id')
+        );
 
         return $pdf->stream('preview.pdf');
     }
 
     public function savePDF(User $student, Career $career, string $insc_conf_id)
     {
-        $inscriptions = \App\Models\Inscriptions::where('user_id', $student->id)->
-          where('name', $insc_conf_id)->get();
+        $inscriptions = $this->inscriptions($student, $insc_conf_id);
         $config = $this->config;
         // this enables static method calls on the PDF class
         $pdf = app('dompdf.wrapper');
-        $pdf->loadView('inscriptionsPDF',
-            compact('inscriptions', 'student', 'career', 'config', 'insc_conf_id'));
+        $pdf->loadView(
+            'pdf.inscriptionsPDF',
+            compact('inscriptions', 'student', 'career', 'config', 'insc_conf_id')
+        );
         $content = $pdf->download()->getOriginalContent();
         Storage::put("private/inscriptions/insc-$student->id-$career->id-$insc_conf_id-.pdf", $content);
 

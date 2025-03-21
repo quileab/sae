@@ -1,8 +1,11 @@
 <?php
 
 use Livewire\Volt\Volt;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\BookmarkController;
+use App\Http\Controllers\print\PrintInscriptionsController;
 
 Route::get('/', function () {
   return view('dashboard');
@@ -15,7 +18,7 @@ Volt::route('/login', 'login')->name('login');
 Route::middleware('auth')->group(function () {
 
   Route::get('/logout', function () {
-    auth()->logout();
+    Auth::logout();
     request()->session()->invalidate();
     request()->session()->regenerateToken();
     return redirect('/');
@@ -45,6 +48,9 @@ Route::middleware('auth')->group(function () {
     }
     return "<pre>" . print_r($logs, true) . "</pre><hr />";
   });
+
+  Route::get('/inscriptionsPDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'index'])->name('inscriptionsPDF');
+  Route::get('/inscriptionsSavePDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'savePDF'])->name('inscriptionsSavePDF');
 
   Route::prefix('bookmark')->group(function () {
     Route::get('/', [BookmarkController::class, 'index']);        // Ver el bookmark actual

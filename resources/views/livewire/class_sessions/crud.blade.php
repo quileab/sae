@@ -47,7 +47,9 @@ new class extends Component {
             $this->data['teacher_id'] = $user_id;
             $subject = \App\Models\Subject::find(session('subject_id'));
             $this->data['subject_id'] = $subject->id;
-
+            // set date to string now 
+            $this->data['date'] = date('Y-m-d');
+            $this->data['class_number'] = \App\Models\ClassSession::where('subject_id', $subject->id)->max('class_number') + 1;
         }
     }
 

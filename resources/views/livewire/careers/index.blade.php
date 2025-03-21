@@ -37,14 +37,14 @@ new class extends Component {
     {
         $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
         return Career::get()
-        ->sortBy($this->sortBy) // Asegúrate de que $this->sortBy sea válido
-        ->when($this->search, function (Collection $collection) use ($search) {
-            return $collection->filter(function ($item) use ($search) {
-                // Normalizar los caracteres latinos y convertir a minúsculas
-                $fullSearch = Str::of($item['name'] . ' ' . $item['id'])->lower()->ascii();
-                return str_contains($fullSearch, $search);
-            });
-        })->take(20);
+            ->sortBy($this->sortBy) // Asegúrate de que $this->sortBy sea válido
+            ->when($this->search, function (Collection $collection) use ($search) {
+                return $collection->filter(function ($item) use ($search) {
+                    // Normalizar los caracteres latinos y convertir a minúsculas
+                    $fullSearch = Str::of($item['name'] . ' ' . $item['id'])->lower()->ascii();
+                    return str_contains($fullSearch, $search);
+                });
+            })->take(20);
     }
 
     public function with(): array
@@ -63,7 +63,7 @@ new class extends Component {
 
 <div>
     <!-- HEADER -->
-    <x-header title="Carreras" separator progress-indicator>
+    <x-header title="Carreras">
         <x-slot:middle class="!justify-end">
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
@@ -74,9 +74,7 @@ new class extends Component {
 
     <!-- TABLE  -->
     <x-card>
-        <x-table :headers="$headers" :rows="$careers" :sort-by="$sortBy"
-            striped link="/career/{id}"
-            >
+        <x-table :headers="$headers" :rows="$careers" :sort-by="$sortBy" striped link="/career/{id}">
             @scope('cell_allow_enrollments', $career)
             <x-icon :name="$career['allow_enrollments'] ? 'o-check' : 'o-x-mark'" :class="$career['allow_enrollments'] ? 'text-success' : 'text-error'" />
             @endscope
@@ -84,14 +82,15 @@ new class extends Component {
             @scope('cell_allow_evaluations', $career)
             <x-icon :name="$career['allow_evaluations'] ? 'o-check' : 'o-x-mark'" :class="$career['allow_evaluations'] ? 'text-success' : 'text-error'" />
             @endscope
-            
+
             @scope('actions', $career)
             <x-dropdown>
                 <x-slot:trigger>
                     <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
                 </x-slot:trigger>
 
-                <x-button icon="o-bookmark" wire:click="bookmark({{ $career['id'] }})" spinner class="btn-ghost btn-sm text-lime-500" />
+                <x-button icon="o-bookmark" wire:click="bookmark({{ $career['id'] }})" spinner
+                    class="btn-ghost btn-sm text-lime-500" />
             </x-dropdown>
             @endscope
         </x-table>
@@ -99,7 +98,8 @@ new class extends Component {
 
     <!-- FILTER DRAWER -->
     <x-drawer wire:model="drawer" title="Opciones" right separator with-close-button class="lg:w-1/3">
-        <x-input placeholder="buscar..." wire:model.live.debounce="search" icon="o-magnifying-glass" @keydown.enter="$wire.drawer = false" />
+        <x-input placeholder="buscar..." wire:model.live.debounce="search" icon="o-magnifying-glass"
+            @keydown.enter="$wire.drawer = false" />
 
         <x-slot:actions>
             <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />

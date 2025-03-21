@@ -18,18 +18,17 @@ new class extends Component {
     {
         if (session()->has('user_id')) {
             $user = \App\Models\User::find(session('user_id'));
-            $this->careers = $user->careers;
         } else {
             $user = auth()->user();
-            $this->careers = Career::all();
             // display error message
             $this->warning('No se ha seleccionado Usuario.');
             $this->modal = true;
         }
         //if user is admin, principal, administrative, get all careers 
-        if ($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
-            $this->careers = Career::all();
-        }
+        // if ($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
+        //     $this->careers = Career::all();
+        // }
+        $this->careers = $user->careers;
 
         $careerId = (session()->has('career_id')) ? session('career_id') : $this->careers->first()->id;
 
@@ -84,13 +83,13 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-select label="Carrera para: {{ session()->get('user_id_name') }}" icon="o-academic-cap" :options="$careers"
-        wire:model.lazy="careerId" />
+    <h1 class="text-2xl font-bold">Materias » {{ session()->get('user_id_name') }}</h1>
+    <x-select icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
 
-    <div class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
 
         @foreach($subjects as $subject)
-            <div class="border border-white/10 rounded-md text-black dark:text-white">
+            <div class="border border-white/10 rounded-lg overflow-hidden text-black dark:text-white">
 
                 <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
                     <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong>

@@ -31,19 +31,20 @@ new class extends Component {
     public function mount($id = null)
     {
         $this->roles = \App\Models\Role::all();
+        $this->careers = \App\Models\Career::where(
+            ['allow_enrollments' => true, 'allow_evaluations' => true]
+        )->get();
+        $this->career_id = $this->careers->first()->id;
+
         if ($id === null) {
             $id = session('user_id');
         }
 
         if ($id !== null) {
             $this->data = User::find($id)->toArray();
+            $this->data['careers'] = User::find($id)->careers;
         }
 
-        $this->careers = \App\Models\Career::where(
-            ['allow_enrollments' => true, 'allow_evaluations' => true]
-        )->get();
-        $this->career_id = $this->careers->first()->id;
-        $this->data['careers'] = User::find($id)->careers;
     }
 
     public function save()

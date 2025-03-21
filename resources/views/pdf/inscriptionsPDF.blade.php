@@ -3,36 +3,39 @@
     font-family: Arial, Helvetica, sans-serif
   }
 
-  h2{
-    margin: 0rem;
-    padding: 0rem;
-  }
-  h4{
+  h2 {
     margin: 0rem;
     padding: 0rem;
   }
 
-  table{
-    width:100%; border:1px solid; border-collapse:collapse;
+  h4 {
+    margin: 0rem;
+    padding: 0rem;
   }
 
-  table td, table th{
-    border:1px solid;
-    padding:0.4rem 0.5rem;
+  table {
+    width: 100%;
+    border: 1px solid;
+    border-collapse: collapse;
   }
 
-  .right{
-    text-align:right;
+  table td,
+  table th {
+    border: 1px solid;
+    padding: 0.4rem 0.5rem;
   }
 
+  .right {
+    text-align: right;
+  }
 </style>
 
 <div>
   <h2>{{ $config['shortname'] }} - {{ $config['longname'] }}</h2>
-  <h4>{{ $config[$insc_conf_id] }} - 
+  <h4>{{ $config[$insc_conf_id] }} -
     {{ $career->id }}: {{ $career->name }}
   </h4>
-<br />
+  <br />
   <table>
     <tr>
       <td>
@@ -40,7 +43,7 @@
         <small>({{$student->id}}) {{$student->email}} - {{$student->phone}}</small>
       </td>
       <td class='right'>
-        {{ date('d-m-Y H:i', strtotime(now())) }}    
+        {{ date('d-m-Y H:i', strtotime(now())) }}
       </td>
     </tr>
   </table>
@@ -58,16 +61,16 @@
     </thead>
     <tbody>
       @foreach ($inscriptions as $inscription)
-        @if ($inscription->subject['career_id']==$career->id)    
-        <tr>
-          <td>{{ $inscription->subject_id }}</td>
-          <td>{{ $inscription->subject['name'] }}</td>      
-          <td>{{ $inscription->value }}</td>
-          <td></td>
-          <td></td>
-        </tr>
-        @endif
-      @endforeach
+      @if ($inscription->subject['career_id'] == $career->id)
+      <tr>
+      <td>{{ $inscription->subject_id }}</td>
+      <td>{{ $inscription->subject['name'] }}</td>
+      <td>{{ $inscription->value }}</td>
+      <td></td>
+      <td></td>
+      </tr>
+    @endif
+    @endforeach
     </tbody>
   </table>
 </div>

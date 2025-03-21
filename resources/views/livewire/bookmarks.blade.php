@@ -14,15 +14,15 @@ new class extends Component {
         switch ($data['type']) {
             case 'user_id':
                 $user = \App\Models\User::find($data['value']);
-                $this->shortName = substr($user['lastname'] . ' ' . $user['firstname'], 0, 20);
+                $this->shortName = substr($user['lastname'] . ' ' . $user['firstname'], 0, 30);
                 break;
             case 'career_id':
                 $career = \App\Models\Career::find($data['value']);
-                $this->shortName = substr($career['id'] . ' ' . $career['name'], 0, 20);
+                $this->shortName = substr($career['id'] . ' ' . $career['name'], 0, 30);
                 break;
             case 'subject_id':
                 $subject = \App\Models\Subject::find($data['value']);
-                $this->shortName = substr($subject['id'] . ' ' . $subject['name'], 0, 20);
+                $this->shortName = substr($subject['id'] . ' ' . $subject['name'], 0, 30);
                 break;
             case 'cycle_id':
                 $this->shortName = $data['value'];

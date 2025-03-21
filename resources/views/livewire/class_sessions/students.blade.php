@@ -148,7 +148,7 @@ new class extends Component {
 
 <div>
     <!-- HEADER -->
-    <x-header title="Estudiantes" separator progress-indicator>
+    <x-header title="Estudiantes">
         <x-slot:middle class="!justify-end">
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>

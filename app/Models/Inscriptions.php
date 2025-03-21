@@ -8,4 +8,9 @@ class Inscriptions extends Model
 {
     protected $guarded = ['id'];
     public $timestamps = false;
+
+    public function subject()
+    {
+        return $this->belongsTo('App\Models\Subject');
+    }
 }

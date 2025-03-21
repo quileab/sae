@@ -160,6 +160,10 @@ new class extends Component {
             <x-button label="Filters" @click="$wire.drawer = true" responsive icon="o-funnel" />
         </x-slot:actions>
     </x-header>
+    {{-- if return with message --}}
+    @if (session()->has('success'))
+        <x-alert icon="o-information-circle" title="{{ session('success') }}" class="alert-success" dismissible />
+    @endif
 
     <!-- TABLE  -->
     <x-card>
@@ -174,6 +178,10 @@ new class extends Component {
                     <div></div>
                 @endif
                 <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
+                <x-button label="Previsualizar" icon="o-eye" class="btn-warning mt-7"
+                    link="/inscriptionsPDF/{{ $user->id }}/{{ $career_id }}/{{ $inscription_id }}" external />
+                <x-button label="Enviar" icon="o-paper-airplane" class="btn-success mt-7"
+                    link="/inscriptionsSavePDF/{{ $user->id }}/{{ $career_id }}/{{ $inscription_id }}" />
             </div>
         </div>
         <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped>
