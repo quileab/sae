@@ -13,4 +13,13 @@ class Inscriptions extends Model
     {
         return $this->belongsTo('App\Models\Subject');
     }
+
+    public function user()
+    {
+        return $this->belongsTo('App\Models\User');
+    }
+    public function career()
+    {
+        return $this->belongsTo('App\Models\Career');
+    }
 }

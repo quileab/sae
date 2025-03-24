@@ -7,13 +7,13 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\print\PrintInscriptionsController;
 
-Route::get('/', function () {
-  return view('dashboard');
-});
 
 // Users will be redirected to this route if not logged in
 Volt::route('/login', 'login')->name('login');
 // Volt::route('/register', 'register'); 
+Route::get('/', function () {
+  return redirect('/dashboard'); //view('dashboard');
+});
 
 Route::middleware('auth')->group(function () {
 
@@ -29,11 +29,11 @@ Route::middleware('auth')->group(function () {
     $maintenance = ($option == "cache") ? [
       'Flush' => 'cache:flush',
     ] : [
-      //'DebugBar'=>'debugbar:clear',
-      //'Storage Link'=>'storage:link',
+      'DebugBar' => 'debugbar:clear',
+      'Storage Link' => 'storage:link',
       'Config' => 'config:clear',
       'Optimize Clear' => 'optimize:clear',
-      //'Optimize'=>'optimize',
+      'Optimize' => 'optimize',
       'Route Clear' => 'route:clear',
       'Cache' => 'cache:clear',
     ];
@@ -46,7 +46,13 @@ Route::middleware('auth')->group(function () {
         $logs[$key] = '❌' . $e->getMessage();
       }
     }
-    return "<pre>" . print_r($logs, true) . "</pre><hr />";
+    // table format output
+    $output = '<table><tr><th>Task</th><th>Result</th></tr>';
+    foreach ($logs as $key => $value) {
+      $output .= '<tr><td>' . $key . '</td><td>' . $value . '</td></tr>';
+    }
+    $output .= '</table>';
+    return $output;
   });
 
   Route::get('/inscriptionsPDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'index'])->name('inscriptionsPDF');
@@ -58,6 +64,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/clear', [BookmarkController::class, 'clear']);  // Limpiar los bookmarks
   });
 
+  // route for pdfs stored in private storage
+  Route::get('inscriptions/pdf/{file}', function ($file) {
+    return response()->file(storage_path('app/private/private/inscriptions/' . $file));
+  });
+
   Volt::route('/dashboard', 'dashboard');
   Volt::route('/users', 'users.index');
   Volt::route('/user/{id?}', 'users.crud');
@@ -67,7 +78,9 @@ Route::middleware('auth')->group(function () {
   Volt::route('/subject/{id?}', 'subjects.crud');
   Volt::route('/enrollments', 'enrollment');
   Volt::route('/configs', 'configs');
-  Volt::route('/configs/inscriptions', 'configs.inscriptions');
+  Volt::route('/inscriptions', 'inscriptions.crud');
+  Volt::route('/inscriptions/list', 'inscriptions.index');
+  Volt::route('/inscriptions/pdfs', 'inscriptions.indexpdfs');
   Volt::route('/class-sessions', 'class_sessions.index');
   Volt::route('/class-session/{id?}', 'class_sessions.crud');
   Volt::route('/class-sessions/students/{id?}', 'class_sessions.students');

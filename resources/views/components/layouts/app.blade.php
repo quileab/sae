@@ -35,7 +35,7 @@
             {{-- MENU --}}
             <x-menu activate-by-route>
 
-                {{-- User --}}
+                {{-- SETEO User --}}
                 @if($user = auth()->user())
                     <x-list-item :item="$user" value="name" sub-value="email" no-separator no-hover
                         class="-mx-2 !-mt-2 rounded bg-black/20">
@@ -59,11 +59,21 @@
                     <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
                     <x-menu-item title="Mis Estudiantes" icon="o-user-group" link="/class-sessions/students" />
                 </x-menu-sub>
-                <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
-                    <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/configs/inscriptions" />
-                    <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
-                    <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="####" />
-                </x-menu-sub>
+                <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
+                @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                    <x-menu-sub title="Admin Inscripciones" icon="o-clipboard-document-check">
+                @endif
+                    @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
+                        <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
+                    @endif
+                    @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                            <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
+                        </x-menu-sub>
+                        <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
+                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
+                            <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
+                        </x-menu-sub>
+                    @endif
             </x-menu>
         </x-slot:sidebar>
 

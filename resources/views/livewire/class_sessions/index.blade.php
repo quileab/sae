@@ -63,12 +63,12 @@ new class extends Component {
         $search = Str::of($this->search)->lower()->ascii(); // Convertir la búsqueda a minúsculas y eliminar acentos
         // return collection of items that belongs to user, subject and content matches search
         $query = ClassSession::whereYear('date', $this->cycle)
-        ->where('subject_id', $this->subject_id);
+            ->where('subject_id', $this->subject_id);
 
         if ($this->search) {
             $query->where(function ($q) use ($search) {
                 $q->where('content', 'like', '%' . $search . '%')
-                ->orWhere('activities', 'like', '%' . $search . '%');
+                    ->orWhere('activities', 'like', '%' . $search . '%');
             });
         }
 
@@ -122,14 +122,11 @@ new class extends Component {
     </x-card>
 
     <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Opciones" right separator with-close-button class="lg:w-1/3">
-        <x-input placeholder="buscar..." wire:model.live.debounce="search" icon="o-magnifying-glass"
-            @keydown.enter="$wire.drawer = false" />
-
+    <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
         <x-slot:actions>
             <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />
-            <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
             <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
+            <x-button label="Imprimir" icon="o-printer" class="btn-primary" @click="$wire.drawer = false" />
         </x-slot:actions>
     </x-drawer>
 </div>

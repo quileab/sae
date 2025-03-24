@@ -110,7 +110,6 @@ class User extends Authenticatable
             ->exists();
     }
 
-
     public static function hasRole($role)
     {
         return in_array($role, array_column(self::$roles, 'id'));
@@ -119,5 +118,11 @@ class User extends Authenticatable
     public function hasAnyRole($roles)
     {
         return in_array($this->role, $roles);
+    }
+
+    // full name attribute
+    public function getFullNameAttribute(): string
+    {
+        return $this->lastname . ', ' . $this->firstname;
     }
 }

@@ -49,7 +49,17 @@ new class extends Component {
 
     public function save()
     {
-        User::updateOrCreate(['id' => $this->data['id']], $this->data);
+        $data = [];
+        $data['id'] = $this->data['id'];
+        $data['name'] = $this->data['name'];
+        $data['email'] = $this->data['email'];
+        $data['firstname'] = $this->data['firstname'];
+        $data['lastname'] = $this->data['lastname'];
+        $data['phone'] = $this->data['phone'];
+        $data['role'] = $this->data['role'];
+        $data['enabled'] = $this->data['enabled'];
+        //dd($data);
+        User::updateOrCreate(['id' => $data['id']], $data);
         $this->success('Usuario guardado.');
         $this->redirect('/users');
     }
