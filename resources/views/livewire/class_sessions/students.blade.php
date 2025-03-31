@@ -18,8 +18,13 @@ new class extends Component {
     public $grades = [];
     public $data = [];
 
-    public function mount($id = null): void
+    public function mount($id = null)
     {
+        // check if user is logged in and has teacher role
+        if (!auth()->user()->hasAnyRole(['teacher', 'admin', 'principal', 'administrative'])) {
+            return redirect()->back();
+        }
+
         //$this->user = User::find(session('user_id')) ?: auth()->user();
         //$this->role_student = \App\Models\Role::where('name', 'student')->first()->name;
         if (session()->get('subject_id', false) == false) {
@@ -36,6 +41,13 @@ new class extends Component {
             $this->class_session->class_number = 0;
             $this->class_session->unit = '';
             $this->class_session->content = '';
+        }
+        //check if class session subject_id belongs to this user
+        if (
+            $this->class_session->subject_id != session('subject_id') ||
+            auth()->user()->hasSubject(session('subject_id') == false)
+        ) {
+            $this->redirect('/class-sessions');
         }
     }
 

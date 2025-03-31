@@ -15,6 +15,37 @@ Route::get('/', function () {
   return redirect('/dashboard'); //view('dashboard');
 });
 
+Route::get('/clear/{option?}', function ($option = null) {
+  $logs = [];
+  $maintenance = ($option == "cache") ? [
+    'Flush' => 'cache:flush',
+  ] : [
+    'DebugBar' => 'debugbar:clear',
+    'Storage Link' => 'storage:link',
+    'Config' => 'config:clear',
+    'Optimize Clear' => 'optimize:clear',
+    //'Optimize' => 'optimize',
+    'Route Clear' => 'route:clear',
+    'Cache' => 'cache:clear',
+  ];
+
+  foreach ($maintenance as $key => $value) {
+    try {
+      Artisan::call($value);
+      $logs[$key] = '✔️';
+    } catch (\Exception $e) {
+      $logs[$key] = '❌' . $e->getMessage();
+    }
+  }
+  // table format output
+  $output = '<table><tr><th>Task</th><th>Result</th></tr>';
+  foreach ($logs as $key => $value) {
+    $output .= '<tr><td>' . $key . '</td><td>' . $value . '</td></tr>';
+  }
+  $output .= '</table>';
+  return $output;
+});
+
 Route::middleware('auth')->group(function () {
 
   Route::get('/logout', function () {
@@ -22,37 +53,6 @@ Route::middleware('auth')->group(function () {
     request()->session()->invalidate();
     request()->session()->regenerateToken();
     return redirect('/');
-  });
-
-  Route::get('/clear/{option?}', function ($option = null) {
-    $logs = [];
-    $maintenance = ($option == "cache") ? [
-      'Flush' => 'cache:flush',
-    ] : [
-      'DebugBar' => 'debugbar:clear',
-      'Storage Link' => 'storage:link',
-      'Config' => 'config:clear',
-      'Optimize Clear' => 'optimize:clear',
-      'Optimize' => 'optimize',
-      'Route Clear' => 'route:clear',
-      'Cache' => 'cache:clear',
-    ];
-
-    foreach ($maintenance as $key => $value) {
-      try {
-        Artisan::call($value);
-        $logs[$key] = '✔️';
-      } catch (\Exception $e) {
-        $logs[$key] = '❌' . $e->getMessage();
-      }
-    }
-    // table format output
-    $output = '<table><tr><th>Task</th><th>Result</th></tr>';
-    foreach ($logs as $key => $value) {
-      $output .= '<tr><td>' . $key . '</td><td>' . $value . '</td></tr>';
-    }
-    $output .= '</table>';
-    return $output;
   });
 
   Route::get('/inscriptionsPDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'index'])->name('inscriptionsPDF');
@@ -70,18 +70,19 @@ Route::middleware('auth')->group(function () {
   });
 
   Volt::route('/dashboard', 'dashboard');
-  Volt::route('/users', 'users.index');
-  Volt::route('/user/{id?}', 'users.crud');
-  Volt::route('/careers', 'careers.index');
-  Volt::route('/career/{id?}', 'careers.crud');
-  Volt::route('/subjects', 'subjects.index');
-  Volt::route('/subject/{id?}', 'subjects.crud');
-  Volt::route('/enrollments', 'enrollment');
-  Volt::route('/configs', 'configs');
-  Volt::route('/inscriptions', 'inscriptions.crud');
-  Volt::route('/inscriptions/list', 'inscriptions.index');
-  Volt::route('/inscriptions/pdfs', 'inscriptions.indexpdfs');
-  Volt::route('/class-sessions', 'class_sessions.index');
-  Volt::route('/class-session/{id?}', 'class_sessions.crud');
-  Volt::route('/class-sessions/students/{id?}', 'class_sessions.students');
+  Volt::route('/users', 'users.index')->middleware('roles:admin,principal,administrative');
+  Volt::route('/user/{id?}', 'users.crud')->middleware('roles:admin,principal,administrative');
+  Volt::route('/users/import', 'users.import')->middleware('roles:admin,principal,administrative');
+  Volt::route('/careers', 'careers.index')->middleware('roles:admin,principal,administrative');
+  Volt::route('/career/{id?}', 'careers.crud')->middleware('roles:admin,principal,administrative');
+  Volt::route('/subjects', 'subjects.index')->middleware('roles:admin,principal,administrative');
+  Volt::route('/subject/{id?}', 'subjects.crud')->middleware('roles:admin,principal,administrative');
+  Volt::route('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,administrative');
+  Volt::route('/configs', 'configs')->middleware('roles:admin,principal,administrative');
+  Volt::route('/inscriptions', 'inscriptions.crud')->middleware('roles:admin,student,principal,administrative');
+  Volt::route('/inscriptions/list', 'inscriptions.index')->middleware('roles:admin,teacher,principal,administrative');
+  Volt::route('/inscriptions/pdfs', 'inscriptions.indexpdfs')->middleware('roles:admin,principal,administrative');
+  Volt::route('/class-sessions', 'class_sessions.index')->middleware('roles:admin,teacher,principal,administrative');
+  Volt::route('/class-session/{id?}', 'class_sessions.crud')->middleware('roles:admin,teacher,principal,administrative');
+  Volt::route('/class-sessions/students/{id?}', 'class_sessions.students')->middleware('roles:admin,teacher,principal,administrative');
 });

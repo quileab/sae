@@ -50,6 +50,10 @@ new class extends Component {
     public function save()
     {
         $data = [];
+        //check if user not exists assign password
+        if (!User::find($this->data['id'])) {
+            $data['password'] = $this->data['id'];
+        }
         $data['id'] = $this->data['id'];
         $data['name'] = $this->data['name'];
         $data['email'] = $this->data['email'];
@@ -62,6 +66,16 @@ new class extends Component {
         User::updateOrCreate(['id' => $data['id']], $data);
         $this->success('Usuario guardado.');
         $this->redirect('/users');
+    }
+
+    public function changePassword()
+    {
+        $user = User::find($this->data['id']);
+        $user->password = $this->data['password'];
+        $user->save();
+        $this->success('Contraseña cambiada.');
+        $this->drawer = false;
+        $this->skipRender();
     }
 
     public function assignCareer()
@@ -143,7 +157,7 @@ new class extends Component {
     <!-- DRAWER -->
     <x-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
         class="lg:w-1/3">
-        <x-input inline label="Password" wire:model="newPassword" type="text" icon="o-key" error-field="newPassword">
+        <x-input inline label="Password" wire:model="data.password" type="text" icon="o-key" error-field="newPassword">
             <x-slot:append>
                 <x-button label="Cambiar Clave" icon="o-check" class="btn-primary rounded-s-none"
                     wire:click="changePassword" spinner="changePassword" />

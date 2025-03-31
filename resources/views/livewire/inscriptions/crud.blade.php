@@ -32,17 +32,20 @@ new class extends Component {
 
     public $temp = [];
 
-    private $isAdmin = false;
     private $admin_id = null;
 
     public function mount()
     {
         $this->user = \App\Models\User::find(session('user_id')) ?: auth()->user();
-        $this->isAdmin = $this->user->hasAnyRole(['admin', 'principal', 'administrative']);
-        if ($this->isAdmin) {
+        if ($this->user->enabled == false) {
+            return;
+        }
+        // si es admin, principal o administrative
+        if ($this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
             $this->inscriptions = \App\Models\Configs::where('group', 'inscriptions')->get();
             $this->careers = \App\Models\Career::where('allow_enrollments', true)
                 ->where('allow_evaluations', true)->get();
+            $this->admin_id = \App\Models\User::where('name', 'admin')->first()->id;
         } else {
             $this->inscriptions = \App\Models\Configs::where('group', 'inscriptions')
                 ->where('value', 'true')
@@ -77,7 +80,7 @@ new class extends Component {
 
     public function items(): Collection
     {
-        if (count($this->inscriptions) === 0 ) {
+        if (count($this->inscriptions) === 0) {
             return collect([]);
         }
         $this->info('Cargando...', timeout: 2000);
@@ -113,6 +116,7 @@ new class extends Component {
 
         $this->subjects = $subjects->keyBy('id')->toArray();
         //dump($this->admin_id, $this->subjects, $subjects, $inscriptions);
+        $this->skipMount();
         return $subjects;
     }
 
@@ -126,19 +130,19 @@ new class extends Component {
 
     public function save()
     {
+        $isAdmin = auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']);
+        // which user Admin or Student?
+        $isAdmin ? $user = $this->admin_id : $user = $this->user->id;
+
         foreach ($this->subjects as $subject_id => $value) {
             // dd($subject_id, $value);
             $inscription = \App\Models\Inscriptions::firstOrNew([
-                'user_id' => $this->user->id,
+                'user_id' => $user,
                 'subject_id' => $subject_id,
                 'configs_id' => $this->inscription_id
             ]);
-            // check if user is student
-            if ($this->user->hasRole('student')) {
-                $save_value = $value['selected'];
-            } else {
-                $save_value = $value['value'];
-            }
+            // check if not admin 
+            !$isAdmin ? $save_value = $value['selected'] : $save_value = $value['value'];
 
             if ($save_value == '') {
                 $inscription->delete();
@@ -162,9 +166,9 @@ new class extends Component {
         <x-slot:middle class="!justify-end">
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
-        <x-slot:actions>
+        {{-- <x-slot:actions>
             <x-button label="OPCIONES" @click="$wire.drawer = true" responsive icon="o-bars-3" />
-        </x-slot:actions>
+        </x-slot:actions> --}}
     </x-header>
     {{-- if return with message --}}
     @if (session()->has('success'))
@@ -178,15 +182,20 @@ new class extends Component {
             <x-select wire:model.lazy="inscription_id" label="Inscripciones a" :options="$inscriptions"
                 option-value="id" option-label="description" />
             <x-select wire:model.lazy="career_id" label="Carrera" :options="$careers" />
-            <div class="grid grid-cols-2 gap-2">
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
-                    <x-select label="Tipo" wire:model.lazy="type" :options="$types" />
-                @else
-                    <x-button label="Confirmar" @click="$wire.drawer = true" responsive icon="o-bars-3"
-                        class="btn-secondary mt-7" />
-                @endif
-                <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
-            </div>
+            @if($user->enabled)
+                <div class="grid grid-cols-2 gap-2">
+                    @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                        <x-select label="Tipo" wire:model.lazy="type" :options="$types" />
+                    @else
+                        <x-button label="Confirmar" @click="$wire.drawer = true" responsive icon="o-bars-3"
+                            class="btn-secondary mt-7" />
+                    @endif
+                    <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
+                </div>
+            @else
+                <x-alert title="Se ha encontrado un error. Verifique con Tesorería	" icon="o-exclamation-triangle"
+                    class="alert-error" shadow />
+            @endif
         </div>
         <div class="z-10">
             <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped>

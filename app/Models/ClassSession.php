@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClassSession extends Model
 {
+    protected $guarded = [];
+
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);

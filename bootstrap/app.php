@@ -3,18 +3,21 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use App\Http\Middleware\CheckPermission;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        commands: __DIR__.'/../routes/console.php',
+        web: __DIR__ . '/../routes/web.php',
+        commands: __DIR__ . '/../routes/console.php',
         health: '/up',
+        // then: function ($router) {
+        //     $router->middleware('roles', App\Http\Middleware\CheckRoles::class);
+        // }
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // add CheckPermission middleware
-        // $middleware->append(CheckPermission::class);
-
+        //si es un middleware GLOBAL
+        $middleware->alias([
+            'roles' => App\Http\Middleware\CheckRoles::class
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

@@ -32,8 +32,7 @@ new class extends Component {
     {
         return [
             ['key' => 'id', 'label' => '#', 'class' => 'w-10'],
-            ['key' => 'lastname', 'label' => 'Apellido', 'class' => 'w-64'],
-            ['key' => 'firstname', 'label' => 'Nombre', 'class' => 'w-full'],
+            ['key' => 'fullname', 'label' => 'Apellido y Nombre', 'class' => 'w-full'],
             ['key' => 'phone', 'label' => 'Tel.', 'sortable' => false],
             ['key' => 'email', 'label' => 'E-mail', 'sortable' => false],
             ['key' => 'role', 'label' => 'Rol', 'sortable' => false],
@@ -69,6 +68,7 @@ new class extends Component {
         // Notifica al componente Bookmarks
         $this->dispatch('bookmarked', ['type' => 'user_id', 'value' => $id]);
     }
+
 }; ?>
 
 <div>

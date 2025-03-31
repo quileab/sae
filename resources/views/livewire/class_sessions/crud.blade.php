@@ -49,7 +49,10 @@ new class extends Component {
             $this->data['subject_id'] = $subject->id;
             // set date to string now 
             $this->data['date'] = date('Y-m-d');
-            $this->data['class_number'] = \App\Models\ClassSession::where('subject_id', $subject->id)->max('class_number') + 1;
+            $this->data['class_number'] = \App\Models\ClassSession::where('subject_id', $subject->id)
+                // where in date year
+                ->where('date', 'like', '%' . $this->data['date'] . '%')
+                ->max('class_number') + 1;
         }
     }
 

@@ -1,9 +1,7 @@
 <?php
-
 use Livewire\Volt\Component;
 use App\Models\Enrollment;
 use App\Models\Subject;
-use App\Models\Career;
 use Mary\Traits\Toast;
 
 new class extends Component {
@@ -16,18 +14,11 @@ new class extends Component {
 
     public function mount()
     {
-        if (session()->has('user_id')) {
-            $user = \App\Models\User::find(session('user_id'));
-        } else {
-            $user = auth()->user();
-            // display error message
+        $user = $this->getUser();
+        if (!$user) {
             $this->warning('No se ha seleccionado Usuario.');
             $this->modal = true;
         }
-        //if user is admin, principal, administrative, get all careers 
-        // if ($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('administrative')) {
-        //     $this->careers = Career::all();
-        // }
         $this->careers = $user->careers;
 
         $careerId = (session()->has('career_id')) ? session('career_id') : $this->careers->first()->id;
@@ -39,6 +30,18 @@ new class extends Component {
         $this->loadEnrollments();
     }
 
+    public function getUser(): object
+    {
+        if (session()->has('user_id')) {
+            $user = \App\Models\User::find(session('user_id'));
+        } else {
+            $user = auth()->user();
+            //save user to session
+        }
+
+        return $user;
+    }
+
     public function loadSubjects()
     {
         $this->subjects = Subject::where('career_id', $this->careerId)->get();
@@ -46,7 +49,8 @@ new class extends Component {
 
     public function loadEnrollments()
     {
-        $this->enrolledSubjects = Enrollment::where('user_id', session()->get('user_id'))
+        $user_id = $this->getUser()->id;
+        $this->enrolledSubjects = Enrollment::where('user_id', $user_id)
             ->whereHas('subject', function ($query) {
                 $query->where('career_id', $this->careerId);
             })
@@ -56,7 +60,7 @@ new class extends Component {
 
     public function toggleEnrollment($subjectId)
     {
-        $user_id = session()->get('user_id');
+        $user_id = $this->getUser()->id;
         if (in_array($subjectId, $this->enrolledSubjects)) {
             // Si ya está matriculado, eliminar la inscripción
             Enrollment::where('user_id', $user_id)
@@ -78,12 +82,15 @@ new class extends Component {
     {
         $this->loadSubjects();
         $this->loadEnrollments();
+        $this->skipMount();
     }
 
 }; ?>
 
 <div>
-    <h1 class="text-2xl font-bold">Materias » {{ session()->get('user_id_name') }}</h1>
+    <h1 class="text-2xl font-bold">Materias »
+        {{ session()->get('user_id_name') ? session()->get('user_id_name') : auth()->user()->fullname }}
+    </h1>
     <x-select icon="o-academic-cap" :options="$careers" wire:model.lazy="careerId" />
 
     <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">

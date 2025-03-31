@@ -87,6 +87,13 @@ class User extends Authenticatable
             ->orderBy('id', 'asc');
     }
 
+    public function hasSubject($subject_id): bool
+    {
+        return Enrollment::where('user_id', $this->id)
+            ->where('subject_id', $subject_id)
+            ->exists();
+    }
+
     // user has many grades
     public function grades(): HasMany
     {
