@@ -3,9 +3,8 @@
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Validate;
-use Illuminate\Http\Request;
-use App\Models\User; // Asegúrate de que el modelo User esté importado
-use Illuminate\Support\Facades\Hash; // Importa Hash para encriptar contraseñas
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 new class extends Component {
     use WithFileUploads;
@@ -40,7 +39,6 @@ new class extends Component {
             $header = array_shift($rows);
             foreach ($rows as $row) {
                 $row = array_combine($header, $row);
-
                 try {
                     $user = User::create([
                         'id' => $row['id'],
