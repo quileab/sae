@@ -15,6 +15,7 @@ new class extends Component {
     public $inscription_id = null;
     public $careers = [];
     public $career_id = null;
+    public array $selected = [];
 
     public $temp;
     public $user;
@@ -54,8 +55,9 @@ new class extends Component {
 
     public function items(): Collection
     {
-        $this->info('Cargando...', timeout: 2000);
+        $this->info('Cargando...', timeout: 500);
         $inscripts = [];
+        $this->selected = [];
 
         $pathToStorage = storage_path('app'); // == Storage::path('');
         $pathToFiles = '/private/private/inscriptions';
@@ -70,33 +72,34 @@ new class extends Component {
         }
         $this->temp = $filter;
         $files = [];
+        $id = 0;
         foreach (glob("$pathToStorage/$pathToFiles/$filter") as $nombre_fichero) {
             $files[] = "$pathToFiles/" . basename($nombre_fichero);
             //echo "$pathToFiles/".basename($nombre_fichero)."<br/>";
         }
         foreach ($files as $key => $file) {
+            $key = ++$id;
             //$files[$key] = str_replace('private/private/inscriptions/', 'files/private/', $file);
             $files[$key] = basename($file);
             $user_id = explode('-', $files[$key])[1];
             $career_id = explode('-', $files[$key])[2];
             $config_incription_id = explode('-', $files[$key])[3];
             $user = \App\Models\User::find($user_id);
-            $user != null ? $username = $user->fullname : $username = 'No encontrado';
+            $user != null ? $username = $user->fullname : $username = '🚫' . $files[$key];
             // Get career name
             $career = $this->careers->where('id', $career_id)->first();
             $career != null ? $career = $career->name : $career = '🚫Carrera/Curso';
+            $inscripts[$key]['id'] = $key;
             $inscripts[$key]['filename'] = $file;
             $inscripts[$key]['fullname'] = $username;
             $inscripts[$key]['career'] = $career;
             $inscripts[$key]['inscription'] = $config_incription_id; //\App\Models\Config::find($config_incription_id);
             $inscripts[$key]['pdflink'] = $files[$key];
-            $inscripts[$key]['checked'] = false;
+            //$inscripts[$key]['checked'] = false;
             //dd($inscripts);
         }
         // convertir en collection y ordenar por carrera y usuario
         $inscriptions = collect($inscripts)->sortBy(['career', 'user']);
-        // return to array
-        //$inscripts = $inscripts->toArray();
 
         return $inscriptions;
     }
@@ -107,6 +110,27 @@ new class extends Component {
             'items' => $this->items(),
             'headers' => $this->headers()
         ];
+    }
+
+    public function deleteSelected()
+    {
+        $files = [];
+        $pathToStorage = storage_path('app'); // == Storage::path('');
+        $pathToFiles = '/private/private/inscriptions/';
+        foreach ($this->selected as $key => $value) {
+            $delete = $this->items()->where('id', $value)->first();
+            $files[] = $delete;
+            // check if file exists
+            while (isset($delete['pdflink']) && file_exists($pathToStorage . $pathToFiles . $delete['pdflink'])) {
+                File::delete($pathToStorage . $pathToFiles . $delete['pdflink']);
+                sleep(1);
+            }
+        }
+        //dd($files);
+        $this->selected = [];
+        $this->info('Eliminados: ' . count($files) . ' archivos.', timeout: 2000);
+        $this->drawer = false;
+        //$this->mount();
     }
 
 }; ?>
@@ -135,7 +159,8 @@ new class extends Component {
             <x-select wire:model.lazy="career_id" label="Carrera" :options="$careers" />
         </div>
         <div class="z-10">
-            <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped>
+            <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped wire:model="selected" selectable
+                @row-selection="console.log($event.detail)">
                 @scope('actions', $item)
                 <x-button label="PDF" link="pdf/{{ $item['pdflink'] }}" external icon="s-document"
                     class="btn-error text-red-700 btn-ghost w-32" />
@@ -146,11 +171,9 @@ new class extends Component {
 
     <!-- FILTER DRAWER -->
     <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
-
-        <div class="grid grid-cols-2 gap-2">
-            acciones a realizar TODO
-        </div>
-
+        <x-dropdown label="Eliminar" class="btn-error" right>
+            <x-menu-item title="Confirmar" wire:click="deleteSelected" spinner="deleteSelected" icon="o-trash" />
+        </x-dropdown>
     </x-drawer>
 
 </div>

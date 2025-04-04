@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Support\Collection;
+//use Illuminate\Support\Collection;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -44,7 +44,6 @@ new class extends Component {
             $this->data = User::find($id)->toArray();
             $this->data['careers'] = User::find($id)->careers;
         }
-
     }
 
     public function save()
@@ -65,7 +64,7 @@ new class extends Component {
         //dd($data);
         User::updateOrCreate(['id' => $data['id']], $data);
         $this->success('Usuario guardado.');
-        $this->redirect('/users');
+        //$this->redirect('/users');
     }
 
     public function changePassword()
@@ -97,7 +96,6 @@ new class extends Component {
         $this->data['careers'] = $user->careers;
         $this->skipMount();
     }
-
 
 }; ?>
 
@@ -131,28 +129,31 @@ new class extends Component {
                 <x-button label="Guardar" class="btn-primary" type="submit" spinner="save" />
             </x-slot:actions>
         </x-form>
+        {{ session('user_id') }}
     </x-card>
 
-    <x-card title="Carreras asignadas" shadow class="mt-2">
-        <div class="bg-white/10 dark:bg-black/10 p-4 rounded-md mb-2">
-            @foreach ($data['careers'] as $career)
-                <x-dropdown label="{{ $career->name }}" class="btn-primary">
-                    {{-- para click wire:click.stop='action' --}}
-                    <x-menu-item title="BORRAR" icon="o-trash" class="bg-error"
-                        wire:click.stop="removeCareer({{ $career->id }})" />
-                </x-dropdown>
-            @endforeach
-        </div>
+    @if(!empty($data['id']))
+        <x-card title="Carreras asignadas" shadow class="mt-2">
+            <div class="bg-white/10 dark:bg-black/10 p-4 rounded-md mb-2">
+                @foreach ($data['careers'] as $career)
+                    <x-dropdown label="{{ $career->name }}" class="btn-primary">
+                        {{-- para click wire:click.stop='action' --}}
+                        <x-menu-item title="BORRAR" icon="o-trash" class="bg-error"
+                            wire:click.stop="removeCareer({{ $career->id }})" />
+                    </x-dropdown>
+                @endforeach
+            </div>
 
-        <x-form wire:submit.prevent="assignCareer" no-separator>
-            <x-select label="Carrera Disponibles" icon="o-academic-cap" :options="$careers" wire:model.lazy="career_id">
-                <x-slot:append>
-                    <x-button label="Asignar" icon="o-plus" class="rounded-s-none btn-primary" type="submit"
-                        spinner="assignCareer" />
-                </x-slot:append>
-            </x-select>
-        </x-form>
-    </x-card>
+            <x-form wire:submit.prevent="assignCareer" no-separator>
+                <x-select label="Carrera Disponibles" icon="o-academic-cap" :options="$careers" wire:model.lazy="career_id">
+                    <x-slot:append>
+                        <x-button label="Asignar" icon="o-plus" class="rounded-s-none btn-primary" type="submit"
+                            spinner="assignCareer" />
+                    </x-slot:append>
+                </x-select>
+            </x-form>
+        </x-card>
+    @endif
 
     <!-- DRAWER -->
     <x-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
