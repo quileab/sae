@@ -53,4 +53,10 @@ new class extends Component {
 
         @endforeach
     </x-card>
+    <x-card title="System Info" shadow-md>
+        <p class="text-sm opacity-60">
+            Framework {{ app()->version() }} » PHP {{ phpversion() }} » 
+            {{ env('APP_ENV') }} » {{ env('APP_DEBUG')==1 ? 'Debug' : 'Release' }}
+          </p>
+    </x-card>
 </div>
