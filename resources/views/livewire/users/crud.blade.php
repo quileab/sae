@@ -27,6 +27,7 @@ new class extends Component {
     //public $subjects = [];
     public $careers = [];
     public $career_id = null;
+    public $user_id = null;
 
     public function mount($id = null)
     {
@@ -39,6 +40,7 @@ new class extends Component {
         if ($id === null) {
             $id = session('user_id');
         }
+        $this->user_id = $id;
 
         if ($id !== null) {
             $this->data = User::find($id)->toArray();
@@ -50,7 +52,7 @@ new class extends Component {
     {
         $data = [];
         //check if user not exists assign password
-        if (!User::find($this->data['id'])) {
+        if (!User::find($this->user_id)) {
             $data['password'] = $this->data['id'];
         }
         $data['id'] = $this->data['id'];
@@ -61,8 +63,8 @@ new class extends Component {
         $data['phone'] = $this->data['phone'];
         $data['role'] = $this->data['role'];
         $data['enabled'] = $this->data['enabled'];
-        //dd($data);
-        User::updateOrCreate(['id' => $data['id']], $data);
+        //dd($data, $this->user_id);
+        User::updateOrCreate(['id' => $this->user_id], $data);
         $this->success('Usuario guardado.');
         //$this->redirect('/users');
     }

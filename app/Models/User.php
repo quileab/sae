@@ -80,7 +80,6 @@ class User extends Authenticatable
         return $this->hasMany('App\Models\Books');
     }
 
-    // enrolled table has user_id and subject_id and means that user is enrolled in subject
     public function subjects()
     {
         return $this->belongsToMany('App\Models\Subject', 'enrollments', 'user_id', 'subject_id')
@@ -109,7 +108,6 @@ class User extends Authenticatable
         return $this->hasMany('App\Models\PaymentRecord');
     }
 
-    // return true if the user has grade approved on date=2000-01-01
     public function enrolled($subject_id): bool
     {
         return Enrollment::where('user_id', $this->id)
@@ -117,9 +115,14 @@ class User extends Authenticatable
             ->exists();
     }
 
-    public static function hasRole($role)
+    public function hasRole($role)
     {
-        return in_array($role, array_column(self::$roles, 'id'));
+        return $this->role === $role;
+    }
+
+    public function hasNotRole($role)
+    {
+        return $this->role !== $role;
     }
 
     public function hasAnyRole($roles)
@@ -131,5 +134,10 @@ class User extends Authenticatable
     public function getFullNameAttribute(): string
     {
         return $this->lastname . ', ' . $this->firstname;
+    }
+
+    public function classSessions()
+    {
+        return $this->hasMany(ClassSession::class, 'teacher_id');
     }
 }

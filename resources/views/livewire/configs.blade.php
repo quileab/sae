@@ -45,10 +45,10 @@ new class extends Component {
     @foreach ($data as $key => $config)
         @if($config['group'] != $group)
             @php $group = $config['group']; @endphp
-            <h2 class="text-2xl font-semibold text-black dark:text-white uppercase">{{ $config['group'] }}</h2>
+            <h2 class="text-2xl font-semibold uppercase">{{ $config['group'] }}</h2>
         @endif
         <x-form wire:submit='saveChange({{ $key }})' id="form{{ $key }}" 
-        class="ml-4 p-4 bg-white dark:bg-gray-800 rounded-md">
+        class="ml-4 p-4 rounded-md">
             @switch($config['type'])
                 @case('text')
                     <x-input label="{{ $config['description'] }}" hint="{{ $config['id'] }}" wire:model="data.{{ $key }}.value">

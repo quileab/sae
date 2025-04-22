@@ -17,9 +17,18 @@ class Subject extends Model
         return $this->hasMany(Enrollment::class);
     }
 
+    public function subjectUsers($subjectId = null){
+        return $this->enrollments()->with('user')->where('subject_id', $subjectId);
+    }
+
     // add attribute full_name
     public function getFullNameAttribute()
     {
         return $this->career->name . '» ' . $this->name;
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
     }
 }

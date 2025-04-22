@@ -26,12 +26,12 @@
     </x-nav>
 
     {{-- MAIN --}}
-    <x-main full-width>
+    <x-main>
         {{-- SIDEBAR --}}
         <x-slot:sidebar drawer="main-drawer" collapsible class="bg-base-100 lg:bg-inherit">
 
             {{-- BRAND --}}
-            <x-app-brand class="p-5 pt-3" />
+            <x-app-brand class="p-4 pt-3" />
 
             {{-- MENU --}}
             <x-menu activate-by-route>
@@ -49,7 +49,7 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
-                <x-menu-item icon="o-chat-bubble-left-right" link="###">
+                <x-menu-item icon="o-chat-bubble-left-right" link="/messages">
                     Comunicación <x-badge value="PRONTO" class="bg-primary text-white" />
                 </x-menu-item>
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
@@ -96,6 +96,7 @@
     {{-- TOAST area --}}
     <x-toast />
     @livewireScripts
+    @stack('scripts')
 </body>
 
 </html>

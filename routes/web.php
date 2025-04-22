@@ -15,6 +15,8 @@ Route::get('/', function () {
   return redirect('/dashboard'); //view('dashboard');
 });
 
+Volt::route('/messages', 'messages.index')->middleware('auth');
+
 Route::get('/clear/{option?}', function ($option = null) {
   $logs = [];
   $maintenance = ($option == "cache") ? [
