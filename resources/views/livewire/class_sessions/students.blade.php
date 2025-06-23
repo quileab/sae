@@ -124,12 +124,21 @@ new class extends Component {
                 'comments' => ''
             ];
         }
-        $this->grades['approved'] = $this->grades['grade'] >= 6 ? true : false;
+        //$this->grades['approved'] = $this->grades['grade'] >= 6 ? true : false;
         $this->drawer = true;
     }
 
-    public function saveGrade(): void
+    public function attendanceSet($item, $value): void
     {
+        $this->attendance($item);
+        $this->saveGrade($value);
+    }
+
+    public function saveGrade($value = null): void
+    {
+        if ($value !== null) {
+            $this->grades['attendance'] = $value;
+        }
         $this->validate([
             'grades.attendance' => ['required', 'integer', 'min:0', 'max:100'],
             'grades.grade' => ['required', 'integer', 'min:0', 'max:10'],
@@ -143,12 +152,12 @@ new class extends Component {
                 'class_session_id' => $this->class_session->id,
                 'attendance' => $this->grades['attendance'],
                 'grade' => $this->grades['grade'],
-                'approved' => $this->grades['grade'] >= 6 ? 1 : 0,
+                'approved' => $this->grades['approved'],
                 'comments' => $this->grades['comments']
             ]
         );
         $this->drawer = false;
-        $this->success('Calificación guardada.');
+        $this->success('Registrado.');
     }
 
     public function bookmark($id): void
@@ -192,6 +201,7 @@ new class extends Component {
             <x-icon name="o-academic-cap" class="text-warning" />
             <span class="mx-2">{{ $class_session->content ?? 'CLASE INEXISTENTE' }}</span>
         </div>
+
         <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped>
             {{-- loop index --}}
             @scope('cell_row_id', $item)
@@ -201,6 +211,8 @@ new class extends Component {
             {{-- actions --}}
             @scope('actions', $item)
             <div class="flex items-center align-middle mr-4 gap-2">
+                <x-button label="100" icon="o-percent-badge" class="text-success btn-ghost btn-sm"
+                    wire:click="attendanceSet({{ $item }}, 100)" />
                 <x-button label="Registro" icon="o-user-circle" class="text-yellow-600 btn-ghost btn-sm"
                     wire:click="attendance({{ $item }})" />
                 <x-dropdown>
@@ -208,6 +220,8 @@ new class extends Component {
                         <x-button icon="o-chevron-down" class="btn-ghost btn-sm" />
                     </x-slot:trigger>
 
+                    <x-button label="LISTA" icon="o-document-text" class="btn-primary"
+                        link="/printClassbooks/subject/{{ $item->id }}" external no-wire-navigate />
                     <x-menu-item title="Chat" icon="o-chat-bubble-left" class="text-yellow-600" />
 
                 </x-dropdown>
@@ -236,9 +250,10 @@ new class extends Component {
             <x-button label="100" icon="o-check" class="btn-success btn-outline btn-sm"
                 wire:click="$set('grades.attendance', 100)" />
         </div>
-        <div class="grid grid-cols-2 items-center gap-4 mt-4">
-            <x-input label="Calificación" wire:model="grades.grade" type="number" min="0" max="100" inline />
-            <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Es automático" disabled />
+        <div class="flex items-center gap-4 mt-4">
+            <x-input label="Calificación" wire:model="grades.grade" type="number" min="0" max="100" class="w-24"
+                inline />
+            <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Notas no numéricas" />
         </div>
         <div class="grid items-center gap-4 mt-4">
             <x-input label="Observaciones" wire:model="grades.comments" type="text" class="w-full" />

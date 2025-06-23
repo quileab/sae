@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\BookmarkController;
+use App\Http\Controllers\print\PrintClassbookController;
 use App\Http\Controllers\print\PrintInscriptionsController;
 
 
@@ -59,6 +60,7 @@ Route::middleware('auth')->group(function () {
 
   Route::get('/inscriptionsPDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'index'])->name('inscriptionsPDF');
   Route::get('/inscriptionsSavePDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'savePDF'])->name('inscriptionsSavePDF');
+  Route::get('/printClassbooks/{subject?}/{id?}', [PrintClassbookController::class, 'printClassbooks'])->name('printclassbooks');
 
   Route::prefix('bookmark')->group(function () {
     Route::get('/', [BookmarkController::class, 'index']);        // Ver el bookmark actual

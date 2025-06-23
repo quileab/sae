@@ -49,9 +49,7 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
-                <x-menu-item icon="o-chat-bubble-left-right" link="/messages">
-                    Comunicación <x-badge value="PRONTO" class="bg-primary text-white" />
-                </x-menu-item>
+                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" {{-- link="/messages" --}} disabled />
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                     <x-menu-item title="Usuarios" icon="o-users" link="/users" />
                     <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">

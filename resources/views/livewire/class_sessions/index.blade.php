@@ -104,9 +104,15 @@ new class extends Component {
                 <x-alert title="Sin materias" description="No tienes materias asignadas." icon="o-exclamation-triangle"
                     class="alert-warning" />
             @else
-                <x-select label="Materia" icon="o-queue-list" :options="$subjects" option-label="fullname"
-                    wire:model.lazy="subject_id" inline />
-                <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/class-session" />
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <x-select label="Materia" icon="o-queue-list" :options="$subjects" option-label="fullname"
+                        wire:model.lazy="subject_id" inline />
+                    <div class="text-right">
+                        <x-button label="LISTA {{ $subject_id }}" icon="o-document-text" class="btn-primary"
+                            link="/printClassbooks/{{ $subject_id }}" external no-wire-navigate />
+                        <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/class-session" />
+                    </div>
+                </div>
             @endif
         </div>
 

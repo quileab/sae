@@ -5,6 +5,8 @@ use Livewire\Volt\Component;
 new class extends Component {
     public $cycleYear = null;
     public $inscriptionsStatus = null;
+    public $subjects = [];
+    public $subject_id;
 
     public function mount(): void
     {
@@ -19,6 +21,8 @@ new class extends Component {
 
         }
         $this->inscriptionsStatus = \App\Models\Configs::where('group', 'inscriptions')->get();
+        $this->subjects = \App\Models\User::find(Auth::user()->id)->subjects()->get();
+        $this->subject_id = $this->subjects->first()->id;
     }
 
     public function saveCycleYear(): void
@@ -42,21 +46,26 @@ new class extends Component {
                     wire:click="saveCycleYear" />
             </x-slot:append>
         </x-input>
-        
+
         @foreach ($inscriptionsStatus as $inscription)
-        <div class="mt-2 grid grid-cols-1 border border-primary p-2 rounded-md
-            {{ $inscription['value'] == 'true' ? 'bg-success/10' : 'bg-error/10' }}">
-            <x-icon name="{{ $inscription['value'] == 'true' ? 'o-check' : 'o-x-mark' }}"
-                class="{{ $inscription['value'] == 'true' ? 'text-success' : 'text-error' }}"
-                label="{{ $inscription['description'] }}" />
-        </div>  
+            <div
+                class="mt-2 grid grid-cols-1 border border-primary p-2 rounded-md
+                                                        {{ $inscription['value'] == 'true' ? 'bg-success/10' : 'bg-error/10' }}">
+                <x-icon name="{{ $inscription['value'] == 'true' ? 'o-check' : 'o-x-mark' }}"
+                    class="{{ $inscription['value'] == 'true' ? 'text-success' : 'text-error' }}"
+                    label="{{ $inscription['description'] }}" />
+            </div>
 
         @endforeach
     </x-card>
     <x-card title="System Info" shadow-md>
-        <p class="text-sm opacity-60">
-            Framework {{ app()->version() }} » PHP {{ phpversion() }} » 
-            {{ env('APP_ENV') }} » {{ env('APP_DEBUG')==1 ? 'Debug' : 'Release' }}
-          </p>
+        <p class="text-sm opacity-60 mb-8">
+            Framework {{ app()->version() }} » PHP {{ phpversion() }} »
+            {{ env('APP_ENV') }} » {{ env('APP_DEBUG') == 1 ? 'Debug' : 'Release' }}
+        </p>
+        LIBROS DE TEMAS
+        <x-select label="Materias" wire:model.live="subject_id" :options="$subjects" icon="o-queue-list" />
+        <x-button label="VER LIBRO" icon="o-document-text" class="btn-primary" wire:model="subject_id"
+            link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}" external no-wire-navigate />
     </x-card>
 </div>

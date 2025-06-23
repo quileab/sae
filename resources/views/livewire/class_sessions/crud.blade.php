@@ -49,10 +49,7 @@ new class extends Component {
             $this->data['subject_id'] = $subject->id;
             // set date to string now 
             $this->data['date'] = date('Y-m-d');
-            $this->data['class_number'] = \App\Models\ClassSession::where('subject_id', $subject->id)
-                // where in date year
-                ->where('date', 'like', '%' . $this->data['date'] . '%')
-                ->max('class_number') + 1;
+            $this->data['class_number'] = ClassSession::count($subject->id) + 1;
         }
     }
 
@@ -78,7 +75,7 @@ new class extends Component {
 }; ?>
 
 <div>
-    <x-card title="Clase {{ $data['id']!==null ? $data['id'] : 'Nueva' }}" shadow separator>
+    <x-card title="Clase {{ $data['id'] !== null ? $data['id'] : 'Nueva' }}" shadow separator>
         <x-slot:menu>
             <x-button @click="$wire.drawer = true" responsive icon="o-ellipsis-vertical"
                 class="btn-ghost btn-circle btn-outline btn-sm" />
