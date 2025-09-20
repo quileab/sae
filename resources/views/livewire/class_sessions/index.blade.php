@@ -12,7 +12,7 @@ new class extends Component {
 
     public bool $drawer = false;
 
-    public array $sortBy = ['column' => 'date', 'direction' => 'asc'];
+    public array $sortBy = ['column' => 'date', 'direction' => 'desc'];
     public $subjects = [];
     public $subject_id = null;
     public $user;
@@ -129,10 +129,14 @@ new class extends Component {
 
     <!-- FILTER DRAWER -->
     <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
-        <x-slot:actions>
-            <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />
-            <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
-            <x-button label="Imprimir" icon="o-printer" class="btn-primary" @click="$wire.drawer = false" />
-        </x-slot:actions>
+        <div class="grid grid-cols-2 gap-2">
+            <x-button label="Nuevo Tema" icon="o-plus" class="btn-success" link="/class-session" />
+            @if($subject_id)
+                <x-button label="Administrar Contenidos" icon="o-book-open"
+                    link="{{ route('subjects.content-manager', ['subject' => $subject_id]) }}" class="btn-primary" />
+            @endif
+            <x-button label="Imprimir Asistencias" icon="o-printer" class="btn-primary"
+                link="/print/student-attendance-report/{{ $subject_id }}" external no-wire-navigate />
+        </div>
     </x-drawer>
 </div>

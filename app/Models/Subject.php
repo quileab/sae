@@ -29,6 +29,18 @@ class Subject extends Model
 
     public function users()
     {
-        return $this->belongsToMany(User::class);
+        return $this->belongsToMany(User::class, 'enrollments');
+    }
+
+    public function getTeacherAttribute()
+    {
+        // Find the first class session for this subject and return its teacher
+        $classSession = $this->hasMany(ClassSession::class)->first();
+        return $classSession ? $classSession->teacher : null;
+    }
+
+    public function units()
+    {
+        return $this->hasMany(Unit::class);
     }
 }

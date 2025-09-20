@@ -1,6 +1,10 @@
 <?php
 
+use App\Models\Career;
+use App\Models\Configs;
+use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -23,19 +27,19 @@ new class extends Component {
 
     public function mount()
     {
-        // if user is NOT admin, principal, administrative return back
-        // $user->hasAnyRole(['admin', 'principal', 'administrative'])
         $this->user = auth()->user();
         if (!$this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
             return redirect()->back();
         }
-        $this->inscriptions = \App\Models\Configs::where('group', 'inscriptions')->get();
+
+        $this->inscriptions = Configs::where('group', 'inscriptions')->get();
         $this->inscription_id = $this->inscriptions->first()->id ?? null;
-        $this->careers = \App\Models\Career::where('allow_enrollments', true)
-            ->where('allow_evaluations', true)->get();
+
+        $this->careers = Career::where('allow_enrollments', true)
+            ->where('allow_evaluations', true)
+            ->get();
 
         if ($this->careers->isEmpty()) {
-            // return error message
             $this->warning('No se han encontrado Carreras.');
             $this->career_id = null;
         } else {
@@ -56,53 +60,67 @@ new class extends Component {
     public function items(): Collection
     {
         $this->info('Cargando...', timeout: 500);
-        $inscripts = [];
         $this->selected = [];
 
-        $pathToStorage = storage_path('app'); // == Storage::path('');
+        $pathToStorage = storage_path('app');
         $pathToFiles = '/private/private/inscriptions';
         $filter = "insc-*";
-        // Check if Logged User has "elevated" Roles
-        if (auth()->user()->hasAnyRole(['admin', 'principal', 'administrative'])) {
-            // file filter insc-{user_id}-{career_id}-{inscription_id}.pdf
-            $filter = "insc-*-$this->career_id-$this->inscription_id-.pdf";
-        } // Check for "self" registrations
-        else {
-            $filter = "insc-" . auth()->user()->id . "-*";
-        }
-        $this->temp = $filter;
-        $files = [];
-        $id = 0;
-        foreach (glob("$pathToStorage/$pathToFiles/$filter") as $nombre_fichero) {
-            $files[] = "$pathToFiles/" . basename($nombre_fichero);
-            //echo "$pathToFiles/".basename($nombre_fichero)."<br/>";
-        }
-        foreach ($files as $key => $file) {
-            $key = ++$id;
-            //$files[$key] = str_replace('private/private/inscriptions/', 'files/private/', $file);
-            $files[$key] = basename($file);
-            $user_id = explode('-', $files[$key])[1];
-            $career_id = explode('-', $files[$key])[2];
-            $config_incription_id = explode('-', $files[$key])[3];
-            $user = \App\Models\User::find($user_id);
-            $user != null ? $username = $user->fullname : $username = '🚫' . $files[$key];
-            // Get career name
-            $career = $this->careers->where('id', $career_id)->first();
-            $career != null ? $career = $career->name : $career = '🚫Carrera/Curso';
-            $inscripts[$key]['id'] = $key;
-            $inscripts[$key]['filename'] = $file;
-            $inscripts[$key]['fullname'] = $username;
-            $inscripts[$key]['career'] = $career;
-            $inscripts[$key]['inscription'] = $config_incription_id; //\App\Models\Config::find($config_incription_id);
-            $inscripts[$key]['pdflink'] = $files[$key];
-            //$inscripts[$key]['checked'] = false;
-            //dd($inscripts);
-        }
-        // convertir en collection y ordenar por carrera y usuario
-        $inscriptions = collect($inscripts)->sortBy(['career', 'user']);
 
-        return $inscriptions;
+        if ($this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+            $filter = "insc-*-$this->career_id-$this->inscription_id-.pdf";
+        } else {
+            $filter = "insc-{$this->user->id}-*";
+        }
+
+        $this->temp = $filter;
+        $files = glob("$pathToStorage/$pathToFiles/$filter");
+
+        if (empty($files)) {
+            return collect();
+        }
+
+        $userIds = [];
+        $careerIds = [];
+        foreach ($files as $file) {
+            $parts = explode('-', basename($file));
+            if (count($parts) > 2) {
+                $userIds[] = $parts[1];
+                $careerIds[] = $parts[2];
+            }
+        }
+
+        $users = User::whereIn('id', array_unique($userIds))->pluck('fullname', 'id');
+        $careers = Career::whereIn('id', array_unique($careerIds))->pluck('name', 'id');
+
+        $inscripts = [];
+        $id = 0;
+        foreach ($files as $file) {
+            $key = ++$id;
+            $filename = basename($file);
+            $parts = explode('-', $filename);
+
+            if (count($parts) < 4) continue;
+
+            $userId = $parts[1];
+            $careerId = $parts[2];
+            $configInscriptionId = $parts[3];
+
+            $username = $users->get($userId, '🚫 ' . $filename);
+            $careerName = $careers->get($careerId, '🚫 Carrera/Curso');
+
+            $inscripts[$key] = [
+                'id' => $key,
+                'filename' => $file,
+                'fullname' => $username,
+                'career' => $careerName,
+                'inscription' => $configInscriptionId,
+                'pdflink' => $filename,
+            ];
+        }
+
+        return collect($inscripts)->sortBy(['career', 'fullname']);
     }
+
 
     public function with(): array
     {
@@ -114,23 +132,28 @@ new class extends Component {
 
     public function deleteSelected()
     {
-        $files = [];
-        $pathToStorage = storage_path('app'); // == Storage::path('');
+        $deletedCount = 0;
+        $pathToStorage = storage_path('app');
         $pathToFiles = '/private/private/inscriptions/';
-        foreach ($this->selected as $key => $value) {
-            $delete = $this->items()->where('id', $value)->first();
-            $files[] = $delete;
-            // check if file exists
-            while (isset($delete['pdflink']) && file_exists($pathToStorage . $pathToFiles . $delete['pdflink'])) {
-                File::delete($pathToStorage . $pathToFiles . $delete['pdflink']);
-                sleep(1);
+
+        $allItems = $this->items();
+
+        foreach ($this->selected as $selectedId) {
+            $itemToDelete = $allItems->firstWhere('id', $selectedId);
+
+            if ($itemToDelete && !empty($itemToDelete['pdflink'])) {
+                $filePath = $pathToStorage . $pathToFiles . $itemToDelete['pdflink'];
+
+                if (File::exists($filePath)) {
+                    File::delete($filePath);
+                    $deletedCount++;
+                }
             }
         }
-        //dd($files);
+
+        $this->info($deletedCount . ' archivo(s) eliminado(s).');
         $this->selected = [];
-        $this->info('Eliminados: ' . count($files) . ' archivos.', timeout: 2000);
         $this->drawer = false;
-        //$this->mount();
     }
 
 }; ?>

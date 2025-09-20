@@ -108,12 +108,7 @@ class User extends Authenticatable
         return $this->hasMany('App\Models\PaymentRecord');
     }
 
-    public function enrolled($subject_id): bool
-    {
-        return Enrollment::where('user_id', $this->id)
-            ->where('subject_id', $subject_id)
-            ->exists();
-    }
+    
 
     public function hasRole($role)
     {
@@ -139,5 +134,17 @@ class User extends Authenticatable
     public function classSessions()
     {
         return $this->hasMany(ClassSession::class, 'teacher_id');
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function receivedMessages(): BelongsToMany
+    {
+        return $this->belongsToMany(Message::class, 'message_user', 'user_id', 'message_id')
+            ->withPivot('read_at')
+            ->withTimestamps();
     }
 }

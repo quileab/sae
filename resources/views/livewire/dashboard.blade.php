@@ -22,7 +22,9 @@ new class extends Component {
         }
         $this->inscriptionsStatus = \App\Models\Configs::where('group', 'inscriptions')->get();
         $this->subjects = \App\Models\User::find(Auth::user()->id)->subjects()->get();
-        $this->subject_id = $this->subjects->first()->id;
+        if (!$this->subjects->isEmpty()) {
+            $this->subject_id = $this->subjects->first()->id;
+        }
     }
 
     public function saveCycleYear(): void
@@ -50,7 +52,7 @@ new class extends Component {
         @foreach ($inscriptionsStatus as $inscription)
             <div
                 class="mt-2 grid grid-cols-1 border border-primary p-2 rounded-md
-                                                        {{ $inscription['value'] == 'true' ? 'bg-success/10' : 'bg-error/10' }}">
+                                                                                        {{ $inscription['value'] == 'true' ? 'bg-success/10' : 'bg-error/10' }}">
                 <x-icon name="{{ $inscription['value'] == 'true' ? 'o-check' : 'o-x-mark' }}"
                     class="{{ $inscription['value'] == 'true' ? 'text-success' : 'text-error' }}"
                     label="{{ $inscription['description'] }}" />
@@ -58,14 +60,16 @@ new class extends Component {
 
         @endforeach
     </x-card>
-    <x-card title="System Info" shadow-md>
-        <p class="text-sm opacity-60 mb-8">
-            Framework {{ app()->version() }} » PHP {{ phpversion() }} »
-            {{ env('APP_ENV') }} » {{ env('APP_DEBUG') == 1 ? 'Debug' : 'Release' }}
-        </p>
+    <x-card title="Opciones Rápidas"
+        subtitle="fwk:{{ app()->version() }}/{{ phpversion() }}/{{ env('APP_ENV') }}/{{ env('APP_DEBUG') == 1 ? 'Debug' : 'Release' }}"
+        shadow-md>
         LIBROS DE TEMAS
         <x-select label="Materias" wire:model.live="subject_id" :options="$subjects" icon="o-queue-list" />
-        <x-button label="VER LIBRO" icon="o-document-text" class="btn-primary" wire:model="subject_id"
-            link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}" external no-wire-navigate />
+        <div class="flex items-center mt-1 space-x-2">
+            <x-button label="VER LIBRO" icon="o-document-text" class="btn-primary" wire:model="subject_id"
+                link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}" external no-wire-navigate />
+            <x-button label="VER CONTENIDO" icon="o-eye" class="btn-secondary"
+                link="/simplified-content/{{ $subject_id }}" external no-wire-navigate />
+        </div>
     </x-card>
 </div>

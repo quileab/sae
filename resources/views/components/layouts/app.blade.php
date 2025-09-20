@@ -10,6 +10,7 @@
 
     @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="{{ asset('js/tinymce/tinymce.min.js') }}" defer></script>
 </head>
 
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
@@ -49,7 +50,7 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
-                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" {{-- link="/messages" --}} disabled />
+                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" />
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                     <x-menu-item title="Usuarios" icon="o-users" link="/users" />
                     <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">

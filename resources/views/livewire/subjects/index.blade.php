@@ -108,6 +108,7 @@ new class extends Component {
                     <x-button icon="o-chevron-up-down" class="btn-ghost btn-sm" />
                 </x-slot:trigger>
 
+                <x-button icon="o-academic-cap" label="Administrar Contenido" link="{{ route('subjects.content-manager', ['subject' => $subject->id]) }}" spinner class="btn-ghost btn-sm" />
                 <x-button icon="o-bookmark" label="Recordar" wire:click="bookmark({{ $subject['id'] }})" spinner
                     class="btn-ghost btn-sm text-lime-500" />
                 {{-- <x-button icon="o-trash" wire:click="delete({{ $subject['id'] }})" wire:confirm="Are you sure?"

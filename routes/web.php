@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\print\PrintClassbookController;
 use App\Http\Controllers\print\PrintInscriptionsController;
-
+use App\Http\Controllers\print\PrintStudentReportController;
+use App\Livewire\Chat;
+use App\Livewire\Subjects\Content as SubjectsContent;
 
 // Users will be redirected to this route if not logged in
 Volt::route('/login', 'login')->name('login');
@@ -16,20 +18,19 @@ Route::get('/', function () {
   return redirect('/dashboard'); //view('dashboard');
 });
 
-Volt::route('/messages', 'messages.index')->middleware('auth');
-
 Route::get('/clear/{option?}', function ($option = null) {
   $logs = [];
   $maintenance = ($option == "cache") ? [
     'Flush' => 'cache:flush',
   ] : [
-    'DebugBar' => 'debugbar:clear',
+    //'DebugBar' => 'debugbar:clear',
     'Storage Link' => 'storage:link',
     'Config' => 'config:clear',
+    'Cache' => 'cache:clear',
+    'View' => 'view:clear',
     'Optimize Clear' => 'optimize:clear',
     //'Optimize' => 'optimize',
     'Route Clear' => 'route:clear',
-    'Cache' => 'cache:clear',
   ];
 
   foreach ($maintenance as $key => $value) {
@@ -41,11 +42,12 @@ Route::get('/clear/{option?}', function ($option = null) {
     }
   }
   // table format output
-  $output = '<table><tr><th>Task</th><th>Result</th></tr>';
+  $output = '<html><body style="font-family:sans-serif; background-color:#303030; color:white;">
+  <table><tr><th>Task</th><th>Result</th></tr>';
   foreach ($logs as $key => $value) {
-    $output .= '<tr><td>' . $key . '</td><td>' . $value . '</td></tr>';
+    $output .= '<tr><td>' . $key . '</td><td style="text-align:center;">' . $value . '</td></tr>';
   }
-  $output .= '</table>';
+  $output .= '</table></body></html>';
   return $output;
 });
 
@@ -89,4 +91,10 @@ Route::middleware('auth')->group(function () {
   Volt::route('/class-sessions', 'class_sessions.index')->middleware('roles:admin,teacher,principal,administrative');
   Volt::route('/class-session/{id?}', 'class_sessions.crud')->middleware('roles:admin,teacher,principal,administrative');
   Volt::route('/class-sessions/students/{id?}', 'class_sessions.students')->middleware('roles:admin,teacher,principal,administrative');
+  Route::get('/chat', Chat::class)->middleware('auth');
+  Route::get('/print/student-report/{subject_id}', [PrintStudentReportController::class, 'generateReport'])->name('print.student-report');
+  Route::get('/print/student-attendance-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateAttendanceReport'])->name('print.student-attendance-report');
+  Volt::route('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal');
+  Route::get('/subjects/{subject}/content-manager', \App\Livewire\ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
+  Volt::route('/simplified-content/{subject}', 'simplified-content')->name('simplified-content')->middleware('roles:admin,teacher,director,student,principal');
 });

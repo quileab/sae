@@ -72,6 +72,13 @@ new class extends Component {
         $this->success('Registro guardado');
         $this->redirect('/class-sessions');
     }
+
+    public function delete()
+    {
+        ClassSession::find($this->data['id'])->delete();
+        $this->success('Registro eliminado');
+        $this->redirect('/class-sessions');
+    }
 }; ?>
 
 <div>

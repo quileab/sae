@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Message extends Model
@@ -13,22 +14,20 @@ class Message extends Model
 
     protected $fillable = [
         'sender_id',
-        'receiver_id',
-        'subject_id',
-        'messageType',
         'content',
-        'attachment_path',
-        'attachment_name',
+        'subject_id',
     ];
 
     public function sender(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'sender_id');
     }
 
-    public function receiver(): BelongsTo
+    public function recipients(): BelongsToMany
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsToMany(User::class, 'message_user', 'message_id', 'user_id')
+            ->withPivot('read_at')
+            ->withTimestamps();
     }
 
     public function subject(): BelongsTo
@@ -36,8 +35,5 @@ class Message extends Model
         return $this->belongsTo(Subject::class);
     }
 
-    public function reads(): HasMany
-    {
-        return $this->hasMany(MessageRead::class);
-    }
+    
 }
