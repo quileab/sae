@@ -8,6 +8,7 @@ use App\Models\Grade;
 use App\Models\Subject;
 use App\Models\Configs;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class PrintStudentReportController extends Controller
 {
@@ -131,5 +132,25 @@ class PrintStudentReportController extends Controller
         $second_rec_ev = $studentData['second_semester']['rec_ev'];
 
         return ($first_ev >= 6 || $first_rec_ev >= 6 || $second_ev >= 6 || $second_rec_ev >= 6);
+    }
+
+    public function printStudentsPayments(Request $request)
+    {
+        $dateFrom = $request->input('dateFrom');
+        $dateTo = $request->input('dateTo');
+        $search = $request->input('search');
+
+        $payments = \App\Models\PaymentRecord::with('user')
+            ->whereBetween('created_at', [Carbon::parse($dateFrom)->startOfDay(), Carbon::parse($dateTo)->endOfDay()])
+            ->when($search, function ($query, $search) {
+                $query->whereHas('user', function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('lastname', 'like', '%' . $search . '%')
+                        ->orWhere('firstname', 'like', '%' . $search . '%');
+                });
+            })
+            ->get();
+
+        return view('print.students-payments', compact('payments'));
     }
 }

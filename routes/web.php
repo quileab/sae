@@ -11,6 +11,7 @@ use App\Http\Controllers\print\PrintStudentReportController;
 use App\Livewire\Chat;
 use App\Livewire\Subjects\Content as SubjectsContent;
 
+
 // Users will be redirected to this route if not logged in
 Volt::route('/login', 'login')->name('login');
 // Volt::route('/register', 'register'); 
@@ -94,7 +95,18 @@ Route::middleware('auth')->group(function () {
   Route::get('/chat', Chat::class)->middleware('auth');
   Route::get('/print/student-report/{subject_id}', [PrintStudentReportController::class, 'generateReport'])->name('print.student-report');
   Route::get('/print/student-attendance-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateAttendanceReport'])->name('print.student-attendance-report');
+  Route::get('/print/students-payments', [\App\Http\Controllers\print\PrintStudentReportController::class, 'printStudentsPayments'])->name('printStudentsPayments');
   Volt::route('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal');
   Route::get('/subjects/{subject}/content-manager', \App\Livewire\ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
   Volt::route('/simplified-content/{subject}', 'simplified-content')->name('simplified-content')->middleware('roles:admin,teacher,director,student,principal');
+  Volt::route('/calendar', 'calendar')->name('calendar')->middleware('roles:admin,teacher,principal,administrative,student');
+
+  // Payment System Routes
+  Volt::route('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,administrative');
+  Volt::route('/user-payments-index', 'user-payments-index')->name('user-payments-index')->middleware('roles:admin,principal,administrative');
+  Volt::route('/user-payments/{user}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,administrative');
+  Volt::route('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,administrative');
+  Volt::route('/report-payments', 'report-payments')->name('report-payments')->middleware('roles:admin,principal,administrative');
+
+  Route::get('/payments/receipt/{paymentRecord}', [\App\Http\Controllers\ReceiptController::class, 'show'])->name('payments.receipt');
 });

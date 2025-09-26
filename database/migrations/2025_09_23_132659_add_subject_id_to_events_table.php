@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('permissions', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique(); // Nombre del permiso (e.g., "approve_class").
-            $table->string('description')->nullable(); // Descripción del permiso.
-            $table->timestamps();
+        Schema::table('events', function (Blueprint $table) {
+            $table->foreignId('subject_id')->nullable()->constrained()->onDelete('set null');
         });
     }
 
@@ -24,6 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('permissions');
+        Schema::table('events', function (Blueprint $table) {
+            $table->dropForeign(['subject_id']);
+            $table->dropColumn('subject_id');
+        });
     }
 };

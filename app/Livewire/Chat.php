@@ -15,31 +15,48 @@ class Chat extends Component
     public $recipient_id;
     public $users = [];
     public $subjects = [];
+    public $selectedSubjectId;
 
     public function mount()
     {
-        if (Auth::user()->hasRole('student')) {
-            $subjectUsers = collect();
-            foreach (Auth::user()->subjects as $subject) {
-                $subjectUsers = $subjectUsers->merge($subject->users);
+        $user = Auth::user();
+        $this->subjects = $user->subjects->map(function ($subject) {
+            return ['id' => $subject->id, 'name' => $subject->name];
+        })->all();
+
+        if ($user->hasRole('student')) {
+            $teacherIds = collect();
+            foreach($user->subjects as $subject) {
+                $teacherIds = $teacherIds->merge($subject->users()->where('role', 'teacher')->pluck('users.id'));
             }
 
-            $directorsAndAdmins = User::whereIn('role', ['director', 'admin'])->get();
+            $directorAndAdminIds = User::whereIn('role', ['director', 'admin'])->pluck('id');
 
-            $this->users = $subjectUsers->merge($directorsAndAdmins)->unique('id')->map(function ($user) {
+            $allIds = $teacherIds->merge($directorAndAdminIds)->unique();
+
+            $this->users = User::whereIn('id', $allIds)->get()->map(function ($user) {
                 return ['id' => $user->id, 'name' => $user->fullname];
             })->sortBy('name')->values()->all();
 
-            $this->subjects = Auth::user()->subjects->map(function ($subject) {
-                return ['id' => $subject->id, 'name' => $subject->name];
-            })->all();
         } else {
-            $this->users = User::where('id', '!=', Auth::id())->get()->map(function ($user) {
-                return ['id' => $user->id, 'name' => $user->fullname];
-            })->sortBy('name')->values()->all();
-            $this->subjects = Subject::all()->map(function ($subject) {
-                return ['id' => $subject->id, 'name' => $subject->name];
-            })->all();
+            // For teachers and admins, users are loaded on subject selection.
+            $this->users = [];
+        }
+    }
+
+    public function updatedSelectedSubjectId($subjectId)
+    {
+        if (!Auth::user()->hasRole('student')) {
+            if ($subjectId) {
+                $subject = Subject::find($subjectId);
+                if ($subject) {
+                    $this->users = $subject->users()->where('users.id', '!=', Auth::id())->get()->map(function ($user) {
+                        return ['id' => $user->id, 'name' => $user->fullname];
+                    })->sortBy('name')->values()->all();
+                }
+            } else {
+                $this->users = [];
+            }
         }
     }
 
@@ -137,6 +154,15 @@ class Chat extends Component
             ],
             'recipient_type' => 'required|in:user,subject,all', // Keep validation for now
         ]);
+
+        // Prevent students from sending messages to other students
+        if (Auth::user()->hasRole('student') && $validated['recipient_type'] === 'user') {
+            $recipient = User::find($validated['recipient_id']);
+            if ($recipient && $recipient->hasRole('student')) {
+                session()->flash('error', 'No puedes enviar mensajes a otros estudiantes.');
+                return;
+            }
+        }
 
         // Step 2: Create the message.
         $message = Message::create([

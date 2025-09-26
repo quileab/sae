@@ -51,6 +51,9 @@
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
                 <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" />
+                @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
+                    <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
+                @endif
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                     <x-menu-item title="Usuarios" icon="o-users" link="/users" />
                     <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
@@ -69,6 +72,11 @@
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
                         <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
                     </x-menu-sub>
+                    <x-menu-sub title="Pagos" icon="o-currency-dollar">
+                        <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments-index" />
+                        <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
+                        <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
+                    </x-menu-sub>
                     <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
                         <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
                         <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
@@ -76,6 +84,7 @@
                     </x-menu-sub>
                 @endif
                 @if($user->hasAnyRole(['student']))
+                    <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
                     <x-menu-item title="Matricularme a Materias" icon="o-arrow-path-rounded-square" link="/enrollments" />
                     <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                 @endif

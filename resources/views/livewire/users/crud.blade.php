@@ -31,7 +31,7 @@ new class extends Component {
 
     public function mount($id = null)
     {
-        $this->roles = \App\Models\Role::all();
+        $this->roles = \App\Models\User::$roles;
         $this->careers = \App\Models\Career::where(
             ['allow_enrollments' => true, 'allow_evaluations' => true]
         )->get();
@@ -124,7 +124,7 @@ new class extends Component {
                 <x-input label="E-mail" type="email" wire:model="data.email" />
                 <x-input label="Teléfono" type="tel" wire:model="data.phone" />
                 <x-select label="Rol" icon="o-user" :options="$roles" wire:model="data.role" option-value="name"
-                    option-label="description" />
+                    option-label="alias" />
             </div>
 
             <x-slot:actions>

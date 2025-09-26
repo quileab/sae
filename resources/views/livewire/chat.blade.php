@@ -45,7 +45,17 @@
         <div>
             <form wire:submit.prevent="sendMessage">
                 <x-card title="Enviar Mensaje">
+                    @if (session()->has('error'))
+                        <div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+
                     <x-textarea label="Mensaje" wire:model.defer="content" rows="3" />
+
+                    @if(!auth()->user()->hasRole('student'))
+                        <x-select label="Materia" wire:model.live="selectedSubjectId" :options="$subjects" placeholder="Selecciona una materia para filtrar usuarios" />
+                    @endif
 
                     <x-select label="Enviar a" wire:model.live="recipient_type"
                         :options="auth()->user()->hasRole('student') ? [['id' => 'user', 'name' => 'Usuario'], ['id' => 'subject', 'name' => 'Curso']] : [['id' => 'user', 'name' => 'Usuario'], ['id' => 'subject', 'name' => 'Curso'], ['id' => 'all', 'name' => 'Todos']]" />
