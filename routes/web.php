@@ -95,6 +95,7 @@ Route::middleware('auth')->group(function () {
   Route::get('/chat', Chat::class)->middleware('auth');
   Route::get('/print/student-report/{subject_id}', [PrintStudentReportController::class, 'generateReport'])->name('print.student-report');
   Route::get('/print/student-attendance-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateAttendanceReport'])->name('print.student-attendance-report');
+  Route::get('/print/student-grades-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateGradesReport'])->name('print.student-grades-report');
   Route::get('/print/students-payments', [\App\Http\Controllers\print\PrintStudentReportController::class, 'printStudentsPayments'])->name('printStudentsPayments');
   Volt::route('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal');
   Route::get('/subjects/{subject}/content-manager', \App\Livewire\ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
@@ -105,8 +106,16 @@ Route::middleware('auth')->group(function () {
   Volt::route('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,administrative');
   Volt::route('/user-payments-index', 'user-payments-index')->name('user-payments-index')->middleware('roles:admin,principal,administrative');
   Volt::route('/user-payments/{user}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,administrative');
-  Volt::route('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,administrative');
+  Volt::route('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,administrative,student');
   Volt::route('/report-payments', 'report-payments')->name('report-payments')->middleware('roles:admin,principal,administrative');
 
+  Volt::route('/my-payment-plan', 'user-payment-component')->name('my-payment-plan')->middleware('roles:student');
+
   Route::get('/payments/receipt/{paymentRecord}', [\App\Http\Controllers\ReceiptController::class, 'show'])->name('payments.receipt');
+
+    // Mercado Pago Routes
+    Route::get('/mercadopago/success', [\App\Http\Controllers\MercadoPagoController::class, 'success'])->name('mercadopago.success');
+    Route::get('/mercadopago/failure', [\App\Http\Controllers\MercadoPagoController::class, 'failure'])->name('mercadopago.failure');
+    Route::get('/mercadopago/pending', [\App\Http\Controllers\MercadoPagoController::class, 'pending'])->name('mercadopago.pending');
+    Route::post('/mercadopago/webhook', [\App\Http\Controllers\MercadoPagoController::class, 'webhook'])->name('mercadopago.webhook');
 });

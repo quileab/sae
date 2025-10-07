@@ -135,8 +135,10 @@ new class extends Component {
                 <x-button label="Administrar Contenidos" icon="o-book-open"
                     link="{{ route('subjects.content-manager', ['subject' => $subject_id]) }}" class="btn-primary" />
             @endif
-            <x-button label="Imprimir Asistencias" icon="o-printer" class="btn-primary"
+            <x-button label="Asistencia" icon="o-document-text" class="btn-sm"
                 link="/print/student-attendance-report/{{ $subject_id }}" external no-wire-navigate />
+            <x-button label="Calificaciones" icon="o-academic-cap" class="btn-sm"
+                link="/print/student-grades-report/{{ $subject_id }}" external no-wire-navigate />
         </div>
     </x-drawer>
 </div>

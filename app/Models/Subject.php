@@ -43,4 +43,9 @@ class Subject extends Model
     {
         return $this->hasMany(Unit::class);
     }
+
+    public function classSessions()
+    {
+        return $this->hasMany(ClassSession::class);
+    }
 }

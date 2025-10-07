@@ -30,13 +30,30 @@ new class extends Component {
   public $hasCounter;
   public $userPayments;
 
-  public function mount($user)
+  public $nextPaymentToPay = null;
+
+  public function mount($user = null)
   {
-    $this->userId = $user;
-    $this->user = User::find($user);
+    $this->userId = $user ?? auth()->id();
+    $this->user = User::find($this->userId);
     $this->loadData();
     if ($this->payPlans->isNotEmpty()) {
       $this->selectedPlan = $this->payPlans->first()->id;
+    }
+
+    if (auth()->user()->hasRole('student')) {
+      $this->findNextPayment();
+    }
+  }
+
+  public function findNextPayment()
+  {
+    $pending = UserPayments::where('user_id', $this->userId)
+      ->whereRaw('paid < amount')
+      ->get();
+
+    if ($pending->isNotEmpty()) {
+      $this->nextPaymentToPay = $pending->sortBy('date')->first();
     }
   }
 
@@ -89,12 +106,12 @@ new class extends Component {
 
   public function addPaymentToUser()
   {
-    $paymentToPay = UserPayments::where('user_id', $this->userId)
+    $pending = UserPayments::where('user_id', $this->userId)
       ->whereRaw('paid < amount')
-      ->orderBy('date', 'asc')
-      ->first();
+      ->get();
 
-    if ($paymentToPay) {
+    if ($pending->isNotEmpty()) {
+      $paymentToPay = $pending->sortBy('date')->first();
       $this->paymentId = $paymentToPay->id;
       $this->paymentDescription = $paymentToPay->title;
       $this->paymentAmountPaid = $paymentToPay->amount - $paymentToPay->paid;
@@ -106,6 +123,8 @@ new class extends Component {
 
   public function registerUserPayment()
   {
+    $paymentRecord = null;
+
     DB::transaction(function () use (&$paymentRecord) {
       $amountToDistribute = $this->paymentAmountInput;
       $currentInstallment = UserPayments::find($this->paymentId);
@@ -159,7 +178,9 @@ new class extends Component {
       ]);
     });
 
-    $this->dispatch('open-receipt', url: route('payments.receipt', $paymentRecord));
+    if ($paymentRecord) {
+      $this->dispatch('open-receipt', url: route('payments.receipt', $paymentRecord));
+    }
 
     $this->paymentModal = false;
     $this->loadData();
@@ -206,7 +227,6 @@ new class extends Component {
 }; ?>
 
 <div>
-
   {{-- CRUD Plans Form --}}
   <x-modal wire:model="openModal" title="{{ $user->lastname }}, {{ $user->firstname }}" subtitle="ID: {{ $userId }}"
     separator>
@@ -230,10 +250,15 @@ new class extends Component {
     separator>
     <p>{{ __('Pagando:') }} <strong>{{ $paymentDescription }}</strong> » {{ __('Valor:') }} <strong>$
         {{ number_format($paymentAmountPaid, 2) }}</strong></p>
-    <x-input type="number" wire:model.defer="paymentAmountInput" placeholder="{{ __('Ingresar monto') }}" />
+
+    @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+      <x-input type="number" wire:model.defer="paymentAmountInput" placeholder="{{ __('Ingresar monto') }}" />
+    @endif
 
     <x-slot:actions>
-      <x-button label="{{ __('Ingresar Pago') }}" wire:click="registerUserPayment" class="btn-success" />
+      @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+        <x-button label="{{ __('Ingresar Pago') }}" wire:click="registerUserPayment" class="btn-success" />
+      @endif
       <x-button label="{{ __('Salir') }}" wire:click="$toggle('paymentModal')" wire:loading.attr="disabled"
         class="btn-secondary" />
     </x-slot:actions>
@@ -249,7 +274,7 @@ new class extends Component {
         <br />{{ __('Pagado:') }} <strong>$ {{ number_format($totalPaid, 2) }}</strong>
       </p>
       <x-input type="number" wire:model.defer="totalDebt" />
-      <x-button label="{{ __('Modificar') }}" wire:click="modifyAmount({{$paymentId}})}" class="btn-primary" />
+      <x-button label="{{ __('Modificar') }}" wire:click="modifyAmount({{$paymentId}})" class="btn-primary" />
     </div>
 
     <x-slot:actions>
@@ -261,29 +286,76 @@ new class extends Component {
 
   <div class="mb-2 overflow-hidden bg-gray-200/10 rounded-md shadow-md">
     <div class="flex items-center justify-between w-full px-4 py-2">
-      <h1 class="inline-block">
-        <strong>{{ $user->lastname }}</strong>, {{ $user->firstname }}
-        » <small>{{ $user->id }}</small>
+      <h1 class="text-xl">
+        <strong>{{ ucfirst($user->lastname) }}</strong>,
+        {{ ucfirst($user->firstname) }}
+        <small class="text-primary">(# {{ $user->id }})</small>
       </h1>
+
+      @if(auth()->user()->hasRole('student') && $nextPaymentToPay)
+        <div class="flex items-center space-x-4">
+          <div class="text-right">
+            <p><strong>Pagar Cuota: {{ $nextPaymentToPay->title }}</strong></p>
+            <p>${{ number_format($nextPaymentToPay->amount - $nextPaymentToPay->paid, 2) }}</p>
+          </div>
+          <livewire:online-payment :userPaymentId="$nextPaymentToPay->id" />
+        </div>
+      @endif
+
       {{-- Assign new payment plan --}}
       <div>
-        @if ($hasCounter > 0)
-          @if ($totalPaid < $totalDebt)
-            <x-button wire:click="addPaymentToUser" icon="o-currency-dollar" label="{{ __('Ingresar Pago') }}"
-              class="btn-success" />&nbsp;
+        @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+          @if ($hasCounter > 0)
+            @if ($totalPaid < $totalDebt)
+              <x-button wire:click="addPaymentToUser" icon="o-currency-dollar" label="{{ __('Ingresar Pago') }}"
+                class="btn-success" />&nbsp;
+            @endif
+            <a href="{{ route('payments-details', $user->id) }}" class="ml-2">
+              <x-button icon="o-list-bullet" label="{{ __('Ver Pagos') }}" class="btn-primary" />
+            </a>
           @endif
-          <a href="{{ route('payments-details', $user->id) }}" class="ml-2">
-            <x-button icon="o-list-bullet" label="{{ __('Ver Pagos') }}" class="btn-primary" />
-          </a>
+          <x-button wire:click="$set('openModal',true)" icon="o-plus-circle" label="{{ __('Agregar Plan') }}"
+            class="btn-primary" />
         @endif
-        <x-button wire:click="$set('openModal',true)" icon="o-plus-circle" label="{{ __('Agregar Plan') }}"
-          class="btn-primary" />
       </div>
     </div>
 
+    @if (session('success'))
+      <x-alert icon="o-information-circle" class="alert-success">
+        {{ session('success') }} - El pago puede tardar unos minutos en actualizarse.
+      </x-alert>
+    @endif
+
+    @if (session('error'))
+      <x-alert icon="o-exclamation-triangle" class="alert-error">
+        {{ session('error') }}
+      </x-alert>
+    @endif
+
+    @if (session('info'))
+      <x-alert icon="o-bell" class="alert-info">
+        {{ session('info') }}
+      </x-alert>
+    @endif
+
     <div class="container px-3 mx-auto my-3 md:px-6">
       @foreach ($userPayments as $userPayment)
-        <button wire:click="handleInstallmentClick({{$userPayment}})">
+        @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+          <button wire:click="handleInstallmentClick({{$userPayment}})">
+            <div class="inline-block w-32 m-1 overflow-hidden text-sm uppercase bg-gray-700 rounded-md shadow-lg">
+              <div class="{{$userPayment->bgColor}} w-full text-center p-1">
+                {{ $userPayment->title }}
+                <p class="text-xs">{{ \Carbon\Carbon::parse($userPayment->date)->format('m-Y') }}</p>
+              </div>
+              <div class="px-2 py-1">
+                <div class="text-right">
+                  <p class="text-base">$ {{ number_format($userPayment->paid, 2) }}</p>
+                  <p class="{{$userPayment->textColor}} text-xs">$ {{ number_format($userPayment->amount, 2) }}</p>
+                </div>
+              </div>
+            </div>
+          </button>
+        @else
           <div class="inline-block w-32 m-1 overflow-hidden text-sm uppercase bg-gray-700 rounded-md shadow-lg">
             <div class="{{$userPayment->bgColor}} w-full text-center p-1">
               {{ $userPayment->title }}
@@ -296,7 +368,7 @@ new class extends Component {
               </div>
             </div>
           </div>
-        </button>
+        @endif
       @endforeach
     </div>
     <div class="container px-3 py-1 mx-auto my-3 text-lg text-right bg-gray-300/10 md:px-6">
@@ -311,3 +383,4 @@ new class extends Component {
     </div>
     <div x-data="{}" @open-receipt.window="window.open($event.detail.url, '_blank')"></div>
   </div>
+</div>

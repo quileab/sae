@@ -18,6 +18,10 @@ new class extends Component {
 
   public function mount($user)
   {
+    if (auth()->user()->hasRole('student') && auth()->id() != $user) {
+        abort(403, 'No tienes permiso para ver esta página.');
+    }
+
     $this->user = User::find($user);
   }
 
@@ -112,14 +116,23 @@ new class extends Component {
                   ${{ number_format($payment->paymentAmount, 2) }}
               @endscope
       
-              @scope('actions', $payment)      @if(in_array(auth()->user()->role, ['admin', 'director', 'administrative']) && $payment->paymentAmount > 0)
-        <x-dropdown>
-          <x-slot:trigger>
-            <x-button icon="o-ellipsis-horizontal" class="btn-ghost btn-sm" />
-          </x-slot:trigger>
-          <x-menu-item title="Cancelar" wire:click="cancelPayment('{{ $payment->id }}')" />
-        </x-dropdown>
-      @endif
+              @scope('actions', $payment)
+        <div class="flex items-center">
+        @if($payment->paymentAmount > 0)
+            <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank">
+                <x-button icon="o-document-text" class="btn-ghost btn-sm" />
+            </a>
+        @endif
+
+        @if(in_array(auth()->user()->role, ['admin', 'director', 'administrative']) && $payment->paymentAmount > 0)
+            <x-dropdown>
+              <x-slot:trigger>
+                <x-button icon="o-ellipsis-horizontal" class="btn-ghost btn-sm" />
+              </x-slot:trigger>
+              <x-menu-item title="Cancelar" wire:click="cancelPayment('{{ $payment->id }}')" />
+            </x-dropdown>
+        @endif
+        </div>
       @endscope
       <x-slot:no-data>
         No hay registros para mostrar.

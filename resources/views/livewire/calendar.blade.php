@@ -23,11 +23,12 @@
             @foreach ($week as $day)
                 <div
                     class="text-center rounded-md overflow-hidden p-0 {{ $day['isCurrentMonth'] ? 'bg-gray-100/10' : 'bg-black/10 text-gray-600' }}
-                    {{ Carbon\Carbon::parse($day['date'])->isToday() ? 'ring-2 ring-primary bg-primary/30 ' : '' }}">
-                        {{ $day['day'] }}
+                                    {{ Carbon\Carbon::parse($day['date'])->isToday() ? 'ring-2 ring-primary bg-primary/30 ' : '' }}">
+                    {{ $day['day'] }}
                     <div class="mt-2">
                         @foreach ($day['events'] as $event)
-                            <div class="rounded p-1 cursor-pointer" style="background-color: {{ $event->color }};"
+                            <div class="rounded p-1 cursor-pointer"
+                                style="background-color: {{ $event->color }}60; border: 2px solid {{ $event->color }};"
                                 wire:click="eventClick({{ $event->id }})"
                                 title="{{ $event->title . ' - De ' . Carbon\Carbon::parse($event->start)->format('H:i') . ' a ' . Carbon\Carbon::parse($event->end)->format('H:i') }}">
                                 <small>{{ $event->title }}</small>
@@ -47,20 +48,20 @@
                         <h4 class="text-warning p-1 mb-1 rounded-md text-lg bg-gray-900">
                             {{ Carbon\Carbon::parse($day['date'])->format('d/m/Y') }}
                         </h4>
-                      
-                            @foreach ($day['events'] as $event)
+
+                        @foreach ($day['events'] as $event)
                             <p>
-                                <div class="ml-4 w-3 h-3 rounded-full inline-block" style="background-color: {{ $event->color }};"></div>
-                                <span class="font-bold">
+                            <div class="ml-4 w-3 h-3 rounded-full inline-block" style="background-color: {{ $event->color }};"></div>
+                            <span class="font-bold">
                                 {{ $event->title }}</span>:
-                                de {{ Carbon\Carbon::parse($event->start)->format('H:i') }}hs
-                                a {{ Carbon\Carbon::parse($event->end)->format('H:i') }}hs
-                                @if ($event->subject)
-                                    <span class="text-gray-400">| {{ $event->subject->name }} ({{ $event->subject->id }})</span>
-                                @endif
+                            de {{ Carbon\Carbon::parse($event->start)->format('H:i') }}hs
+                            a {{ Carbon\Carbon::parse($event->end)->format('H:i') }}hs
+                            @if ($event->subject)
+                                <span class="text-gray-400">| {{ $event->subject->name }} ({{ $event->subject->id }})</span>
+                            @endif
                             </p>
-                            @endforeach
-                  
+                        @endforeach
+
                     </div>
                 @endif
             @endforeach

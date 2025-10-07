@@ -3,6 +3,9 @@
 
     <x-card title="Unidades" shadow separator>
         <x-slot:menu>
+            <input type="file" wire:model="upload" class="hidden" id="upload-{{ $this->id() }}">
+            <x-button label="Importar" icon="o-arrow-up-tray" class="btn-primary" onclick="document.getElementById('upload-{{ $this->id() }}').click()" />
+            <x-button label="Exportar" icon="o-arrow-down-tray" class="btn-primary" wire:click="exportContent" spinner />
             <x-button label="Nueva Unidad" icon="o-plus" class="btn-primary" wire:click="addUnit" />
         </x-slot:menu>
 

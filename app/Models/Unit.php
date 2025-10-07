@@ -30,4 +30,13 @@ class Unit extends Model
     {
         return $this->hasMany(Topic::class);
     }
+
+    protected static function booted()
+    {
+        static::deleting(function ($unit) {
+            $unit->topics()->each(function ($topic) {
+                $topic->delete();
+            });
+        });
+    }
 }

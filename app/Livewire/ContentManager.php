@@ -6,12 +6,16 @@ use App\Models\Subject;
 use App\Models\Unit;
 use App\Models\Topic;
 use App\Models\Resource;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Response;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Mary\Traits\Toast;
 
 class ContentManager extends Component
 {
     use Toast;
+    use WithFileUploads;
 
     public Subject $subject;
     public bool $showUnitModal = false;
@@ -237,6 +241,80 @@ class ContentManager extends Component
             $this->subject->refresh();
             $this->success('Visibilidad del recurso actualizada.');
         }
+    }
+
+    public $upload;
+
+    public function exportContent()
+    {
+        $units = $this->subject->units()->with(['topics.resources'])->get();
+
+        $fileName = 'content-' . $this->subject->id . '-' . now()->format('Y-m-d') . '.json';
+
+        return response()->streamDownload(function () use ($units) {
+            echo json_encode($units, JSON_PRETTY_PRINT);
+        }, $fileName);
+    }
+
+    public function importContent()
+    {
+        $this->validate([
+            'upload' => 'required|file|mimes:json|max:10240', // 10MB Max
+        ]);
+
+        $content = $this->upload->get();
+        $units = json_decode($content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->error('Error al decodificar el archivo JSON.');
+            return;
+        }
+
+        DB::transaction(function () use ($units) {
+            // Delete existing content
+            foreach ($this->subject->units as $unit) {
+                $unit->delete(); // This will trigger deleting events on the model for topics and resources
+            }
+
+            foreach ($units as $unitData) {
+                $unit = $this->subject->units()->create([
+                    'name' => $unitData['name'],
+                    'description' => $unitData['description'],
+                    'order' => $unitData['order'],
+                    'is_visible' => $unitData['is_visible'],
+                ]);
+
+                if (isset($unitData['topics'])) {
+                    foreach ($unitData['topics'] as $topicData) {
+                        $topic = $unit->topics()->create([
+                            'name' => $topicData['name'],
+                            'content' => $topicData['content'],
+                            'order' => $topicData['order'],
+                            'is_visible' => $topicData['is_visible'],
+                        ]);
+
+                        if (isset($topicData['resources'])) {
+                            foreach ($topicData['resources'] as $resourceData) {
+                                $topic->resources()->create([
+                                    'title' => $resourceData['title'],
+                                    'url' => $resourceData['url'],
+                                    'is_visible' => $resourceData['is_visible'],
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        $this->success('Contenido importado correctamente.');
+        $this->subject->refresh();
+        $this->reset('upload');
+    }
+
+    public function updatedUpload()
+    {
+        $this->importContent();
     }
 
     public function render()

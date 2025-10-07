@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // }
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            '/mercadopago/webhook'
+        ]);
+
         //si es un middleware GLOBAL
         $middleware->alias([
             'roles' => App\Http\Middleware\CheckRoles::class

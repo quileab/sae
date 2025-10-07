@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($title) ? $title . ' - ' . config('app.name') : config('app.name') }}</title>
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+    <script>
+        const mp = new MercadoPago("{{ config('mercadopago.public_key') }}", {
+            locale: 'es-AR'
+        });
+    </script>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 
     @livewireStyles
@@ -62,10 +68,12 @@
                         <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
                     </x-menu-sub>
                 @endif
-                <x-menu-sub title="Clases" icon="o-document-duplicate">
-                    <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
-                    <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
-                </x-menu-sub>
+                @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
+                    <x-menu-sub title="Clases" icon="o-document-duplicate">
+                        <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
+                        <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
+                    </x-menu-sub>
+                @endif
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                     <x-menu-sub title="Admin Inscripciones" icon="o-clipboard-document-check">
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
@@ -85,8 +93,8 @@
                 @endif
                 @if($user->hasAnyRole(['student']))
                     <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
-                    <x-menu-item title="Matricularme a Materias" icon="o-arrow-path-rounded-square" link="/enrollments" />
                     <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
+                    <x-menu-item title="Mis Pagos" icon="o-currency-dollar" link="{{ route('my-payment-plan') }}" />
                 @endif
                 @if($user->hasAnyRole(['teacher']))
                     <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />

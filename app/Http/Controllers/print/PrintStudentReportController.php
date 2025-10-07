@@ -49,43 +49,119 @@ class PrintStudentReportController extends Controller
         return view('print.student-report', compact('subject', 'reportData'));
     }
 
-    public function generateAttendanceReport(Request $request, $subject_id)
+    public function generateAttendanceReport($subject_id)
     {
-        $subject = Subject::with('career')->findOrFail($subject_id);
-        $students = $subject->users()->where('role', 'student')->orderBy('lastname')->orderBy('firstname')->get();
+        // Fetch subject details
+        $subject = Subject::with([
+            'enrollments.user',
+            'classSessions' => function ($query) {
+                $query->orderBy('date');
+            }
+        ])->findOrFail($subject_id);
 
-        $q1_start = date('Y') . '-01-01';
-        $q1_end = date('Y') . '-07-14';
-        $q2_start = date('Y') . '-07-15';
-        $q2_end = date('Y') . '-12-30';
+        // Extract students from enrollments
+        $students = $subject->enrollments->map(function ($enrollment) {
+            return $enrollment->user;
+        })->sortBy('lastname');
 
-        $class_sessions = ClassSession::where('subject_id', $subject_id)->where('unit', '!=', '0')->get();
+        // Get all class sessions for the subject
+        $classSessions = $subject->classSessions;
 
-        $total_classes_q1 = $class_sessions->whereBetween('date', [$q1_start, $q1_end])->count();
-        $total_classes_q2 = $class_sessions->whereBetween('date', [$q2_start, $q2_end])->count();
-
-        $student_ids = $students->pluck('id');
-        $all_grades = Grade::whereIn('user_id', $student_ids)
-            ->whereIn('class_session_id', $class_sessions->pluck('id'))
-            ->get()
-            ->groupBy('user_id');
-
+        // Create a report data structure
         $reportData = [];
         foreach ($students as $student) {
-            $grades = $all_grades->get($student->id, collect());
+            $studentAttendances = [];
+            $totalAbsences = 0;
 
-            $attendance_q1 = $this->calculateAttendance($grades, $class_sessions, $q1_start, $q1_end, $total_classes_q1);
-            $attendance_q2 = $this->calculateAttendance($grades, $class_sessions, $q2_start, $q2_end, $total_classes_q2);
+            foreach ($classSessions as $session) {
+                $attendance = $student->grades()->where('class_session_id', $session->id)->first();
+                $isPresent = !is_null($attendance);
+                $studentAttendances[$session->id] = $isPresent;
 
-            $reportData[] = [
+                if (!$isPresent) {
+                    $totalAbsences++;
+                }
+            }
+
+            $reportData[$student->id] = [
                 'student' => $student,
-                'attendance_q1' => $attendance_q1,
-                'attendance_q2' => $attendance_q2,
+                'attendances' => $studentAttendances,
+                'total_absences' => $totalAbsences,
             ];
         }
 
-        $config = Configs::all()->pluck('value', 'id');
+        // Separate class sessions by quarter
+        $total_classes_q1 = $classSessions->where('quarter', 1)->count();
+        $total_classes_q2 = $classSessions->where('quarter', 2)->count();
+
+        $config = Configs::find(1);
+        if (!$config) {
+            $config = new \stdClass();
+            $config->logo = 'imgs/logo.png'; // default logo
+            $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
+        }
+
+        // Pass data to the view
         return view('print.student-attendance-report', compact('subject', 'reportData', 'total_classes_q1', 'total_classes_q2', 'config'));
+    }
+
+    public function generateGradesReport($subject_id)
+    {
+        $cycle = session('cycle');
+        if (!$cycle) {
+            $cycle = \App\Models\Configs::getValue('cycle')[0]->value;
+            session(['cycle' => $cycle]);
+        }
+
+        $subject = Subject::with('enrollments.user')->findOrFail($subject_id);
+
+        $classSessions = ClassSession::where('subject_id', $subject_id)
+            ->where('unit', '!=', '0')
+            ->whereYear('date', $cycle)
+            ->orderBy('date')
+            ->get();
+
+        $session_ids = $classSessions->pluck('id');
+
+        $students = $subject->enrollments->map(function ($enrollment) {
+            return $enrollment->user;
+        })->where('role', 'student')->sortBy('lastname');
+
+        $reportData = [];
+        foreach ($students as $student) {
+            $grades = Grade::where('user_id', $student->id)
+                ->whereIn('class_session_id', $session_ids)
+                ->get()
+                ->keyBy('class_session_id');
+
+            $reportData[$student->id] = [
+                'student' => $student,
+                'grades' => $grades,
+            ];
+        }
+
+        $classSessions_q1 = $classSessions->filter(function ($session) {
+            $date = new \DateTime($session->date);
+            $month = $date->format('m');
+            $day = $date->format('d');
+            return ($month == 3 && $day >= 1) || ($month > 3 && $month < 7) || ($month == 7 && $day <= 14);
+        });
+
+        $classSessions_q2 = $classSessions->filter(function ($session) {
+            $date = new \DateTime($session->date);
+            $month = $date->format('m');
+            $day = $date->format('d');
+            return ($month == 7 && $day >= 15) || ($month > 7 && $month < 11) || ($month == 11 && $day <= 30);
+        });
+
+        $total_classes_q1 = $classSessions_q1->count();
+        $total_classes_q2 = $classSessions_q2->count();
+
+        $config = new \stdClass();
+        $config->logo = 'imgs/logo.png'; // default logo
+        $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
+
+        return view('print.student-grades-report', compact('subject', 'reportData', 'total_classes_q1', 'total_classes_q2', 'config', 'classSessions_q1', 'classSessions_q2'));
     }
 
     private function calculateAttendance($grades, $class_sessions, $start_date, $end_date, $total_classes)
