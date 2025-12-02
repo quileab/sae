@@ -105,7 +105,7 @@
         <thead>
             <tr>
                 <td colspan="6">
-                    <h2>{{ $config['shortname'] }} - {{ $config['longname'] }}</h2>
+                    <h2>{{ $config->shortname }} - {{ $config->longname }}</h2>
                 </td>
             </tr>
             <tr>

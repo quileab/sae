@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Career;
 use App\Models\Event;
 use Carbon\Carbon;
 use Livewire\Component;
@@ -19,11 +20,20 @@ class Calendar extends Component
     public function mount()
     {
         $this->date = Carbon::now();
-        if (auth()->user()->hasRole('student')) {
-            $this->careers = auth()->user()->careers;
-            $this->career_id = auth()->user()->careers->first()->id;
-        } else {
-            $this->careers = auth()->user()->careers;
+        $user = auth()->user();
+
+        if ($user->hasAnyRole(['admin', 'director', 'administrative'])) {
+            $this->careers = Career::all();
+        } elseif ($user->hasRole('teacher')) {
+            $subjects = $user->subjects()->with('career')->get();
+            $this->careers = $subjects->map(function ($subject) {
+                return $subject->career;
+            })->filter()->unique('id')->values();
+        } else { // student
+            $this->careers = $user->careers ?? collect();
+            if ($this->careers->isNotEmpty()) {
+                $this->career_id = $this->careers->first()->id;
+            }
         }
     }
 
@@ -42,7 +52,7 @@ class Calendar extends Component
         $startDate = $this->date->copy()->firstOfMonth()->startOfWeek(Carbon::SUNDAY);
         $endDate = $this->date->copy()->lastOfMonth()->endOfWeek(Carbon::SATURDAY);
 
-        $events = Event::with('subject')->whereBetween('start', [$startDate, $endDate])
+        $events = Event::with('subject', 'presidente', 'vocal1', 'vocal2')->whereBetween('start', [$startDate, $endDate])
             ->when($this->career_id, function ($query) {
                 $query->where(function ($q) {
                     $q->whereHas('subject', function ($q2) {
@@ -50,8 +60,8 @@ class Calendar extends Component
                     })->orWhereNull('subject_id');
                 });
             }, function ($query) {
-                // When no career is selected, show only events without a subject
-                $query->whereNull('subject_id');
+                // When no career is selected, show all events
+                return $query;
             })
             ->get();
 

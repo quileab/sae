@@ -34,7 +34,7 @@ new class extends Component {
     public function updatedSubjectId($value): void
     {
         $this->items();
-        $this->info('Materia Seleccionada.' . $value);
+        $this->info('Materia Seleccionada.' . $value, position: 'toast-top toast-center');
         $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $value]);
     }
 
@@ -135,9 +135,9 @@ new class extends Component {
                 <x-button label="Administrar Contenidos" icon="o-book-open"
                     link="{{ route('subjects.content-manager', ['subject' => $subject_id]) }}" class="btn-primary" />
             @endif
-            <x-button label="Asistencia" icon="o-document-text" class="btn-sm"
+            <x-button label="Asistencia" icon="o-document-text" class="btn-sm btn-info"
                 link="/print/student-attendance-report/{{ $subject_id }}" external no-wire-navigate />
-            <x-button label="Calificaciones" icon="o-academic-cap" class="btn-sm"
+            <x-button label="Calificaciones" icon="o-academic-cap" class="btn-sm btn-info"
                 link="/print/student-grades-report/{{ $subject_id }}" external no-wire-navigate />
         </div>
     </x-drawer>

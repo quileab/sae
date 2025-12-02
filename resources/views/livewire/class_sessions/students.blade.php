@@ -256,7 +256,7 @@ new class extends Component {
             <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Notas no numéricas" />
         </div>
         <div class="grid items-center gap-4 mt-4">
-            <x-input label="Observaciones" wire:model="grades.comments" type="text" class="w-full" />
+            <x-input label="Observaciones" wire:model="grades.comments" type="text" placeholder="Observaciones" hint="Comience con Ev: o TP: para indicar el TIPO (Evaluación o Trabajo Practico), de esta manera el sistema podrá calcular el promedio de notas" class="w-full" />
         </div>
         <x-slot:actions>
             <x-dropdown>

@@ -51,77 +51,7 @@ class PrintStudentReportController extends Controller
 
     public function generateAttendanceReport($subject_id)
     {
-        // Fetch subject details
-        $subject = Subject::with([
-            'enrollments.user',
-            'classSessions' => function ($query) {
-                $query->orderBy('date');
-            }
-        ])->findOrFail($subject_id);
-
-        // Extract students from enrollments
-        $students = $subject->enrollments->map(function ($enrollment) {
-            return $enrollment->user;
-        })->sortBy('lastname');
-
-        // Get all class sessions for the subject
-        $classSessions = $subject->classSessions;
-
-        // Create a report data structure
-        $reportData = [];
-        foreach ($students as $student) {
-            $studentAttendances = [];
-            $totalAbsences = 0;
-
-            foreach ($classSessions as $session) {
-                $attendance = $student->grades()->where('class_session_id', $session->id)->first();
-                $isPresent = !is_null($attendance);
-                $studentAttendances[$session->id] = $isPresent;
-
-                if (!$isPresent) {
-                    $totalAbsences++;
-                }
-            }
-
-            $reportData[$student->id] = [
-                'student' => $student,
-                'attendances' => $studentAttendances,
-                'total_absences' => $totalAbsences,
-            ];
-        }
-
-        // Separate class sessions by quarter
-        $total_classes_q1 = $classSessions->where('quarter', 1)->count();
-        $total_classes_q2 = $classSessions->where('quarter', 2)->count();
-
-        $config = Configs::find(1);
-        if (!$config) {
-            $config = new \stdClass();
-            $config->logo = 'imgs/logo.png'; // default logo
-            $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
-        }
-
-        // Pass data to the view
-        return view('print.student-attendance-report', compact('subject', 'reportData', 'total_classes_q1', 'total_classes_q2', 'config'));
-    }
-
-    public function generateGradesReport($subject_id)
-    {
-        $cycle = session('cycle');
-        if (!$cycle) {
-            $cycle = \App\Models\Configs::getValue('cycle')[0]->value;
-            session(['cycle' => $cycle]);
-        }
-
         $subject = Subject::with('enrollments.user')->findOrFail($subject_id);
-
-        $classSessions = ClassSession::where('subject_id', $subject_id)
-            ->where('unit', '!=', '0')
-            ->whereYear('date', $cycle)
-            ->orderBy('date')
-            ->get();
-
-        $session_ids = $classSessions->pluck('id');
 
         $students = $subject->enrollments->map(function ($enrollment) {
             return $enrollment->user;
@@ -129,39 +59,40 @@ class PrintStudentReportController extends Controller
 
         $reportData = [];
         foreach ($students as $student) {
-            $grades = Grade::where('user_id', $student->id)
-                ->whereIn('class_session_id', $session_ids)
-                ->get()
-                ->keyBy('class_session_id');
-
-            $reportData[$student->id] = [
-                'student' => $student,
-                'grades' => $grades,
-            ];
+            $reportData[$student->id] = $this->getStudentGrades($student, $subject);
+            $reportData[$student->id]['student'] = $student;
         }
 
-        $classSessions_q1 = $classSessions->filter(function ($session) {
-            $date = new \DateTime($session->date);
-            $month = $date->format('m');
-            $day = $date->format('d');
-            return ($month == 3 && $day >= 1) || ($month > 3 && $month < 7) || ($month == 7 && $day <= 14);
-        });
+        $config = new \stdClass();
+        $config->logo = 'imgs/logo.png'; // default logo
+        $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
+        $config->shortname = \App\Models\Configs::getValue('shortname')[0]->value;
 
-        $classSessions_q2 = $classSessions->filter(function ($session) {
-            $date = new \DateTime($session->date);
-            $month = $date->format('m');
-            $day = $date->format('d');
-            return ($month == 7 && $day >= 15) || ($month > 7 && $month < 11) || ($month == 11 && $day <= 30);
-        });
+        $total_classes_q1 = reset($reportData)['total_classes_q1'];
+        $total_classes_q2 = reset($reportData)['total_classes_q2'];
 
-        $total_classes_q1 = $classSessions_q1->count();
-        $total_classes_q2 = $classSessions_q2->count();
+        return view('print.student-attendance-report', compact('subject', 'reportData', 'config', 'total_classes_q1', 'total_classes_q2'));
+    }
+
+    public function generateGradesReport($subject_id)
+    {
+        $subject = Subject::with('enrollments.user')->findOrFail($subject_id);
+
+        $students = $subject->enrollments->map(function ($enrollment) {
+            return $enrollment->user;
+        })->where('role', 'student')->sortBy('lastname');
+
+        $reportData = [];
+        foreach ($students as $student) {
+            $reportData[$student->id] = $this->getStudentGrades($student, $subject);
+            $reportData[$student->id]['student'] = $student;
+        }
 
         $config = new \stdClass();
         $config->logo = 'imgs/logo.png'; // default logo
         $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
 
-        return view('print.student-grades-report', compact('subject', 'reportData', 'total_classes_q1', 'total_classes_q2', 'config', 'classSessions_q1', 'classSessions_q2'));
+        return view('print.student-grades-report', compact('subject', 'reportData', 'config'));
     }
 
     private function calculateAttendance($grades, $class_sessions, $start_date, $end_date, $total_classes)
@@ -194,11 +125,7 @@ class PrintStudentReportController extends Controller
         ];
     }
 
-    private function getAverageGrade($grades, $type)
-    {
-        $filtered_grades = $grades->filter(fn($grade) => str_starts_with($grade->comments, $type));
-        return $filtered_grades->avg('grade');
-    }
+
 
     private function checkRegularization($studentData)
     {
@@ -208,6 +135,147 @@ class PrintStudentReportController extends Controller
         $second_rec_ev = $studentData['second_semester']['rec_ev'];
 
         return ($first_ev >= 6 || $first_rec_ev >= 6 || $second_ev >= 6 || $second_rec_ev >= 6);
+    }
+
+    private function getStudentGrades($student, $subject)
+    {
+        $cycle = session('cycle');
+        if (!$cycle) {
+            $cycle = \App\Models\Configs::getValue('cycle')[0]->value;
+            session(['cycle' => $cycle]);
+        }
+
+        $classSessions = ClassSession::where('subject_id', $subject->id)
+            ->where('unit', '!=', '0')
+            ->whereYear('date', $cycle)
+            ->orderBy('date')
+            ->get();
+
+        $classSessions_q1 = $classSessions->filter(function ($session) {
+            $date = new \DateTime($session->date);
+            $month = $date->format('m');
+            $day = $date->format('d');
+            return ($month == 3 && $day >= 1) || ($month > 3 && $month < 7) || ($month == 7 && $day <= 14);
+        });
+
+        $classSessions_q2 = $classSessions->filter(function ($session) {
+            $date = new \DateTime($session->date);
+            $month = $date->format('m');
+            $day = $date->format('d');
+            return ($month == 7 && $day >= 15) || ($month > 7 && $month < 11) || ($month == 11 && $day <= 30);
+        });
+
+        $session_ids_q1 = $classSessions_q1->pluck('id');
+        $session_ids_q2 = $classSessions_q2->pluck('id');
+
+        $grades_q1 = [];
+        foreach ($session_ids_q1 as $session_id) {
+            $grade = Grade::where('user_id', $student->id)
+                ->where('class_session_id', $session_id)
+                ->first();
+            if ($grade) {
+                $grades_q1[$session_id] = $grade;
+            }
+        }
+        $grades_q1 = collect($grades_q1);
+
+        $grades_q2 = [];
+        foreach ($session_ids_q2 as $session_id) {
+            $grade = Grade::where('user_id', $student->id)
+                ->where('class_session_id', $session_id)
+                ->first();
+            if ($grade) {
+                $grades_q2[$session_id] = $grade;
+            }
+        }
+        $grades_q2 = collect($grades_q2);
+
+        // dd($grades_q1, $grades_q2);
+
+        $total_attendance_q1 = 0;
+        foreach ($classSessions_q1 as $session) {
+            $grade = $grades_q1->firstWhere('class_session_id', $session->id);
+            if ($grade) {
+                $total_attendance_q1 += $grade->attendance;
+            }
+        }
+        $attendance_q1 = ($classSessions_q1->count() > 0) ? $total_attendance_q1 / $classSessions_q1->count() : 0;
+
+        $total_attendance_q2 = 0;
+        foreach ($classSessions_q2 as $session) {
+            $grade = $grades_q2->firstWhere('class_session_id', $session->id);
+            if ($grade) {
+                $total_attendance_q2 += $grade->attendance;
+            }
+        }
+        $attendance_q2 = ($classSessions_q2->count() > 0) ? $total_attendance_q2 / $classSessions_q2->count() : 0;
+
+        $avg_ev_q1 = $grades_q1->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'ev');
+        });
+        $count_ev_q1 = $avg_ev_q1->count();
+        $avg_ev_q1 = $avg_ev_q1->avg('grade');
+
+        $avg_tp_q1 = $grades_q1->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'tp');
+        });
+        $count_tp_q1 = $avg_tp_q1->count();
+        $avg_tp_q1 = $avg_tp_q1->avg('grade');
+
+        $avg_ev_q2 = $grades_q2->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'ev');
+        });
+        $count_ev_q2 = $avg_ev_q2->count();
+        $avg_ev_q2 = $avg_ev_q2->avg('grade');
+
+        $avg_tp_q2 = $grades_q2->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'tp');
+        });
+        $count_tp_q2 = $avg_tp_q2->count();
+        $avg_tp_q2 = $avg_tp_q2->avg('grade');
+
+        $annual_count_ev = $count_ev_q1 + $count_ev_q2;
+        $annual_count_tp = $count_tp_q1 + $count_tp_q2;
+
+        $all_grades = $grades_q1->merge($grades_q2);
+
+        $annual_avg_ev = $all_grades->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'ev');
+        })->avg('grade');
+
+        $annual_avg_tp = $all_grades->filter(function ($grade) {
+            return str_starts_with(strtolower($grade->comments), 'tp');
+        })->avg('grade');
+
+        return [
+            'grades_q1' => $grades_q1->keyBy('class_session_id'),
+            'grades_q2' => $grades_q2->keyBy('class_session_id'),
+            'attendance_q1' => [
+                'count' => $grades_q1->count(),
+                'percentage' => $attendance_q1,
+            ],
+            'attendance_q2' => [
+                'count' => $grades_q2->count(),
+                'percentage' => $attendance_q2,
+            ],
+            'avg_ev_q1' => $avg_ev_q1,
+            'count_ev_q1' => $count_ev_q1,
+            'avg_tp_q1' => $avg_tp_q1,
+            'count_tp_q1' => $count_tp_q1,
+            'avg_ev_q2' => $avg_ev_q2,
+            'count_ev_q2' => $count_ev_q2,
+            'avg_tp_q2' => $avg_tp_q2,
+            'count_tp_q2' => $count_tp_q2,
+            'classSessions_q1' => $classSessions_q1,
+            'classSessions_q2' => $classSessions_q2,
+            'total_classes_q1' => $classSessions_q1->count(),
+            'total_classes_q2' => $classSessions_q2->count(),
+            'annual_attendance_percentage' => ($attendance_q1 + $attendance_q2) / 2,
+            'annual_avg_tp' => $annual_avg_tp,
+            'annual_count_tp' => $annual_count_tp,
+            'annual_avg_ev' => $annual_avg_ev,
+            'annual_count_ev' => $annual_count_ev,
+        ];
     }
 
     public function printStudentsPayments(Request $request)

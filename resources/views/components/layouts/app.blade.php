@@ -56,7 +56,7 @@
                 @endif
 
                 <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
-                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" />
+                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" no-wire-navigate />
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
                     <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
                 @endif
@@ -93,6 +93,7 @@
                 @endif
                 @if($user->hasAnyRole(['student']))
                     <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
+                    <x-menu-item title="Matricularse" icon="o-academic-cap" link="/enrollments" />
                     <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                     <x-menu-item title="Mis Pagos" icon="o-currency-dollar" link="{{ route('my-payment-plan') }}" />
                 @endif

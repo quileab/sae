@@ -1,7 +1,7 @@
 <div>
     <div class="flex justify-between items-center mb-4">
         <x-button icon="o-arrow-left" wire:click="previousMonth" class="btn-circle btn-primary" />
-        <h2 class="text-2xl font-bold">{{ $date->format('F Y') }}</h2>
+        <h2 class="text-2xl font-bold">{{ $date->translatedFormat('F Y') }}</h2>
         <x-button icon="o-arrow-right" wire:click="nextMonth" class="btn-circle btn-primary" />
     </div>
 
@@ -23,14 +23,13 @@
             @foreach ($week as $day)
                 <div
                     class="text-center rounded-md overflow-hidden p-0 {{ $day['isCurrentMonth'] ? 'bg-gray-100/10' : 'bg-black/10 text-gray-600' }}
-                                    {{ Carbon\Carbon::parse($day['date'])->isToday() ? 'ring-2 ring-primary bg-primary/30 ' : '' }}">
+                                                                    {{ Carbon\Carbon::parse($day['date'])->isToday() ? 'ring-2 ring-primary bg-primary/30 ' : '' }}">
                     {{ $day['day'] }}
                     <div class="mt-2">
                         @foreach ($day['events'] as $event)
                             <div class="rounded p-1 cursor-pointer"
                                 style="background-color: {{ $event->color }}60; border: 2px solid {{ $event->color }};"
-                                wire:click="eventClick({{ $event->id }})"
-                                title="{{ $event->title . ' - De ' . Carbon\Carbon::parse($event->start)->format('H:i') . ' a ' . Carbon\Carbon::parse($event->end)->format('H:i') }}">
+                                wire:click="eventClick({{ $event->id }})" title="{{ $event->description }}">
                                 <small>{{ $event->title }}</small>
                             </div>
                         @endforeach
@@ -46,7 +45,7 @@
                 @if ($day['events']->count() > 0)
                     <div class="mb-4">
                         <h4 class="text-warning p-1 mb-1 rounded-md text-lg bg-gray-900">
-                            {{ Carbon\Carbon::parse($day['date'])->format('d/m/Y') }}
+                            {{ Carbon\Carbon::parse($day['date'])->translatedFormat('d/m/Y') }}
                         </h4>
 
                         @foreach ($day['events'] as $event)
@@ -60,6 +59,18 @@
                                 <span class="text-gray-400">| {{ $event->subject->name }} ({{ $event->subject->id }})</span>
                             @endif
                             </p>
+                            @if ($event->description)
+                                <p class="ml-8 text-gray-400">{{ $event->description }}</p>
+                            @endif
+                            @if ($event->presidente)
+                                <p class="ml-8 text-gray-500">Presidente: {{ $event->presidente->full_name }}</p>
+                            @endif
+                            @if ($event->vocal1)
+                                <p class="ml-8 text-gray-500">Vocal 1: {{ $event->vocal1->full_name }}</p>
+                            @endif
+                            @if ($event->vocal2)
+                                <p class="ml-8 text-gray-500">Vocal 2: {{ $event->vocal2->full_name }}</p>
+                            @endif
                         @endforeach
 
                     </div>

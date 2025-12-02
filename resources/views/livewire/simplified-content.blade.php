@@ -52,18 +52,16 @@ new class extends Component {
                                             <div class="prose prose-sm max-w-none ml-4 mb-4">{!! $topic->content !!}</div>
                                             <p class="mt-4 text-lg font-bold text-warning border-b border-warning">Recursos:</p>
                                             @if($topic->resources->count() > 0)
-                                                <ul class="flex flex-row flex-wrap gap-2 mt-4">
+                                                <div class="flex flex-row flex-wrap gap-2 mt-4">
                                                     @foreach($topic->resources as $resource)
-                                                        <li>
-                                                            @if($resource->url)
-                                                                <a href="{{ $resource->url }}" target="_blank"
-                                                                    class="text-blue-500 hover:text-white border rounded p-2 bg-blue-500/10">{{ $resource->title }}</a>
-                                                            @else
-                                                                {{ $resource->title }}
-                                                            @endif
-                                                        </li>
+                                                        @if($resource->url)
+                                                            <a href="{{ $resource->url }}" target="_blank"
+                                                                class="text-blue-500 hover:text-white border rounded p-2 bg-blue-500/10">{{ $resource->title }}</a>
+                                                        @else
+                                                            <span class="text-gray-400 border rounded p-2 bg-gray-500/10">{{ $resource->title }}</span>
+                                                        @endif
                                                     @endforeach
-                                                </ul>
+                                                </div>
                                             @endif
                                         </x-slot:content>
                                     </x-collapse>

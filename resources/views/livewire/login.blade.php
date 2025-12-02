@@ -38,15 +38,15 @@ new #[Layout('components.layouts.empty')]       // <-- Here is the `empty` layou
 
 <div class="min-h-screen flex justify-center items-center">
     <div
-        class="w-3/4 md:w-1/3 mx-auto bg-slate-900 bg-opacity-40 backdrop-blur-xl rounded-lg shadow-lg shadow-black/50 p-4">
-        <x-header title="LOGIN" />
+        class="w-3/4 md:w-1/3 mx-auto bg-slate-900/70 backdrop-blur-xl rounded-lg shadow-lg shadow-black/50 p-4">
+        <x-header title="INGRESO" />
         <x-form wire:submit="login" no-separator>
-            <x-input label="E-mail" wire:model="email" icon="o-envelope" inline />
-            <x-input label="Password" wire:model="password" type="password" icon="o-key" inline />
+            <x-input label="Email" wire:model="email" icon="o-envelope" inline />
+            <x-input label="Contraseña" wire:model="password" type="password" icon="o-key" inline />
 
             <x-slot:actions>
-                {{-- <x-button label="Create an account" class="btn-ghost" link="/register" /> --}}
-                <x-button label="Login" type="submit" icon="o-paper-airplane" class="btn-primary" spinner="login" />
+                {{-- <x-button label="Crear cuenta" class="btn-ghost" link="/register" /> --}}
+                <x-button label="INGRESAR" type="submit" icon="o-arrow-right-end-on-rectangle" class="btn-primary" spinner="login" />
             </x-slot:actions>
         </x-form>
     </div>

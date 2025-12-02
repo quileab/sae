@@ -47,6 +47,16 @@ new class extends Component {
         }
     }
 
+    public function updatedInscriptionId()
+    {
+        $this->selected = [];
+    }
+
+    public function updatedCareerId()
+    {
+        $this->selected = [];
+    }
+
     // Table headers
     public function headers(): array
     {
@@ -60,7 +70,6 @@ new class extends Component {
     public function items(): Collection
     {
         $this->info('Cargando...', timeout: 500);
-        $this->selected = [];
 
         $pathToStorage = storage_path('app');
         $pathToFiles = '/private/private/inscriptions';

@@ -104,4 +104,8 @@ new class extends Component {
             </div>
         </x-card>
     @endif
+    
+    <div class="md:col-span-2">
+        <livewire:upcoming-exams />
+    </div>
 </div>

@@ -7,7 +7,9 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use Livewire\Attributes\Layout;
 
+#[Layout('components.layouts.chat')]
 class Chat extends Component
 {
     public $content = '';
@@ -16,13 +18,48 @@ class Chat extends Component
     public $users = [];
     public $subjects = [];
     public $selectedSubjectId;
+    public $careers = [];
+    public $selectedCareerId;
+    public $allSubjects = [];
+    public $amount = 20;
+    public $activeTab = 'messages';
+
+    private function getRoleEmoji(string $role): string
+    {
+        return match ($role) {
+            'student' => '🧑‍🎓',
+            'teacher' => '🧑‍🏫',
+            'admin' => '👑',
+            'director' => '👔',
+            default => '👤',
+        };
+    }
+
+    public function loadMore()
+    {
+        $this->amount += 20;
+        $this->dispatch('messages-loaded');
+    }
 
     public function mount()
     {
         $user = Auth::user();
-        $this->subjects = $user->subjects->map(function ($subject) {
-            return ['id' => $subject->id, 'name' => $subject->name];
+        
+        $subjects = $user->subjects()->with('career')->get();
+
+        $this->careers = $subjects->pluck('career')->unique('id')->filter()->map(function ($career) {
+            return ['id' => $career->id, 'name' => $career->name];
+        })->sortBy('name')->values()->all();
+
+        $this->allSubjects = $subjects->map(function ($subject) {
+            return [
+                'id' => $subject->id, 
+                'name' => $subject->name, 
+                'career_id' => $subject->career_id
+            ];
         })->all();
+
+        $this->subjects = $this->allSubjects;
 
         if ($user->hasRole('student')) {
             $teacherIds = collect();
@@ -35,11 +72,24 @@ class Chat extends Component
             $allIds = $teacherIds->merge($directorAndAdminIds)->unique();
 
             $this->users = User::whereIn('id', $allIds)->get()->map(function ($user) {
-                return ['id' => $user->id, 'name' => $user->fullname];
+                return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role) . ' ' . $user->fullname];
             })->sortBy('name')->values()->all();
 
         } else {
             // For teachers and admins, users are loaded on subject selection.
+            $this->users = [];
+        }
+    }
+
+    public function updatedSelectedCareerId($careerId)
+    {
+        if ($careerId) {
+            $this->subjects = collect($this->allSubjects)->where('career_id', $careerId)->values()->all();
+        } else {
+            $this->subjects = $this->allSubjects;
+        }
+        $this->selectedSubjectId = null;
+        if (!Auth::user()->hasRole('student')) {
             $this->users = [];
         }
     }
@@ -51,7 +101,7 @@ class Chat extends Component
                 $subject = Subject::find($subjectId);
                 if ($subject) {
                     $this->users = $subject->users()->where('users.id', '!=', Auth::id())->get()->map(function ($user) {
-                        return ['id' => $user->id, 'name' => $user->fullname];
+                        return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role) . ' ' . $user->fullname];
                     })->sortBy('name')->values()->all();
                 }
             } else {
@@ -71,6 +121,7 @@ class Chat extends Component
 
         $this->recipient_type = $type;
         $this->recipient_id = $id;
+        $this->amount = 20; // Reset pagination
 
         // Mark messages as read
         Auth::user()->receivedMessages()
@@ -83,6 +134,8 @@ class Chat extends Component
             })
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
+
+        $this->dispatch('scroll-to-bottom');
     }
 
     public function render()
@@ -90,6 +143,7 @@ class Chat extends Component
         $userId = Auth::id();
 
         // Get all messages where the user is the sender or a recipient
+        // Note: This is still heavy for the conversation list, but requested optimization is for the chat view pagination.
         $allMessages = Message::where('sender_id', $userId)
             ->orWhereHas('recipients', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
@@ -104,7 +158,8 @@ class Chat extends Component
             }
             // If the user is the sender, group by the first recipient
             if ($message->sender_id == $userId) {
-                return 'user_' . $message->recipients->first()->id;
+                // Fallback if recipients is empty (shouldn't happen in valid chat)
+                return 'user_' . ($message->recipients->first()->id ?? 0);
             }
             // If the user is the recipient, group by the sender
             return 'user_' . $message->sender_id;
@@ -116,21 +171,38 @@ class Chat extends Component
             $type = $this->selectedConversation['type'];
             $id = $this->selectedConversation['id'];
 
-            $filteredMessages = $allMessages->filter(function ($message) use ($type, $id, $userId) {
-                if ($type === 'user') {
-                    return (!$message->subject_id) &&
-                           (($message->sender_id == $userId && $message->recipients->pluck('id')->contains($id)) ||
-                            ($message->sender_id == $id && $message->recipients->pluck('id')->contains($userId)));
-                } else { // type is 'subject'
-                    return $message->subject_id == $id;
-                }
-            });
+            $query = Message::query();
+            
+            if ($type === 'user') {
+                $query->where(function($q) use ($id, $userId) {
+                     $q->whereNull('subject_id')
+                       ->where(function($subQ) use ($id, $userId) {
+                           $subQ->where(function($q2) use ($id, $userId) {
+                               $q2->where('sender_id', $userId)
+                                  ->whereHas('recipients', function($r) use ($id) {
+                                      $r->where('user_id', $id);
+                                  });
+                           })->orWhere(function($q2) use ($id, $userId) {
+                               $q2->where('sender_id', $id)
+                                  ->whereHas('recipients', function($r) use ($userId) {
+                                      $r->where('user_id', $userId);
+                                  });
+                           });
+                       });
+                });
+            } else {
+                $query->where('subject_id', $id);
+            }
+
+            $filteredMessages = $query->latest()
+                ->take($this->amount)
+                ->get();
         }
 
         return view('livewire.chat', [
             'conversations' => $conversations,
             'receivedMessages' => $filteredMessages,
-        ]);
+        ])->layout('components.layouts.chat');
     }
 
     public function sendMessage()
@@ -198,5 +270,7 @@ class Chat extends Component
 
         // Step 5: Reset the form fields.
         $this->reset('content', 'recipient_type', 'recipient_id');
+
+        $this->dispatch('scroll-to-bottom');
     }
 }
