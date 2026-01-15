@@ -30,7 +30,7 @@ class Chat extends Component
             'student' => '🧑‍🎓',
             'teacher' => '🧑‍🏫',
             'admin' => '👑',
-            'director' => '👔',
+            'director' => '⭐',
             default => '👤',
         };
     }
@@ -44,7 +44,7 @@ class Chat extends Component
     public function mount()
     {
         $user = Auth::user();
-        
+
         $subjects = $user->subjects()->with('career')->get();
 
         $this->careers = $subjects->pluck('career')->unique('id')->filter()->map(function ($career) {
@@ -53,8 +53,8 @@ class Chat extends Component
 
         $this->allSubjects = $subjects->map(function ($subject) {
             return [
-                'id' => $subject->id, 
-                'name' => $subject->name, 
+                'id' => $subject->id,
+                'name' => $subject->name,
                 'career_id' => $subject->career_id
             ];
         })->all();
@@ -63,7 +63,7 @@ class Chat extends Component
 
         if ($user->hasRole('student')) {
             $teacherIds = collect();
-            foreach($user->subjects as $subject) {
+            foreach ($user->subjects as $subject) {
                 $teacherIds = $teacherIds->merge($subject->users()->where('role', 'teacher')->pluck('users.id'));
             }
 
@@ -74,7 +74,6 @@ class Chat extends Component
             $this->users = User::whereIn('id', $allIds)->get()->map(function ($user) {
                 return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role) . ' ' . $user->fullname];
             })->sortBy('name')->values()->all();
-
         } else {
             // For teachers and admins, users are loaded on subject selection.
             $this->users = [];
@@ -148,6 +147,9 @@ class Chat extends Component
             ->orWhereHas('recipients', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
+            ->with(['recipients' => function ($query) use ($userId) {
+                $query->where('user_id', $userId);
+            }])
             ->latest()
             ->get();
 
@@ -172,29 +174,30 @@ class Chat extends Component
             $id = $this->selectedConversation['id'];
 
             $query = Message::query();
-            
+
             if ($type === 'user') {
-                $query->where(function($q) use ($id, $userId) {
-                     $q->whereNull('subject_id')
-                       ->where(function($subQ) use ($id, $userId) {
-                           $subQ->where(function($q2) use ($id, $userId) {
-                               $q2->where('sender_id', $userId)
-                                  ->whereHas('recipients', function($r) use ($id) {
-                                      $r->where('user_id', $id);
-                                  });
-                           })->orWhere(function($q2) use ($id, $userId) {
-                               $q2->where('sender_id', $id)
-                                  ->whereHas('recipients', function($r) use ($userId) {
-                                      $r->where('user_id', $userId);
-                                  });
-                           });
-                       });
+                $query->where(function ($q) use ($id, $userId) {
+                    $q->whereNull('subject_id')
+                        ->where(function ($subQ) use ($id, $userId) {
+                            $subQ->where(function ($q2) use ($id, $userId) {
+                                $q2->where('sender_id', $userId)
+                                    ->whereHas('recipients', function ($r) use ($id) {
+                                        $r->where('user_id', $id);
+                                    });
+                            })->orWhere(function ($q2) use ($id, $userId) {
+                                $q2->where('sender_id', $id)
+                                    ->whereHas('recipients', function ($r) use ($userId) {
+                                        $r->where('user_id', $userId);
+                                    });
+                            });
+                        });
                 });
             } else {
                 $query->where('subject_id', $id);
             }
 
             $filteredMessages = $query->latest()
+                ->with(['subject.career', 'sender'])
                 ->take($this->amount)
                 ->get();
         }
@@ -258,7 +261,7 @@ class Chat extends Component
             case 'all':
                 // For safety, only non-students can send to all.
                 if (!Auth::user()->hasRole('student')) {
-                    $recipients = User::all();
+                    $recipients = User::select('id')->get();
                 }
                 break;
         }
@@ -269,7 +272,8 @@ class Chat extends Component
         }
 
         // Step 5: Reset the form fields.
-        $this->reset('content', 'recipient_type', 'recipient_id');
+        $this->reset('content');
+        // Don't reset recipient info so user can continue chatting
 
         $this->dispatch('scroll-to-bottom');
     }

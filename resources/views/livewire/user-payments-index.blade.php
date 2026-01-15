@@ -12,9 +12,12 @@ new class extends Component {
 
     public function with(): array
     {
-        $users = User::where('name', 'like', '%' . $this->search . '%')
-            ->orWhere('lastname', 'like', '%' . $this->search . '%')
-            ->orWhere('firstname', 'like', '%' . $this->search . '%')
+        $users = User::where('role', 'student')
+            ->where(function($query) {
+                $query->where('name', 'like', '%' . $this->search . '%')
+                    ->orWhere('lastname', 'like', '%' . $this->search . '%')
+                    ->orWhere('firstname', 'like', '%' . $this->search . '%');
+            })
             ->paginate($this->perPage);
 
         return [

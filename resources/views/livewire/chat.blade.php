@@ -29,14 +29,29 @@
                 @if($activeTab === 'messages')
                     <div class="absolute inset-0 overflow-y-auto p-2 space-y-2">
                         @foreach ($conversations as $key => $conversation)
-                                                                                    @php
-                                                                                        [$type, $id] = explode('_', $key);
-                                                                                        $model = $type === 'user' ? App\Models\User::find($id) : App\Models\Subject::find($id);
-                                                                                    @endphp
-                                                                                    <div wire:click="selectConversation('{{ $type }}', {{ $id }})"
-                                                                                        class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $id && $selectedConversation['type'] == $type ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
-                                                                                        <div class="font-bold truncate">{{ $model->fullname }}</div>
-                                                                                        <div class="text-xs opacity-70">                                    {{ $conversation->first()->created_at->format('d/m/Y H:i') }}
+                                                                                                                                            @php
+                                                                                                                                                [$type, $id] = explode('_', $key);
+                                                                                                                                                $model = $type === 'user' ? App\Models\User::find($id) : App\Models\Subject::find($id);
+                                                                                                                                                $unreadCount = $conversation->filter(function($msg) {
+                                                                                                                                                    return $msg->sender_id !== auth()->id() && 
+                                                                                                                                                           $msg->recipients->first() && 
+                                                                                                                                                           is_null($msg->recipients->first()->pivot->read_at);
+                                                                                                                                                })->count();
+                                                                                                                                            @endphp
+                                                                                                                                            <div wire:click="selectConversation('{{ $type }}', {{ $id }})"
+                                                                                                                                                class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $id && $selectedConversation['type'] == $type ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
+                                                                                                                                                                                <div class="flex justify-between items-start">
+                                                                                                                                                                                    <div class="font-bold truncate max-w-[75%]">
+                                                                                                                                                                                        @if($type === 'subject' && $model)
+                                                                                                                                                                                            {{ $model->name }} <span class="text-xs font-normal opacity-70 block">{{ $model->career->name ?? '' }}</span>
+                                                                                                                                                                                        @else
+                                                                                                                                                                                            {{ $model ? $model->fullname : 'Usuario desconocido' }}
+                                                                                                                                                                                        @endif
+                                                                                                                                                                                    </div>
+                                                                                                                                                                                    @if($unreadCount > 0)
+                                                                                                                                                                                        <span class="badge badge-sm badge-error text-white">{{ $unreadCount }}</span>
+                                                                                                                                                                                    @endif
+                                                                                                                                                                                </div>                                                                                                                    <div class="text-xs opacity-70">                                    {{ $conversation->first()->created_at->format('d/m/Y H:i') }}
                                 </div>
                             </div>
                         @endforeach
@@ -63,6 +78,9 @@
                         @if ($recipient_type === 'user')
                             <x-select label="Usuario" wire:model.defer="recipient_id" :options="$users"
                                 option-value="id" option-label="name" placeholder="Selecciona un usuario" />
+                        @elseif ($recipient_type === 'subject')
+                            <x-select label="Curso" wire:model.defer="recipient_id" :options="$subjects"
+                                option-value="id" option-label="name" placeholder="Selecciona un curso" />
                         @endif
                     </div>
                 @endif
@@ -105,6 +123,11 @@
                     @forelse ($receivedMessages->sortBy('created_at') as $message)
                         <div class="flex {{ $message->sender_id == auth()->id() ? 'justify-end' : 'justify-start' }}">
                             <div class="max-w-[70%] {{ $message->sender_id == auth()->id() ? 'bg-primary text-primary-content' : 'bg-base-100' }} rounded-lg p-3 shadow-sm">
+                                @if ($message->subject)
+                                    <div class="text-xs font-bold opacity-70 mb-1">
+                                        📚 Curso: {{ $message->subject->name }} - {{ $message->subject->career->name ?? 'N/A' }}
+                                    </div>
+                                @endif
                                 @if ($message->sender_id != auth()->id())
                                     <div class="text-xs font-bold opacity-70 mb-1">{{ $message->sender->fullname }}</div>
                                 @endif

@@ -8,7 +8,7 @@
 </head>
 <body class="grid min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200 bg-cover bg-center"
     style="background-image: url({{ asset('storage/background.jpg') }})">
-    <x-main>
+    <x-main full-width="true">
         <x-slot:content>
             @if(isset($slot))
                 {{ $slot }}

@@ -31,11 +31,14 @@ class MercadoPagoController extends Controller
     {
         ini_set('max_execution_time', 300);
 
+        \Illuminate\Support\Facades\Log::info('MercadoPago Webhook Received', ['data' => $request->all()]);
+
         MercadoPagoConfig::setAccessToken(config('mercadopago.access_token'));
 
         $paymentId = $request->input('data.id');
 
         if (!$paymentId) {
+            \Illuminate\Support\Facades\Log::warning('MercadoPago Webhook: No payment ID provided');
             return response()->json(['status' => 'error', 'message' => 'Payment ID not provided'], 400);
         }
 
@@ -44,9 +47,17 @@ class MercadoPagoController extends Controller
             $payment = $client->get($paymentId);
 
             if ($payment && $payment->status == 'approved') {
+                // Idempotency Check
+                $existingRecord = \App\Models\PaymentRecord::where('description', 'LIKE', '%ID: ' . $payment->id . '%')->first();
+                if ($existingRecord) {
+                    \Illuminate\Support\Facades\Log::info('MercadoPago Webhook: Payment already recorded', ['payment_id' => $payment->id]);
+                    return response()->json(['status' => 'success', 'message' => 'Already recorded'], 200);
+                }
+
                 $userPayment = \App\Models\UserPayments::find($payment->external_reference);
 
-                if ($userPayment && $userPayment->paid < $userPayment->amount) {
+                if ($userPayment) {
+                    // Prevent overpayment logic if needed, but primarily record the payment
                     $userPayment->paid += $payment->transaction_amount;
                     $userPayment->save();
 
@@ -57,16 +68,20 @@ class MercadoPagoController extends Controller
                         'description' => 'Pago online via Mercado Pago - ID: ' . $payment->id,
                         'paymentAmount' => $payment->transaction_amount,
                     ]);
+
+                    \Illuminate\Support\Facades\Log::info('MercadoPago Webhook: Payment recorded successfully', ['payment_id' => $payment->id, 'user_payment_id' => $userPayment->id]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('MercadoPago Webhook: UserPayment not found for external_reference', ['external_reference' => $payment->external_reference]);
                 }
             }
 
             return response()->json(['status' => 'success'], 200);
 
         } catch (MPApiException $e) {
-            // Log error
+            \Illuminate\Support\Facades\Log::error('MercadoPago Webhook MPApiException', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         } catch (\Exception $e) {
-            // Log error
+            \Illuminate\Support\Facades\Log::error('MercadoPago Webhook Exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }

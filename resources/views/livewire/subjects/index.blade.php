@@ -90,13 +90,13 @@ new class extends Component {
 
 <div>
     <!-- HEADER -->
-    <x-header title="Materias">
+    <x-header title="Materias" separator progress-indicator>
         <x-slot:middle class="!justify-end">
-            <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
+            <div class="flex gap-3">
+                <x-select wire:model.live="career_id" :options="$careers" icon="o-academic-cap" />
+                <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
+            </div>
         </x-slot:middle>
-        <x-slot:actions>
-            <x-button label="Opciones" @click="$wire.drawer = true" responsive icon="o-bars-3" />
-        </x-slot:actions>
     </x-header>
 
     <!-- TABLE  -->
@@ -117,12 +117,5 @@ new class extends Component {
             @endscope
         </x-table>
     </x-card>
-    <x-drawer wire:model="drawer" title="Opciones" right separator with-close-button class="lg:w-1/3">
-        <x-choices-offline label="Carrera" wire:model.live="career_id" :options="$careers" placeholder="Buscar..."
-            single searchable />
 
-        <x-slot:actions>
-            <x-button label="Cerrar" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
-        </x-slot:actions>
-    </x-drawer>
 </div>

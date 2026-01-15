@@ -29,6 +29,7 @@ new class extends Component {
   public $totalDebt;
   public $hasCounter;
   public $userPayments;
+  public $plansError = false;
 
   public $nextPaymentToPay = null;
 
@@ -62,7 +63,14 @@ new class extends Component {
     $this->userPayments = UserPayments::where('user_id', $this->userId)->get();
     $this->totalDebt = $this->userPayments->sum('amount');
     $this->totalPaid = $this->userPayments->sum('paid');
-    $this->payPlans = PlansMaster::all();
+    
+    try {
+        $this->payPlans = PlansMaster::all();
+    } catch (\Illuminate\Database\QueryException $e) {
+        $this->plansError = true;
+        $this->payPlans = collect();
+    }
+
     $this->hasCounter = $this->userPayments->count();
 
     foreach ($this->userPayments as $userPayment) {
@@ -227,6 +235,12 @@ new class extends Component {
 }; ?>
 
 <div>
+  @if($plansError)
+    <x-alert icon="o-exclamation-triangle" class="alert-warning mb-4">
+      Error: No se pudo cargar la configuración de planes de pago (Tabla 'plans_masters' no encontrada).
+    </x-alert>
+  @endif
+
   {{-- CRUD Plans Form --}}
   <x-modal wire:model="openModal" title="{{ $user->lastname }}, {{ $user->firstname }}" subtitle="ID: {{ $userId }}"
     separator>

@@ -1,5 +1,5 @@
 <div>
-    <x-card title="Próximas Mesas de Examen" shadow separator>
+    <x-card title="Próximas Mesas de Examen" shadow separator class="bg-base-200">
         @if (auth()->user()->hasRole('student') || auth()->user()->hasAnyRole(['admin', 'director', 'administrative']))
             <div class="mb-4">
                 <x-select wire:model.live="selectedProfessorId" :options="$professors" option-value="id"

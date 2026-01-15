@@ -10,7 +10,7 @@
 
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
   <img id="background" class="fixed left-0 top-0 w-full h-auto" src="../background.jpg" />
-  <x-main>
+  <x-main full-width="true">
     <x-slot:content>
       <div class="mx-auto bg-slate-800 bg-opacity-30 backdrop-blur-sm rounded-lg shadow-sm shadow-black p-4">
         <div class="my-4 text-center grid grid-cols-2 gap-2 md:grid-cols-4">

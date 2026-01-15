@@ -19,38 +19,38 @@ Route::get('/', function () {
   return redirect('/dashboard'); //view('dashboard');
 });
 
-Route::get('/clear/{option?}', function ($option = null) {
-  $logs = [];
-  $maintenance = ($option == "cache") ? [
-    'Flush' => 'cache:flush',
-  ] : [
-    //'DebugBar' => 'debugbar:clear',
-    'Storage Link' => 'storage:link',
-    'Config' => 'config:clear',
-    'Cache' => 'cache:clear',
-    'View' => 'view:clear',
-    'Optimize Clear' => 'optimize:clear',
-    //'Optimize' => 'optimize',
-    'Route Clear' => 'route:clear',
-  ];
+// Route::get('/clear/{option?}', function ($option = null) {
+//   $logs = [];
+//   $maintenance = ($option == "cache") ? [
+//     'Flush' => 'cache:flush',
+//   ] : [
+//     //'DebugBar' => 'debugbar:clear',
+//     'Storage Link' => 'storage:link',
+//     'Config' => 'config:clear',
+//     'Cache' => 'cache:clear',
+//     'View' => 'view:clear',
+//     'Optimize Clear' => 'optimize:clear',
+//     //'Optimize' => 'optimize',
+//     'Route Clear' => 'route:clear',
+//   ];
 
-  foreach ($maintenance as $key => $value) {
-    try {
-      Artisan::call($value);
-      $logs[$key] = '✔️';
-    } catch (\Exception $e) {
-      $logs[$key] = '❌' . $e->getMessage();
-    }
-  }
-  // table format output
-  $output = '<html><body style="font-family:sans-serif; background-color:#303030; color:white;">
-  <table><tr><th>Task</th><th>Result</th></tr>';
-  foreach ($logs as $key => $value) {
-    $output .= '<tr><td>' . $key . '</td><td style="text-align:center;">' . $value . '</td></tr>';
-  }
-  $output .= '</table></body></html>';
-  return $output;
-});
+//   foreach ($maintenance as $key => $value) {
+//     try {
+//       Artisan::call($value);
+//       $logs[$key] = '✔️';
+//     } catch (\Exception $e) {
+//       $logs[$key] = '❌' . $e->getMessage();
+//     }
+//   }
+//   // table format output
+//   $output = '<html><body style="font-family:sans-serif; background-color:#303030; color:white;">
+//   <table><tr><th>Task</th><th>Result</th></tr>';
+//   foreach ($logs as $key => $value) {
+//     $output .= '<tr><td>' . $key . '</td><td style="text-align:center;">' . $value . '</td></tr>';
+//   }
+//   $output .= '</table></body></html>';
+//   return $output;
+// });
 
 Route::middleware('auth')->group(function () {
 
@@ -73,7 +73,15 @@ Route::middleware('auth')->group(function () {
 
   // route for pdfs stored in private storage
   Route::get('inscriptions/pdf/{file}', function ($file) {
-    return response()->file(storage_path('app/private/private/inscriptions/' . $file));
+      // Security: Prevent path traversal
+      if (str_contains($file, '..') || str_contains($file, '/') || str_contains($file, '\\')) {
+          abort(403, 'Invalid file path');
+      }
+      $path = storage_path('app/private/private/inscriptions/' . $file);
+      if (!file_exists($path)) {
+          abort(404);
+      }
+      return response()->file($path);
   });
 
   Volt::route('/dashboard', 'dashboard');

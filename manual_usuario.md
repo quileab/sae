@@ -65,12 +65,14 @@ El perfil de Profesor está enfocado en la gestión del aula y el seguimiento ac
 *   **Administrador de Contenido**: Suba material didáctico (documentos, enlaces, videos) para sus alumnos.
 *   **Organización**: Estructure el contenido por temas o unidades para facilitar el acceso a los estudiantes.
 
-### 4.3 Calendario Académico
+### 4.3 Calendario y Eventos
 *Ubicación: Menú Principal > Calendario*
-*   Visualice su horario de clases, fechas de exámenes y otros eventos académicos importantes.
+*   **Vista Mensual**: Visualice su horario de clases, fechas de exámenes y eventos académicos.
+*   **Gestión de Eventos**: Cree nuevos eventos (exámenes, entregas, avisos), agregue descripciones y asigne profesores responsables si es necesario.
+*   **Widget de Próximos Exámenes**: En el Dashboard principal, verá un resumen rápido de las evaluaciones cercanas.
 
 ### 4.4 Reportes
-*   Genere reportes de calificaciones y asistencia de sus grupos para el seguimiento académico.
+*   Genere reportes de calificaciones y asistencia de sus grupos para el seguimiento académico, ahora con un diseño optimizado para impresión y visualización clara.
 
 ---
 
@@ -80,15 +82,41 @@ El perfil de Estudiante permite gestionar la vida académica y administrativa de
 ### 5.1 Área Académica
 *   **Inscripciones**: Realice su inscripción a las materias habilitadas para su carrera en el periodo correspondiente.
 *   **Mis Materias**: Acceda al "Contenido Simplificado" de sus materias para ver y descargar el material de estudio proporcionado por los profesores.
-*   **Calendario**: Consulte su horario de clases y fechas de entrega o exámenes.
+*   **Calendario y Exámenes**: Consulte su horario de clases y fechas de entrega. Utilice el widget "Próximos Exámenes" en el inicio para estar al tanto de sus evaluaciones inminentes.
 
 ### 5.2 Área Administrativa / Financiera
 *   **Mi Plan de Pagos**: Consulte el plan de pagos asignado, fechas de vencimiento y montos.
 *   **Detalle de Pagos**: Vea el historial de sus pagos realizados y el estado actual de su cuenta (al día o con deuda).
 *   **Recibos**: Descargue comprobantes de sus pagos si el sistema lo permite.
 
-### 5.3 Comunicación
-*   **Chat**: Utilice la herramienta de chat para comunicarse con sus profesores o compañeros (según configuración del sistema).
+---
+
+## 6. Sistema de Mensajería (Chat)
+El sistema cuenta con un módulo de comunicación interna robusto y mejorado para facilitar la interacción entre todos los miembros de la comunidad educativa.
+
+*Ubicación: Ícono de Chat en la barra superior o navegación móvil.*
+
+### 6.1 Organización del Panel
+El panel de mensajería se divide en dos pestañas principales para una navegación intuitiva:
+*   **Pestaña "Mensajes" (Icono 💬)**: Muestra su historial de conversaciones.
+    *   **Identificación de Roles**: Los usuarios se identifican visualmente con emojis:
+        *   👨‍🎓 Estudiante
+        *   🧑‍🏫 Profesor
+        *   👑 Administrador
+        *   👔 Director
+        *   📚 Curso (Materia)
+    *   **Contexto de Curso**: Las conversaciones grupales de materias muestran claramente el nombre del curso y la carrera a la que pertenecen (ej. "Matemáticas - Ingeniería").
+    *   **Notificaciones**: Un distintivo rojo (🔴) indica la cantidad de mensajes no leídos en cada conversación.
+*   **Pestaña "Nuevo" (Icono ✏️)**: Permite iniciar nuevas conversaciones.
+
+### 6.2 Funcionalidades de Chat
+*   **Envío de Mensajes**:
+    *   Puede enviar mensajes directos a **Usuarios** (profesores, administradores, etc.).
+    *   Puede enviar mensajes grupales a **Cursos** completos (si está matriculado o es el profesor).
+    *   *Nota: Los estudiantes no pueden enviar mensajes privados a otros estudiantes, pero pueden participar en los chats de sus cursos.*
+*   **Enlaces Inteligentes**: Si comparte una dirección web (URL), el sistema la convertirá automáticamente en un enlace clicable que se abre en una nueva pestaña.
+*   **Historial Infinito**: Cargue mensajes antiguos simplemente desplazándose hacia arriba en la conversación (Scroll Infinito).
+*   **Lectura de Mensajes**: Al entrar en una conversación, los mensajes se marcan automáticamente como leídos y el contador de notificaciones se actualiza.
 
 ---
 
