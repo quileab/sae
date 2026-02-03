@@ -14,7 +14,6 @@
     </script>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 
-    @livewireStyles
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script src="{{ asset('js/tinymce/tinymce.min.js') }}" defer></script>
 </head>
@@ -112,7 +111,6 @@
 
     {{-- TOAST area --}}
     <x-toast />
-    @livewireScripts
     @stack('scripts')
 </body>
 

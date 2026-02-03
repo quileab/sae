@@ -1,0 +1,16 @@
+{
+    "agents": [
+        "copilot",
+        "opencode",
+        "gemini"
+    ],
+    "guidelines": true,
+    "herd_mcp": false,
+    "mcp": true,
+    "sail": false,
+    "skills": [
+        "livewire-development",
+        "pest-testing",
+        "tailwindcss-development"
+    ]
+}

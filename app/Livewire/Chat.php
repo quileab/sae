@@ -6,22 +6,32 @@ use App\Models\Message;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Component;
 
-#[Layout('components.layouts.chat')]
+#[Layout('layouts.chat')]
 class Chat extends Component
 {
     public $content = '';
+
     public $recipient_type = 'user';
+
     public $recipient_id;
+
     public $users = [];
+
     public $subjects = [];
+
     public $selectedSubjectId;
+
     public $careers = [];
+
     public $selectedCareerId;
+
     public $allSubjects = [];
+
     public $amount = 20;
+
     public $activeTab = 'messages';
 
     private function getRoleEmoji(string $role): string
@@ -55,7 +65,7 @@ class Chat extends Component
             return [
                 'id' => $subject->id,
                 'name' => $subject->name,
-                'career_id' => $subject->career_id
+                'career_id' => $subject->career_id,
             ];
         })->all();
 
@@ -72,7 +82,7 @@ class Chat extends Component
             $allIds = $teacherIds->merge($directorAndAdminIds)->unique();
 
             $this->users = User::whereIn('id', $allIds)->get()->map(function ($user) {
-                return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role) . ' ' . $user->fullname];
+                return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role).' '.$user->fullname];
             })->sortBy('name')->values()->all();
         } else {
             // For teachers and admins, users are loaded on subject selection.
@@ -88,19 +98,19 @@ class Chat extends Component
             $this->subjects = $this->allSubjects;
         }
         $this->selectedSubjectId = null;
-        if (!Auth::user()->hasRole('student')) {
+        if (! Auth::user()->hasRole('student')) {
             $this->users = [];
         }
     }
 
     public function updatedSelectedSubjectId($subjectId)
     {
-        if (!Auth::user()->hasRole('student')) {
+        if (! Auth::user()->hasRole('student')) {
             if ($subjectId) {
                 $subject = Subject::find($subjectId);
                 if ($subject) {
                     $this->users = $subject->users()->where('users.id', '!=', Auth::id())->get()->map(function ($user) {
-                        return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role) . ' ' . $user->fullname];
+                        return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role).' '.$user->fullname];
                     })->sortBy('name')->values()->all();
                 }
             } else {
@@ -156,15 +166,16 @@ class Chat extends Component
         // Group messages into conversations
         $conversations = $allMessages->groupBy(function ($message) use ($userId) {
             if ($message->subject_id) {
-                return 'subject_' . $message->subject_id;
+                return 'subject_'.$message->subject_id;
             }
             // If the user is the sender, group by the first recipient
             if ($message->sender_id == $userId) {
                 // Fallback if recipients is empty (shouldn't happen in valid chat)
-                return 'user_' . ($message->recipients->first()->id ?? 0);
+                return 'user_'.($message->recipients->first()->id ?? 0);
             }
+
             // If the user is the recipient, group by the sender
-            return 'user_' . $message->sender_id;
+            return 'user_'.$message->sender_id;
         });
 
         // Filter messages for the selected conversation
@@ -205,7 +216,7 @@ class Chat extends Component
         return view('livewire.chat', [
             'conversations' => $conversations,
             'receivedMessages' => $filteredMessages,
-        ])->layout('components.layouts.chat');
+        ])->layout('layouts.chat');
     }
 
     public function sendMessage()
@@ -217,11 +228,11 @@ class Chat extends Component
                 'required_if:recipient_type,user,subject',
                 function ($attribute, $value, $fail) {
                     if ($this->recipient_type === 'user') {
-                        if (!User::where('id', $value)->exists()) {
+                        if (! User::where('id', $value)->exists()) {
                             $fail('El usuario seleccionado no existe.');
                         }
                     } elseif ($this->recipient_type === 'subject') {
-                        if (!Subject::where('id', $value)->exists()) {
+                        if (! Subject::where('id', $value)->exists()) {
                             $fail('El curso seleccionado no existe.');
                         }
                     }
@@ -235,6 +246,7 @@ class Chat extends Component
             $recipient = User::find($validated['recipient_id']);
             if ($recipient && $recipient->hasRole('student')) {
                 session()->flash('error', 'No puedes enviar mensajes a otros estudiantes.');
+
                 return;
             }
         }
@@ -242,7 +254,7 @@ class Chat extends Component
         // Step 2: Create the message.
         $message = Message::create([
             'sender_id' => Auth::id(),
-            'content'   => $validated['content'],
+            'content' => $validated['content'],
             'subject_id' => $validated['recipient_type'] === 'subject' ? $validated['recipient_id'] : null,
         ]);
 
@@ -260,7 +272,7 @@ class Chat extends Component
                 break;
             case 'all':
                 // For safety, only non-students can send to all.
-                if (!Auth::user()->hasRole('student')) {
+                if (! Auth::user()->hasRole('student')) {
                     $recipients = User::select('id')->get();
                 }
                 break;

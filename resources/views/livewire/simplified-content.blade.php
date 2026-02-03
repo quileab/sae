@@ -1,31 +1,3 @@
-<?php
-
-use Livewire\Volt\Component;
-use App\Models\Subject;
-use App\Models\Unit;
-
-new class extends Component {
-    public Subject $subject;
-    public $units;
-
-    public function mount(Subject $subject): void
-    {
-        $this->subject = $subject;
-        $this->units = Unit::where('subject_id', $this->subject->id)
-            ->where('is_visible', true)
-            ->with([
-                'topics' => function ($query) {
-                    $query->where('is_visible', true)->with([
-                        'resources' => function ($query) {
-                            $query->where('is_visible', true);
-                        }
-                    ]);
-                }
-            ])
-            ->get();
-    }
-}; ?>
-
 <div>
     <x-header title="Contenido de {{ $subject->name }}" subtitle="({{ $subject->id }})" separator>
         <x-slot:actions>

@@ -12,7 +12,7 @@
         @else
             <div class="space-y-4">
                 @foreach ($exams as $exam)
-                    <div class="p-4 rounded-lg shadow-md bg-gray-800 border border-gray-700">
+                    <div wire:key="{{ $exam->id }}" class="p-4 rounded-lg shadow-md bg-gray-800 border border-gray-700">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="col-span-1">
                                 <p class="font-bold text-lg text-primary">

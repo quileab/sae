@@ -63,8 +63,11 @@
                         @if (!auth()->user()->hasRole('student'))
                             <x-select label="Carrera" wire:model.live="selectedCareerId" :options="$careers"
                                 placeholder="Selecciona una carrera" class="mb-4" />
-                            <x-select label="Curso" wire:model.live="selectedSubjectId" :options="$subjects"
-                                placeholder="Selecciona un curso" class="mb-4" />
+                            
+                            @if($recipient_type === 'user')
+                                <x-select label="Curso" wire:model.live="selectedSubjectId" :options="$subjects"
+                                    placeholder="Selecciona un curso" class="mb-4" />
+                            @endif
                         @endif
                         <x-select label="Enviar a" wire:model.live="recipient_type" :options="auth()->user()->hasRole('student')
                             ? [['id' => 'user', 'name' => 'Usuario'], ['id' => 'subject', 'name' => 'Curso']]

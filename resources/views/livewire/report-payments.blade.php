@@ -1,19 +1,3 @@
-<?php
-
-use Livewire\Volt\Component;
-
-new class extends Component {
-  public $dateFrom;
-  public $dateTo;
-  public $search = '';
-
-  public function mount()
-  {
-    $this->dateFrom = now()->subDays(30)->format('Y-m-d');
-    $this->dateTo = now()->format('Y-m-d');
-  }
-}; ?>
-
 <div>
   <div class="flex flex-wrap gap-4 rounded bg-gray-300/10 shadow-md p-4">
     <x-input label="{{ __('Fecha Desde') }}" type='date' wire:model.debounce='dateFrom' inline />
