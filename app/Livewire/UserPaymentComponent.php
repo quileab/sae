@@ -9,6 +9,7 @@ use App\Models\UserPayments;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
@@ -24,8 +25,6 @@ class UserPaymentComponent extends Component
 
     public $selectedPlan;
 
-    public $payPlans;
-
     public $combinePlans = false;
 
     public $paymentModal = false;
@@ -40,66 +39,56 @@ class UserPaymentComponent extends Component
 
     public $paymentId;
 
-    public $totalPaid;
-
     public $totalDebt;
 
-    public $hasCounter;
-
-    public $userPayments;
-
     public $plansError = false;
-
-    public $nextPaymentToPay = null;
 
     public function mount($user = null)
     {
         $this->userId = $user ?? auth()->id();
-        $this->user = User::find($this->userId);
-        $this->loadData();
+        $this->user = User::findOrFail($this->userId);
+
         if ($this->payPlans->isNotEmpty()) {
             $this->selectedPlan = $this->payPlans->first()->id;
         }
-
-        if (auth()->user()->hasRole('student')) {
-            $this->findNextPayment();
-        }
     }
 
-    public function findNextPayment()
+    #[Computed]
+    public function nextPaymentToPay()
     {
-        $pending = UserPayments::where('user_id', $this->userId)
+        return UserPayments::where('user_id', $this->userId)
             ->whereRaw('paid < amount')
-            ->get();
-
-        if ($pending->isNotEmpty()) {
-            $this->nextPaymentToPay = $pending->sortBy('date')->first();
-        }
+            ->orderBy('date')
+            ->first();
     }
 
-    public function loadData()
+    #[Computed]
+    public function userPayments()
     {
-        $this->userPayments = UserPayments::where('user_id', $this->userId)->get();
-        $this->totalDebt = $this->userPayments->sum('amount');
-        $this->totalPaid = $this->userPayments->sum('paid');
+        return UserPayments::where('user_id', $this->userId)
+            ->orderBy('date')
+            ->get();
+    }
 
+    #[Computed]
+    public function payPlans()
+    {
         try {
-            $this->payPlans = PlansMaster::all();
+            return PlansMaster::all();
         } catch (\Illuminate\Database\QueryException $e) {
             $this->plansError = true;
-            $this->payPlans = collect();
-        }
 
-        $this->hasCounter = $this->userPayments->count();
-
-        foreach ($this->userPayments as $userPayment) {
-            $textColor = ($userPayment->paid == $userPayment->amount) ? 'text-green-200' : 'text-blue-200';
-            $textColor = ($userPayment->paid < $userPayment->amount && $userPayment->paid > 0) ? 'text-amber-200' : $textColor;
-            $bgColor = ($userPayment->paid == $userPayment->amount) ? 'bg-green-700' : 'bg-blue-700';
-            $bgColor = ($userPayment->paid < $userPayment->amount && $userPayment->paid > 0) ? 'bg-amber-600' : $bgColor;
-            $userPayment->textColor = $textColor;
-            $userPayment->bgColor = $bgColor;
+            return collect();
         }
+    }
+
+    #[Computed]
+    public function totals()
+    {
+        return [
+            'debt' => $this->userPayments->sum('amount'),
+            'paid' => $this->userPayments->sum('paid'),
+        ];
     }
 
     public function assignPayPlan()
@@ -129,21 +118,19 @@ class UserPaymentComponent extends Component
         }
 
         $this->openModal = false;
-        $this->loadData();
+        unset($this->userPayments);
+        unset($this->totals);
         $this->success('Plan asignado.');
     }
 
     public function addPaymentToUser()
     {
-        $pending = UserPayments::where('user_id', $this->userId)
-            ->whereRaw('paid < amount')
-            ->get();
+        $next = $this->nextPaymentToPay;
 
-        if ($pending->isNotEmpty()) {
-            $paymentToPay = $pending->sortBy('date')->first();
-            $this->paymentId = $paymentToPay->id;
-            $this->paymentDescription = $paymentToPay->title;
-            $this->paymentAmountPaid = $paymentToPay->amount - $paymentToPay->paid;
+        if ($next) {
+            $this->paymentId = $next->id;
+            $this->paymentDescription = $next->title;
+            $this->paymentAmountPaid = $next->amount - $next->paid;
             $this->paymentModal = true;
         } else {
             $this->info('No hay cuotas pendientes de pago.');
@@ -152,6 +139,12 @@ class UserPaymentComponent extends Component
 
     public function registerUserPayment()
     {
+        if (empty($this->paymentAmountInput) || $this->paymentAmountInput <= 0) {
+            $this->error('Debe ingresar un importe válido mayor a 0.');
+
+            return;
+        }
+
         $paymentRecord = null;
 
         DB::transaction(function () use (&$paymentRecord) {
@@ -212,25 +205,28 @@ class UserPaymentComponent extends Component
         }
 
         $this->paymentModal = false;
-        $this->loadData();
+        unset($this->userPayments);
+        unset($this->totals);
         $this->success('Pago registrado.');
     }
 
-    public function handleInstallmentClick($userPayment)
+    public function handleInstallmentClick($userPaymentId)
     {
-        if ($userPayment['paid'] < $userPayment['amount']) {
+        $userPayment = UserPayments::findOrFail($userPaymentId);
+
+        if ($userPayment->paid < $userPayment->amount) {
             // Open payment modal
-            $this->paymentId = $userPayment['id'];
-            $this->paymentDescription = $userPayment['title'];
-            $this->paymentAmountPaid = $userPayment['amount'] - $userPayment['paid'];
+            $this->paymentId = $userPayment->id;
+            $this->paymentDescription = $userPayment->title;
+            $this->paymentAmountPaid = $userPayment->amount - $userPayment->paid;
             $this->paymentModal = true;
         } else {
             // Open modify modal
-            $this->paymentId = $userPayment['id'];
-            $this->paymentDescription = $userPayment['title'];
-            $this->paymentAmountPaid = $userPayment['amount'];
-            $this->totalPaid = $userPayment['paid'];
+            $this->paymentId = $userPayment->id;
+            $this->paymentDescription = $userPayment->title;
+            $this->paymentAmountPaid = $userPayment->amount;
             $this->modifyPaymentModal = true;
+            $this->totalDebt = $userPayment->amount; // Set default for modification
         }
     }
 
@@ -242,7 +238,8 @@ class UserPaymentComponent extends Component
             $payment->save();
         }
         $this->modifyPaymentModal = false;
-        $this->loadData();
+        unset($this->userPayments);
+        unset($this->totals);
         $this->info('Monto modificado.');
     }
 
@@ -250,7 +247,8 @@ class UserPaymentComponent extends Component
     {
         UserPayments::destroy($paymentId);
         $this->modifyPaymentModal = false;
-        $this->loadData();
+        unset($this->userPayments);
+        unset($this->totals);
         $this->error('Pago eliminado.');
     }
 

@@ -17,16 +17,16 @@
     <x-card>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2 sticky top-0 z-20 backdrop-blur-md
         pb-1 border-b border-black/20 dark:border-white/20">
-            <x-select wire:model.lazy="inscription_id" label="Inscripciones a" :options="$inscriptions"
+            <x-select wire:model.live="inscription_id" label="Inscripciones a" :options="$inscriptions"
                 option-value="id" option-label="description" />
-            <x-select wire:model.lazy="career_id" label="Carrera" :options="$careers" />
+            <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
         </div>
         <div class="z-10">
             <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped wire:model="selected" selectable
                 @row-selection="console.log($event.detail)">
                 @scope('actions', $item)
-                <x-button label="PDF" link="pdf/{{ $item['pdflink'] }}" external icon="s-document"
-                    class="btn-error text-red-700 btn-ghost w-32" />
+                <x-button label="PDF" link="/inscriptions/pdf/{{ $item['pdflink'] }}" external icon="s-document"
+                    class="btn-error text-red-700 btn-ghost w-32" responsive />
                 @endscope
             </x-table>
         </div>

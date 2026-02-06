@@ -9,7 +9,7 @@
   <x-modal wire:model="openModal" title="{{ $user->lastname }}, {{ $user->firstname }}" subtitle="ID: {{ $userId }}"
     separator>
     <div class="flex items-center justify-evenly">
-      <x-select wire:model.live="selectedPlan" label="{{ __('Seleccionar Plan') }}" :options="$payPlans"
+      <x-select wire:model.live="selectedPlan" label="{{ __('Seleccionar Plan') }}" :options="$this->payPlans"
         option-value="id" option-label="title" />
 
       {{-- checkbox to combine with other plans --}}
@@ -19,7 +19,7 @@
     <x-slot:actions>
       <x-button label="{{ __('Salir') }}" wire:click="$toggle('openModal')" wire:loading.attr="disabled"
         class="btn-secondary" />
-      <x-button label="{{ __('Asignar Plan') }}" wire:click="assignPayPlan" class="btn-primary" />
+      <x-button label="{{ __('Asignar Plan') }}" wire:click="assignPayPlan" class="btn-primary" spinner="assignPayPlan" />
     </x-slot:actions>
   </x-modal>
 
@@ -30,12 +30,12 @@
         {{ number_format($paymentAmountPaid, 2) }}</strong></p>
 
     @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
-      <x-input type="number" wire:model.defer="paymentAmountInput" placeholder="{{ __('Ingresar monto') }}" />
+      <x-input type="number" wire:model="paymentAmountInput" placeholder="{{ __('Ingresar monto') }}" />
     @endif
 
     <x-slot:actions>
       @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
-        <x-button label="{{ __('Ingresar Pago') }}" wire:click="registerUserPayment" class="btn-success" />
+        <x-button label="{{ __('Ingresar Pago') }}" wire:click="registerUserPayment" class="btn-success" spinner="registerUserPayment" />
       @endif
       <x-button label="{{ __('Salir') }}" wire:click="$toggle('paymentModal')" wire:loading.attr="disabled"
         class="btn-secondary" />
@@ -49,14 +49,13 @@
     <div class="flex items-center justify-evenly">
       <p>{{ __('Modificar monto a pagar:') }} <strong>{{ $paymentDescription }}</strong>
         <br />{{ __('A Pagar:') }} <strong>$ {{ number_format($paymentAmountPaid, 2) }}</strong>
-        <br />{{ __('Pagado:') }} <strong>$ {{ number_format($totalPaid, 2) }}</strong>
       </p>
-      <x-input type="number" wire:model.defer="totalDebt" />
-      <x-button label="{{ __('Modificar') }}" wire:click="modifyAmount({{$paymentId}})" class="btn-primary" />
+      <x-input type="number" wire:model="totalDebt" />
+      <x-button label="{{ __('Modificar') }}" wire:click="modifyAmount({{$paymentId}})" class="btn-primary" spinner="modifyAmount" />
     </div>
 
     <x-slot:actions>
-      <x-button label="{{ __('Eliminar') }}" wire:click="deletePayment({{ $paymentId }})" class="btn-error" />
+      <x-button label="{{ __('Eliminar') }}" wire:click="deletePayment({{ $paymentId }})" class="btn-error" spinner="deletePayment" />
       <x-button label="{{ __('Salir') }}" wire:click="$toggle('modifyPaymentModal')" wire:loading.attr="disabled"
         class="btn-secondary" />
     </x-slot:actions>
@@ -70,23 +69,23 @@
         <small class="text-primary">(# {{ $user->id }})</small>
       </h1>
 
-      @if(auth()->user()->hasRole('student') && $nextPaymentToPay)
+      @if(auth()->user()->hasRole('student') && $this->nextPaymentToPay)
         <div class="flex items-center space-x-4">
           <div class="text-right">
-            <p><strong>Pagar Cuota: {{ $nextPaymentToPay->title }}</strong></p>
-            <p>${{ number_format($nextPaymentToPay->amount - $nextPaymentToPay->paid, 2) }}</p>
+            <p><strong>Pagar Cuota: {{ $this->nextPaymentToPay->title }}</strong></p>
+            <p>${{ number_format($this->nextPaymentToPay->amount - $this->nextPaymentToPay->paid, 2) }}</p>
           </div>
-          <livewire:online-payment :userPaymentId="$nextPaymentToPay->id" />
+          <livewire:online-payment :userPaymentId="$this->nextPaymentToPay->id" />
         </div>
       @endif
 
       {{-- Assign new payment plan --}}
       <div>
         @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
-          @if ($hasCounter > 0)
-            @if ($totalPaid < $totalDebt)
+          @if ($this->userPayments->isNotEmpty())
+            @if ($this->totals['paid'] < $this->totals['debt'])
               <x-button wire:click="addPaymentToUser" icon="o-currency-dollar" label="{{ __('Ingresar Pago') }}"
-                class="btn-success" />&nbsp;
+                class="btn-success" spinner="addPaymentToUser" />&nbsp;
             @endif
             <a href="{{ route('payments-details', $user->id) }}" class="ml-2">
               <x-button icon="o-list-bullet" label="{{ __('Ver Pagos') }}" class="btn-primary" />
@@ -117,13 +116,13 @@
     @endif
 
     <div class="container px-3 mx-auto my-3 md:px-6">
-      @foreach ($userPayments as $userPayment)
+      @foreach ($this->userPayments as $userPayment)
         @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
-          <button wire:click="handleInstallmentClick({{$userPayment}})">
+          <button wire:click="handleInstallmentClick({{$userPayment->id}})" wire:key="payment-{{ $userPayment->id }}">
             <div class="inline-block w-32 m-1 overflow-hidden text-sm uppercase bg-gray-700 rounded-md shadow-lg">
               <div class="{{$userPayment->bgColor}} w-full text-center p-1">
                 {{ $userPayment->title }}
-                <p class="text-xs">{{ \Carbon\Carbon::parse($userPayment->date)->format('m-Y') }}</p>
+                <p class="text-xs">{{ $userPayment->date->format('m-Y') }}</p>
               </div>
               <div class="px-2 py-1">
                 <div class="text-right">
@@ -134,10 +133,10 @@
             </div>
           </button>
         @else
-          <div class="inline-block w-32 m-1 overflow-hidden text-sm uppercase bg-gray-700 rounded-md shadow-lg">
+          <div class="inline-block w-32 m-1 overflow-hidden text-sm uppercase bg-gray-700 rounded-md shadow-lg" wire:key="payment-{{ $userPayment->id }}">
             <div class="{{$userPayment->bgColor}} w-full text-center p-1">
               {{ $userPayment->title }}
-              <p class="text-xs">{{ \Carbon\Carbon::parse($userPayment->date)->format('m-Y') }}</p>
+              <p class="text-xs">{{ $userPayment->date->format('m-Y') }}</p>
             </div>
             <div class="px-2 py-1">
               <div class="text-right">
@@ -151,13 +150,13 @@
     </div>
     <div class="container px-3 py-1 mx-auto my-3 text-lg text-right bg-gray-300/10 md:px-6">
       <p>{{ __('Deuda Total') }} <span class="inline-block font-bold bg-gray-200/10 w-44">$
-          {{ number_format($totalDebt, 2) }}</span>
+          {{ number_format($this->totals['debt'], 2) }}</span>
       </p>
       <p>{{ __('Total Pagado') }} <span class="inline-block font-bold bg-gray-200/10 w-44">$
-          {{ number_format($totalPaid, 2) }}</span>
+          {{ number_format($this->totals['paid'], 2) }}</span>
       </p>
       <p>{{ __('Saldo') }} <span class="inline-block font-bold bg-gray-100/10 w-44">$
-          {{ number_format($totalDebt - $totalPaid, 2) }}</span></p>
+          {{ number_format($this->totals['debt'] - $this->totals['paid'], 2) }}</span></p>
     </div>
     <div x-data="{}" @open-receipt.window="window.open($event.detail.url, '_blank')"></div>
   </div>

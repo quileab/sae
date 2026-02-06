@@ -16,7 +16,7 @@ class CreatePlansDetailsTable extends Migration
         Schema::create('plans_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('plans_master_id')->constrained()->cascadeOnDelete()->cascadeOnUpdate();
-            $table->date('date')->key();
+            $table->date('date')->index();
             $table->string('title');
             $table->decimal('amount', 10, 2);
             $table->timestamps();

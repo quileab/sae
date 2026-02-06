@@ -1,6 +1,6 @@
 <div>
     <div class="flex justify-between gap-2 flex-wrap">
-        <x-header title="{{ __('Control de Pagos') }}" subtitle="{{ __('Administrar pagos y planes de pago') }}" />
+        <x-header title="{{ __('Control de Pagos') }}" subtitle="{{ __('Administrar pagos y planes de pago') }}" progress-indicator />
 
         <x-input icon="o-magnifying-glass" wire:model.live.debounce.500ms="search" placeholder="{{ __('Buscar...') }}"
             class="w-72 flex-1" />

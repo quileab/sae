@@ -25,8 +25,8 @@
                     @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                         <x-select label="Tipo" wire:model.lazy="type" :options="$types" />
                     @else
-                        <x-button label="Confirmar" @click="$wire.drawer = true" responsive icon="o-bars-3"
-                            class="btn-secondary mt-7" />
+                        <x-button label="Confirmar" @click="$wire.drawer = true" icon="o-bars-3"
+                            class="btn-info mt-7" />
                     @endif
                     <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
                 </div>

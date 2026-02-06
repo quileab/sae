@@ -1,12 +1,12 @@
 <div>
   {{-- CRUD Books Form --}}
-  <x-modal wire:model="openModal" title="@if ($updating) {{ __('Actualizando') }} @else {{ __('Nuevo') }} @endif" subtitle="" separator>
+  <x-modal wire:model="openModal" :title="$updating ? __('Actualizando') : __('Nuevo')" subtitle="" separator>
     <x-slot:menu>
       @if ($errors->any())
         <div class="text-yellow-300">{{ __('Verifique la información ingresada') }}</div>
       @endif
       <x-button wire:click="save" wire:loading.attr="disabled" wire:target="save"
-        label="@if ($updating) {{ __('Actualizar') }} @else {{ __('Guardar') }} @endif" class="btn-primary" />
+        :label="$updating ? __('Actualizar') : __('Guardar')" class="btn-primary" />
       <x-button wire:click="$set('openModal',false)" label="{{ __('Cancelar') }}" class="btn-secondary" />
     </x-slot:menu>
   </x-modal>
