@@ -51,6 +51,19 @@ class UserPayments extends Model
         return 'text-blue-200';
     }
 
+    public function getBorderColorAttribute(): string
+    {
+        if ($this->paid >= $this->amount) {
+            return 'border-green-500';
+        }
+
+        if ($this->paid > 0) {
+            return 'border-amber-500';
+        }
+
+        return 'border-blue-500';
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

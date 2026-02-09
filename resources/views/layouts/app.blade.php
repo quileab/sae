@@ -80,7 +80,7 @@
                         <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
                     </x-menu-sub>
                     <x-menu-sub title="Pagos" icon="o-currency-dollar">
-                        <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments-index" />
+                        <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments" />
                         <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
                         <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
                     </x-menu-sub>

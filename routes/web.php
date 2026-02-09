@@ -112,8 +112,10 @@ Route::middleware('auth')->group(function () {
 
     // Payment System Routes
     Route::livewire('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/user-payments-index', 'user-payments-index')->name('user-payments-index')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/user-payments/{user}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,administrative');
+    Route::get('/user-payments-index', function () {
+        return redirect()->route('user-payments');
+    })->middleware('roles:admin,principal,administrative');
+    Route::livewire('/user-payments/{user?}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,administrative');
     Route::livewire('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,administrative,student');
     Route::livewire('/report-payments', 'report-payments')->name('report-payments')->middleware('roles:admin,principal,administrative');
 

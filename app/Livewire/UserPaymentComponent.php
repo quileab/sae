@@ -45,10 +45,15 @@ class UserPaymentComponent extends Component
 
     public function mount($user = null)
     {
-        $this->userId = $user ?? auth()->id();
-        $this->user = User::findOrFail($this->userId);
+        if ($user) {
+            $this->userId = $user;
+            $this->user = User::find($this->userId);
+        } elseif (auth()->user()->hasRole('student')) {
+            $this->userId = auth()->id();
+            $this->user = auth()->user();
+        }
 
-        if ($this->payPlans->isNotEmpty()) {
+        if ($this->user && $this->payPlans->isNotEmpty()) {
             $this->selectedPlan = $this->payPlans->first()->id;
         }
     }
@@ -56,6 +61,10 @@ class UserPaymentComponent extends Component
     #[Computed]
     public function nextPaymentToPay()
     {
+        if (! $this->userId) {
+            return null;
+        }
+
         return UserPayments::where('user_id', $this->userId)
             ->whereRaw('paid < amount')
             ->orderBy('date')
@@ -65,6 +74,10 @@ class UserPaymentComponent extends Component
     #[Computed]
     public function userPayments()
     {
+        if (! $this->userId) {
+            return collect();
+        }
+
         return UserPayments::where('user_id', $this->userId)
             ->orderBy('date')
             ->get();
@@ -107,15 +120,36 @@ class UserPaymentComponent extends Component
             return;
         }
 
-        foreach ($planMaster->details as $detail) {
-            UserPayments::create([
-                'user_id' => $this->userId,
-                'amount' => $detail->amount,
-                'paid' => 0,
-                'date' => $detail->date,
-                'title' => $detail->title,
-            ]);
-        }
+        DB::transaction(function () use ($planMaster) {
+            foreach ($planMaster->details as $detail) {
+                $installment = null;
+
+                if ($this->combinePlans) {
+                    $installment = UserPayments::where('user_id', $this->userId)
+                        ->whereDate('date', $detail->date)
+                        ->first();
+                }
+
+                if ($installment) {
+                    $updateData = ['title' => $detail->title];
+
+                    // Protect fully paid installments from amount changes
+                    if ($installment->paid < $installment->amount) {
+                        $updateData['amount'] = $detail->amount;
+                    }
+
+                    $installment->update($updateData);
+                } else {
+                    UserPayments::create([
+                        'user_id' => $this->userId,
+                        'amount' => $detail->amount,
+                        'paid' => 0,
+                        'date' => $detail->date,
+                        'title' => $detail->title,
+                    ]);
+                }
+            }
+        });
 
         $this->openModal = false;
         unset($this->userPayments);
@@ -128,13 +162,27 @@ class UserPaymentComponent extends Component
         $next = $this->nextPaymentToPay;
 
         if ($next) {
-            $this->paymentId = $next->id;
-            $this->paymentDescription = $next->title;
-            $this->paymentAmountPaid = $next->amount - $next->paid;
+            $this->setPaymentDefaults($next);
             $this->paymentModal = true;
         } else {
             $this->info('No hay cuotas pendientes de pago.');
         }
+    }
+
+    private function setPaymentDefaults($userPayment)
+    {
+        $this->paymentId = $userPayment->id;
+        $this->paymentDescription = $userPayment->title;
+        $this->paymentAmountPaid = $userPayment->amount - $userPayment->paid;
+
+        // Balance until today, starting from the selected installment
+        $balance = UserPayments::where('user_id', $this->userId)
+            ->where('date', '>=', $userPayment->date)
+            ->where('date', '<=', now())
+            ->get()
+            ->sum(fn ($p) => max(0, $p->amount - $p->paid));
+
+        $this->paymentAmountInput = $balance > 0 ? $balance : $this->paymentAmountPaid;
     }
 
     public function registerUserPayment()
@@ -184,7 +232,7 @@ class UserPaymentComponent extends Component
                 }
 
                 // Append the formatted date to the description
-                $description .= $descriptionPrefix.ucfirst(Carbon::parse($installment->date)->translatedFormat('M\'y')).' - ';
+                $description .= $descriptionPrefix.Carbon::parse($installment->date)->format('d/m/Y').' - ';
             }
 
             // Remove the trailing ' - ' from the description
@@ -216,18 +264,22 @@ class UserPaymentComponent extends Component
 
         if ($userPayment->paid < $userPayment->amount) {
             // Open payment modal
-            $this->paymentId = $userPayment->id;
-            $this->paymentDescription = $userPayment->title;
-            $this->paymentAmountPaid = $userPayment->amount - $userPayment->paid;
+            $this->setPaymentDefaults($userPayment);
             $this->paymentModal = true;
         } else {
             // Open modify modal
-            $this->paymentId = $userPayment->id;
-            $this->paymentDescription = $userPayment->title;
-            $this->paymentAmountPaid = $userPayment->amount;
-            $this->modifyPaymentModal = true;
-            $this->totalDebt = $userPayment->amount; // Set default for modification
+            $this->openModifyModal($userPaymentId);
         }
+    }
+
+    public function openModifyModal($userPaymentId)
+    {
+        $userPayment = UserPayments::findOrFail($userPaymentId);
+        $this->paymentId = $userPayment->id;
+        $this->paymentDescription = $userPayment->title;
+        $this->paymentAmountPaid = $userPayment->amount;
+        $this->modifyPaymentModal = true;
+        $this->totalDebt = $userPayment->amount; // Set default for modification
     }
 
     public function modifyAmount($paymentId)
@@ -241,15 +293,6 @@ class UserPaymentComponent extends Component
         unset($this->userPayments);
         unset($this->totals);
         $this->info('Monto modificado.');
-    }
-
-    public function deletePayment($paymentId)
-    {
-        UserPayments::destroy($paymentId);
-        $this->modifyPaymentModal = false;
-        unset($this->userPayments);
-        unset($this->totals);
-        $this->error('Pago eliminado.');
     }
 
     public function render()

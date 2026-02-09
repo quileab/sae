@@ -117,7 +117,7 @@
         <tbody>
             @foreach($payments as $payment)
                 <tr>
-                    <td>{{ $payment->created_at->format('Y-m-d') }}</td>
+                    <td>{{ $payment->created_at->format('d/m/Y') }}</td>
                     <td>{{ $payment->id }}</td>
                     <td>{{ $payment->user->lastname }}, {{ $payment->user->firstname }}</td>
                     <td>{{ $payment->description }}</td>

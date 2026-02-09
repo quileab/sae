@@ -30,6 +30,9 @@
           </x-select>
         </div>
       </x-slot:actions>
+              @scope('cell_created_at', $payment)
+                  {{ $payment->created_at->format('d/m/Y') }}
+              @endscope
               @scope('cell_paymentAmount', $payment)
                   ${{ number_format($payment->paymentAmount, 2) }}
               @endscope
