@@ -24,11 +24,11 @@
                 <div class="grid grid-cols-2 gap-2">
                     @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
                         <x-select label="Tipo" wire:model.lazy="type" :options="$types" />
+                        <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
                     @else
-                        <x-button label="Confirmar" @click="$wire.drawer = true" icon="o-bars-3"
-                            class="btn-info mt-7" />
+                        <x-button label="Confirmar" @click="$wire.drawer = true" icon="o-check"
+                            class="btn-primary mt-7" />
                     @endif
-                    <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
                 </div>
             @else
                 <x-alert title="Se ha encontrado un error. Verifique con Tesorería	" icon="o-exclamation-triangle"
@@ -48,13 +48,19 @@
                                 @endphp
 
                                 {{-- if type csv-1 add single to x-choices --}}
-                                @if($type == 'csv-1')
-                                    <x-choices wire:model="subjects.{{ $item->id }}.selected" :options="$values" :key="uniqid()"
-                                        class="w-full" single />
-                                @else
-                                    <x-choices wire:model="subjects.{{ $item->id }}.selected" :options="$values" :key="uniqid()"
-                                        class="w-full" />
-                                @endif
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 min-w-[300px]">
+                                        @if($type == 'csv-1')
+                                            <x-choices wire:model="subjects.{{ $item->id }}.selected" :options="$values"
+                                                :key="'choices-'.$item->id" single />
+                                        @else
+                                            <x-choices wire:model="subjects.{{ $item->id }}.selected" :options="$values"
+                                                :key="'choices-'.$item->id" />
+                                        @endif
+                                    </div>
+                                    <x-button icon="o-trash" class="btn-ghost btn-sm text-error"
+                                        wire:click="clearSelection({{ $item->id }})" />
+                                </div>
 
                 @endif
                 @endscope
@@ -67,9 +73,9 @@
 
         <div class="grid grid-cols-2 gap-2">
             <x-button label="Previsualizar" icon="o-eye" class="btn-warning"
-                link="/inscriptionsPDF/{{ $user->id }}/{{ $career_id }}/{{ $inscription_id }}" external />
+                wire:click="preview" />
             <x-button label="Enviar" icon="o-paper-airplane" class="btn-success"
-                link="/inscriptionsSavePDF/{{ $user->id }}/{{ $career_id }}/{{ $inscription_id }}" />
+                wire:click="saveAndConfirm" />
         </div>
 
     </x-drawer>

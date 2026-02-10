@@ -141,7 +141,13 @@ class Crud extends Component
 
         foreach ($subjects as $subject) {
             $subject->value = $inscriptions[$subject->id]['value'] ?? null;
-            $subject->selected = $selected[$subject->id]['value'] ?? null;
+
+            // Preserve current selection if it exists in local state, otherwise load from DB
+            if (isset($this->subjects[$subject->id]) && array_key_exists('selected', $this->subjects[$subject->id])) {
+                $subject->selected = $this->subjects[$subject->id]['selected'];
+            } else {
+                $subject->selected = $selected[$subject->id]['value'] ?? null;
+            }
         }
 
         $this->subjects = $subjects->keyBy('id')->toArray();
@@ -179,6 +185,38 @@ class Crud extends Component
         $this->success('Inscripciones actualizadas');
         // prevent reload / render
         $this->skipRender();
+    }
+
+    public function saveAndConfirm()
+    {
+        $this->save();
+
+        return redirect()->route('inscriptionsSavePDF', [
+            'student' => $this->user->id,
+            'career' => $this->career_id,
+            'inscription' => $this->inscription_id,
+        ]);
+    }
+
+    public function clearSelection($subject_id)
+    {
+        if (isset($this->subjects[$subject_id])) {
+            $this->subjects[$subject_id]['selected'] = null;
+        }
+    }
+
+    public function preview()
+    {
+        $this->save();
+        $this->drawer = false;
+
+        $url = route('inscriptionsPDF', [
+            'student' => $this->user->id,
+            'career' => $this->career_id,
+            'inscription' => $this->inscription_id,
+        ]);
+
+        $this->js("window.open('$url', '_blank')");
     }
 
     public function render()

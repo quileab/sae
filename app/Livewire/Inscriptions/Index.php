@@ -41,6 +41,8 @@ class Index extends Component
 
     public $user;
 
+    public array $selectedRows = [];
+
     public function mount()
     {
         // if user is NOT admin, principal, administrative return back
@@ -80,30 +82,61 @@ class Index extends Component
     {
         $search = Str::of($this->search)->lower()->ascii();
         // search inscriptions by configs_id order by user_id
-        $inscriptions = Inscriptions::with('user', 'subject')
+        $query = Inscriptions::with('user', 'subject')
             ->where('user_id', '>', 1000)
             ->where('configs_id', $this->inscription_id)
-            ->where('subject_id', $this->subject_id)
-            ->when($this->search, function ($query) use ($search) {
-                return $query->where(function ($query) use ($search) {
-                    $query->where('user_id', 'like', '%'.$search.'%')
-                        ->orWhere('subject_id', 'like', '%'.$search.'%');
+            ->when($this->subject_id, function ($query) {
+                return $query->where('subject_id', $this->subject_id);
+            }, function ($query) {
+                return $query->whereHas('subject', function ($query) {
+                    $query->where('career_id', $this->career_id);
                 });
             })
-            ->orderBy($this->sortBy['column'], $this->sortBy['direction']);
+            ->when($this->search, function ($query) use ($search) {
+                return $query->where(function ($query) use ($search) {
+                    $query->whereHas('user', function ($query) use ($search) {
+                        $query->where('firstname', 'like', '%'.$search.'%')
+                            ->orWhere('lastname', 'like', '%'.$search.'%')
+                            ->orWhere('email', 'like', '%'.$search.'%');
+                    });
+                });
+            });
 
-        return $inscriptions->get();
+        // Handle sorting for relationship columns
+        if ($this->sortBy['column'] === 'user.fullname') {
+            $query->join('users', 'inscriptions.user_id', '=', 'users.id')
+                ->orderBy('users.lastname', $this->sortBy['direction'])
+                ->orderBy('users.firstname', $this->sortBy['direction'])
+                ->select('inscriptions.*');
+        } elseif ($this->sortBy['column'] === 'subject.name') {
+            $query->join('subjects', 'inscriptions.subject_id', '=', 'subjects.id')
+                ->orderBy('subjects.name', $this->sortBy['direction'])
+                ->select('inscriptions.*');
+        } else {
+            $query->orderBy($this->sortBy['column'], $this->sortBy['direction']);
+        }
+
+        return $query->get();
     }
 
     public function updatedCareerId($value): void
     {
         $this->subjects = Subject::where('career_id', $value)->get();
-        if ($this->subjects->isNotEmpty()) {
-            $this->subject_id = $this->subjects->first()->id;
-        } else {
-            $this->subject_id = null;
+        $this->subject_id = null;
+    }
+
+    public function deleteSelected(): void
+    {
+        if (empty($this->selectedRows)) {
+            $this->warning('No hay elementos seleccionados.');
+
+            return;
         }
-        // $this->items(); // No need to call this here as it's called in render/with
+
+        Inscriptions::whereIn('id', $this->selectedRows)->delete();
+        $this->selectedRows = [];
+        $this->drawer = false;
+        $this->success('Inscripciones eliminadas correctamente.');
     }
 
     public function render()

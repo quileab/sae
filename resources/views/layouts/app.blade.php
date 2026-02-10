@@ -74,7 +74,7 @@
                     </x-menu-sub>
                 @endif
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
-                    <x-menu-sub title="Admin Inscripciones" icon="o-clipboard-document-check">
+                    <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
                         <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
