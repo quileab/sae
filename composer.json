@@ -3,8 +3,11 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
+    "license": "AGPL-3.0-or-later",
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
