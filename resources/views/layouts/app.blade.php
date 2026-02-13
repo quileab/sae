@@ -47,6 +47,8 @@
                     <x-list-item :item="$user" value="name" sub-value="email" no-separator no-hover
                         class="-mx-2 !-mt-2 rounded bg-black/20">
                         <x-slot:actions>
+                            <x-button icon="o-user" class="btn-circle btn-ghost btn-xs hover:text-primary"
+                                tooltip-left="PERFIL" link="/profile" />
                             <x-button icon="o-power" class="btn-circle btn-ghost btn-xs hover:text-error"
                                 tooltip-left="SALIR" no-wire-navigate link="/logout" />
                         </x-slot:actions>

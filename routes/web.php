@@ -91,6 +91,7 @@ Route::middleware('auth')->group(function () {
     Route::livewire('/careers', 'careers.index')->middleware('roles:admin,principal,administrative');
     Route::livewire('/career/{id?}', 'careers.crud')->middleware('roles:admin,principal,administrative');
     Route::livewire('/subjects', 'subjects.index')->middleware('roles:admin,principal,administrative');
+    Route::livewire('/subjects-table', 'subjects.table-crud')->middleware('roles:admin,principal,administrative');
     Route::livewire('/subject/{id?}', 'subjects.crud')->middleware('roles:admin,principal,administrative');
     Route::livewire('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,administrative');
     Route::livewire('/configs', 'configs')->middleware('roles:admin,principal,administrative');
@@ -109,6 +110,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/subjects/{subject}/content-manager', \App\Livewire\ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
     Route::livewire('/simplified-content/{subject}', 'simplified-content')->name('simplified-content')->middleware('roles:admin,teacher,director,student,principal');
     Route::livewire('/calendar', 'calendar')->name('calendar')->middleware('roles:admin,teacher,principal,administrative,student');
+    Route::livewire('/profile', 'users.profile')->name('profile');
 
     // Payment System Routes
     Route::livewire('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,administrative');

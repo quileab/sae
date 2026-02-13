@@ -16,7 +16,7 @@ class CreateUserpaymentsTable extends Migration
         Schema::create('userpayments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
-            $table->date('date')->key();
+            $table->date('date')->index();
             $table->string('title');
             $table->decimal('paid', 10, 2)->default(0);
             $table->decimal('amount', 10, 2);

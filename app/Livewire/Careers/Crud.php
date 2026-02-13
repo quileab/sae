@@ -10,8 +10,6 @@ class Crud extends Component
 {
     use Toast;
 
-    public bool $drawer = false;
-
     public array $data = [
         'id' => null,
         'name' => '',
@@ -38,6 +36,7 @@ class Crud extends Component
     {
         Career::updateOrCreate(['id' => $this->data['id']], $this->data);
         $this->success('Carrera guardada.');
+        $this->redirect('/careers');
     }
 
     public function delete()

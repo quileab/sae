@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('topic_id')->constrained()->onDelete('cascade');
             $table->string('title');
             $table->string('url');
+            $table->boolean('is_visible')->default(true);
             $table->timestamps();
         });
     }

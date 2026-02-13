@@ -11,6 +11,8 @@ class Crud extends Component
 {
     use Toast;
 
+    public $original_id = null;
+
     public array $data = [
         'id' => null,
         'career_id' => '',
@@ -21,8 +23,6 @@ class Crud extends Component
     public $careers;
 
     public $subjects;
-
-    public $drawer = false;
 
     public $subjectsToStudy = [];
 
@@ -38,20 +38,52 @@ class Crud extends Component
             $subject = Subject::find($id);
             if ($subject) {
                 $this->data = $subject->toArray();
+                $this->original_id = $id;
             }
         }
 
         $this->careers = Career::all();
-        $this->subjects = Subject::where('career_id', $this->data['career_id'])->get();
+        $this->refreshSubjects();
         $this->createPrequisite();
+    }
+
+    public function updatedDataCareerId()
+    {
+        $this->refreshSubjects();
+    }
+
+    public function refreshSubjects()
+    {
+        if ($this->data['career_id']) {
+            $this->subjects = Subject::where('career_id', $this->data['career_id'])
+                ->where('id', '!=', $this->data['id'])
+                ->get();
+        } else {
+            $this->subjects = collect();
+        }
     }
 
     public function save()
     {
-        Subject::updateOrCreate(['id' => $this->data['id']], $this->data);
-        $this->success('Materia guardada.');
+        // If we are editing and the ID has changed
+        if ($this->original_id && $this->data['id'] != $this->original_id) {
+            // Check if the new ID already exists to avoid conflict
+            if (Subject::where('id', $this->data['id'])->exists()) {
+                $this->error('El nuevo ID ya está en uso por otra materia.');
 
-        return redirect('/subjects');
+                return;
+            }
+
+            // Perform manual update of the ID directly in DB to trigger ON UPDATE CASCADE
+            \Illuminate\Support\Facades\DB::table('subjects')
+                ->where('id', $this->original_id)
+                ->update(['id' => $this->data['id']]);
+        }
+
+        Subject::updateOrCreate(['id' => $this->data['id']], $this->data);
+
+        $this->success('Materia guardada.');
+        $this->redirect('/subjects');
     }
 
     public function delete()

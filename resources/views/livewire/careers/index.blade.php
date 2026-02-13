@@ -5,6 +5,7 @@
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
         <x-slot:actions>
+            <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />
             <x-button label="OPCIONES" @click="$wire.drawer = true" responsive icon="o-bars-3" />
         </x-slot:actions>
     </x-header>
@@ -39,7 +40,6 @@
             @keydown.enter="$wire.drawer = false" />
 
         <x-slot:actions>
-            <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/career" />
             <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
             <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer = false" />
         </x-slot:actions>

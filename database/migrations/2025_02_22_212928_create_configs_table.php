@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('value', 250);
             $table->timestamps();
             $table->primary('id');
-            $table->index('group')->unique();
+            $table->unique('group');
         });
     }
 

@@ -18,6 +18,11 @@ return new class extends Migration
             $table->dateTime('end');
             $table->string('color')->default('#000000');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('subject_id')->nullable()->constrained()->onDelete('set null');
+            $table->text('description')->nullable();
+            $table->foreignId('presidente_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('vocal1_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('vocal2_id')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }

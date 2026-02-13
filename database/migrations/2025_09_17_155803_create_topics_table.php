@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('name');
             $table->longText('content')->nullable();
             $table->integer('order')->default(0);
+            $table->boolean('is_visible')->default(true);
             $table->timestamps();
         });
     }

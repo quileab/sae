@@ -3,17 +3,17 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use App\Models\Enrollment;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -64,15 +64,17 @@ class User extends Authenticatable
         ['id' => 4, 'name' => 'director', 'alias' => 'Director'],
         ['id' => 5, 'name' => 'administrative', 'alias' => 'Administrativo'],
         ['id' => 6, 'name' => 'treasurer', 'alias' => 'Tesorero'],
-        ['id' => 7, 'name' => 'user', 'alias' => 'Usuario']
+        ['id' => 7, 'name' => 'user', 'alias' => 'Usuario'],
     ];
 
-    //public static function that reurns role name from id
+    // public static function that reurns role name from id
     public static function getRoleName(string $name): string
     {
         $role = collect(self::$roles)->firstWhere('name', $name);
+
         return $role['alias'] ?? 'error';
     }
+
     // users may have multiple careers
     public function careers(): BelongsToMany
     {
@@ -102,6 +104,7 @@ class User extends Authenticatable
     {
         return $this->hasMany('App\Models\Grade');
     }
+
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
@@ -130,7 +133,7 @@ class User extends Authenticatable
     // full name attribute
     public function getFullNameAttribute(): string
     {
-        return $this->lastname . ', ' . $this->firstname;
+        return $this->lastname.', '.$this->firstname;
     }
 
     public function classSessions()

@@ -7,6 +7,10 @@
                 <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
             </div>
         </x-slot:middle>
+        <x-slot:actions>
+            <x-button label="NUEVO" icon="o-plus" class="btn-success" link="/subject" />
+            <x-button label="EDITOR RÁPIDO" icon="o-table-cells" class="btn-outline" link="/subjects-table" />
+        </x-slot:actions>
     </x-header>
 
     <!-- TABLE  -->

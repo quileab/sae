@@ -12,10 +12,14 @@ Para ingresar al sistema, siga estos pasos:
 3.  Haga clic en el botón **"Ingresar"**.
     *   *Nota: Si olvidó su contraseña, contacte al administrador para restablecerla.*
 
+![Pantalla de Inicio de Sesión](public/images/manual/login.png)
+
 ---
 
 ## 3. Rol: Administrador
 El perfil de Administrador tiene el nivel de acceso más alto y es responsable de la gestión global del sistema.
+
+![Dashboard de Administrador](public/images/manual/admin_dashboard.png)
 
 ### 3.1 Gestión de Usuarios
 *Ubicación: Menú Principal > Usuarios*
@@ -33,6 +37,8 @@ El perfil de Administrador tiene el nivel de acceso más alto y es responsable d
     *   Genere reportes PDF de las inscripciones.
     *   Visualice listas de inscritos por materia.
 
+![Gestión Académica - Carreras](public/images/manual/academic.png)
+
 ### 3.3 Gestión de Clases
 *Ubicación: Menú Principal > Clases*
 *   **Sesiones de Clase**: Supervise las sesiones de clase programadas por los profesores.
@@ -44,6 +50,8 @@ El perfil de Administrador tiene el nivel de acceso más alto y es responsable d
 *   **Planes de Pago**: Configure los diferentes planes de pago y cuotas aplicables a los estudiantes.
 *   **Pagos de Usuarios**: Registre pagos manuales y verifique el estado de cuenta de cada estudiante.
 *   **Reportes de Pagos**: Genere informes detallados sobre los ingresos y pagos pendientes.
+
+![Gestión Financiera - Pagos](public/images/manual/finance.png)
 
 ### 3.5 Configuraciones del Sistema
 *Ubicación: Menú Principal > Configuración*
@@ -108,6 +116,8 @@ El panel de mensajería se divide en dos pestañas principales para una navegaci
     *   **Contexto de Curso**: Las conversaciones grupales de materias muestran claramente el nombre del curso y la carrera a la que pertenecen (ej. "Matemáticas - Ingeniería").
     *   **Notificaciones**: Un distintivo rojo (🔴) indica la cantidad de mensajes no leídos en cada conversación.
 *   **Pestaña "Nuevo" (Icono ✏️)**: Permite iniciar nuevas conversaciones.
+
+![Sistema de Mensajería / Chat](public/images/manual/chat.png)
 
 ### 6.2 Funcionalidades de Chat
 *   **Envío de Mensajes**:
