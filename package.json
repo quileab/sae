@@ -1,4 +1,6 @@
 {
+    "name": "sae",
+    "description": "Sistema de Administración Escolar (SAE) built with the TALL stack.",
     "private": true,
     "type": "module",
     "scripts": {

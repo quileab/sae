@@ -1,11 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "quileab/sae",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Sistema de Administración Escolar (SAE) built with the TALL stack.",
     "keywords": [
         "laravel",
-        "framework"
+        "livewire",
+        "school-management",
+        "education",
+        "tall-stack",
+        "mary-ui"
     ],
     "license": "AGPL-3.0-or-later",
     "require": {
