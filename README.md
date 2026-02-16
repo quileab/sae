@@ -86,4 +86,4 @@ SAE is a comprehensive, modern web application designed to manage all aspects of
 
 ## License
 
-This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Este proyecto es software de código abierto bajo la licencia [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
