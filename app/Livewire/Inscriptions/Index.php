@@ -45,26 +45,39 @@ class Index extends Component
 
     public function mount()
     {
-        // if user is NOT admin, principal, administrative return back
-        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        $this->user = auth()->user();
+        // if user is NOT admin, principal, administrative or teacher return back
+        if (! $this->user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher'])) {
             return redirect()->back();
         }
-        $this->user = auth()->user();
+
         $this->inscriptions = Configs::where('group', 'inscriptions')->get();
         if ($this->inscriptions->isNotEmpty()) {
             $this->inscription_id = $this->inscriptions->first()->id;
         }
-        $this->careers = Career::where('allow_enrollments', true)
-            ->where('allow_evaluations', true)->get();
 
-        if ($this->careers->isEmpty()) {
-            // return error message
-            $this->warning('No se han encontrado Carreras.');
-            $this->career_id = null;
+        if ($this->user->hasRole('teacher')) {
+            $this->subjects = Subject::whereHas('classSessions', function ($query) {
+                $query->where('teacher_id', $this->user->id);
+            })->get();
+
+            if ($this->subjects->isNotEmpty()) {
+                $this->subject_id = $this->subjects->first()->id;
+                $this->career_id = $this->subjects->first()->career_id;
+            }
         } else {
-            $this->career_id = $this->careers->first()->id;
+            $this->careers = Career::where('allow_enrollments', true)
+                ->where('allow_enrollments', true)->get();
+
+            if ($this->careers->isEmpty()) {
+                // return error message
+                $this->warning('No se han encontrado Carreras.');
+                $this->career_id = null;
+            } else {
+                $this->career_id = $this->careers->first()->id;
+                $this->updatedCareerId($this->career_id);
+            }
         }
-        $this->updatedCareerId($this->career_id);
     }
 
     // Table headers
@@ -75,6 +88,7 @@ class Index extends Component
             ['key' => 'user.fullname', 'label' => 'Apellido y Nombre'],
             ['key' => 'subject.name', 'label' => 'Materia'],
             ['key' => 'configs_id', 'label' => 'Inscripto a', 'sortable' => false],
+            ['key' => 'pdf', 'label' => 'PDF', 'sortable' => false],
         ];
     }
 
@@ -84,14 +98,25 @@ class Index extends Component
         // search inscriptions by configs_id order by user_id
         $query = Inscriptions::with('user', 'subject')
             ->where('user_id', '>', 1000)
-            ->where('configs_id', $this->inscription_id)
-            ->when($this->subject_id, function ($query) {
-                return $query->where('subject_id', $this->subject_id);
-            }, function ($query) {
+            ->where('configs_id', $this->inscription_id);
+
+        if ($this->user->hasRole('teacher')) {
+            $query->whereHas('subject', function ($query) {
+                $query->whereHas('classSessions', function ($query) {
+                    $query->where('teacher_id', $this->user->id);
+                });
+            });
+        }
+
+        $query->when($this->subject_id, function ($query) {
+            return $query->where('subject_id', $this->subject_id);
+        }, function ($query) {
+            if (! $this->user->hasRole('teacher')) {
                 return $query->whereHas('subject', function ($query) {
                     $query->where('career_id', $this->career_id);
                 });
-            })
+            }
+        })
             ->when($this->search, function ($query) use ($search) {
                 return $query->where(function ($query) use ($search) {
                     $query->whereHas('user', function ($query) use ($search) {
@@ -127,6 +152,12 @@ class Index extends Component
 
     public function deleteSelected(): void
     {
+        if (! $this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+            $this->warning('No tienes permisos para realizar esta acción.');
+
+            return;
+        }
+
         if (empty($this->selectedRows)) {
             $this->warning('No hay elementos seleccionados.');
 

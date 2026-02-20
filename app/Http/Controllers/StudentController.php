@@ -46,7 +46,7 @@ class StudentController extends Controller
                 ]);
             } catch (\Illuminate\Database\QueryException $exception) {
                 // Just Continue
-                //$this->errorInfo = $this->errorInfo.$exception->errorInfo;
+                // $this->errorInfo = $this->errorInfo.$exception->errorInfo;
                 $user = null;
             }
             // Assign Role & Career to User

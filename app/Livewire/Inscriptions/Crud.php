@@ -20,8 +20,6 @@ class Crud extends Component
 
     public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
 
-    public bool $drawer = false;
-
     public $inscriptions = [];
 
     public $inscription_id = null;
@@ -51,6 +49,10 @@ class Crud extends Component
 
     public $temp = [];
 
+    public $pdfExists = false;
+
+    public $pdfFileName = '';
+
     private $admin_id = null;
 
     public function mount()
@@ -76,7 +78,10 @@ class Crud extends Component
             $this->careers = $this->user->careers ?? [];
         }
 
-        if ($this->inscriptions->isNotEmpty()) {
+        if ($this->inscriptions->isEmpty()) {
+            $this->warning('No se han encontrado Inscripciones abiertas.');
+            $this->inscription_id = null;
+        } else {
             $this->inscription_id = $this->inscriptions->first()->id;
         }
 
@@ -87,6 +92,28 @@ class Crud extends Component
         } else {
             $this->career_id = $this->careers->first()->id;
         }
+
+        $this->checkPdf();
+    }
+
+    public function checkPdf(): void
+    {
+        if ($this->user && $this->career_id && $this->inscription_id) {
+            $this->pdfFileName = "insc-{$this->user->id}-{$this->career_id}-{$this->inscription_id}-.pdf";
+            $this->pdfExists = \Illuminate\Support\Facades\Storage::exists("private/inscriptions/{$this->pdfFileName}");
+        } else {
+            $this->pdfExists = false;
+        }
+    }
+
+    public function updatedCareerId(): void
+    {
+        $this->checkPdf();
+    }
+
+    public function updatedInscriptionId(): void
+    {
+        $this->checkPdf();
     }
 
     public function boot()
@@ -159,6 +186,12 @@ class Crud extends Component
 
     public function save()
     {
+        if (! $this->career_id || ! $this->inscription_id) {
+            $this->warning('Debe seleccionar una Carrera e Inscripción.');
+
+            return;
+        }
+
         $isAdmin = auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']);
         // which user Admin or Student?
         $isAdmin ? $user = $this->admin_id : $user = $this->user->id;
@@ -182,13 +215,21 @@ class Crud extends Component
                 ])->save();
             }
         }
-        $this->success('Inscripciones actualizadas');
+        if (auth()->user()->hasAnyRole(['admin', 'principal', 'administrative'])) {
+            $this->success('Inscripciones actualizadas');
+        }
         // prevent reload / render
         $this->skipRender();
     }
 
     public function saveAndConfirm()
     {
+        if (! $this->career_id || ! $this->inscription_id) {
+            $this->warning('Debe seleccionar una Carrera e Inscripción para confirmar.');
+
+            return;
+        }
+
         $this->save();
 
         return redirect()->route('inscriptionsSavePDF', [
@@ -203,20 +244,6 @@ class Crud extends Component
         if (isset($this->subjects[$subject_id])) {
             $this->subjects[$subject_id]['selected'] = null;
         }
-    }
-
-    public function preview()
-    {
-        $this->save();
-        $this->drawer = false;
-
-        $url = route('inscriptionsPDF', [
-            'student' => $this->user->id,
-            'career' => $this->career_id,
-            'inscription' => $this->inscription_id,
-        ]);
-
-        $this->js("window.open('$url', '_blank')");
     }
 
     public function render()

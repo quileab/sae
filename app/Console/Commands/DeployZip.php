@@ -49,7 +49,7 @@ class DeployZip extends Command
         $zipName = "deploy_{$timestamp}.zip";
         $zipPath = base_path($zipName);
 
-        $this->info("Creando archivo ZIP: {$zipName}...");
+        $this->info("Creando archivo ZIP: {$zipPath}...");
 
         if (! class_exists('ZipArchive')) {
             $this->error('La extensión ZipArchive de PHP no está disponible.');
@@ -79,17 +79,19 @@ class DeployZip extends Command
             '.gemini.rem/',
             '.opencode/',
             'node_modules/',
+            // 'vendor/', // Ya no lo excluimos
             'tests/',
             'storage/logs/',
-            'storage/framework/cache/data/',
-            'storage/framework/sessions/',
-            'storage/framework/views/',
+            'storage/framework/',
+            'storage/app/public',
+            'public/hot',
             'phpunit.xml',
             '.editorconfig',
             'package-lock.json',
             'composer.lock',
             'respaldo_servidor.sql',
             'manual_usuario.md',
+            $zipName,
         ];
 
         if (! $this->option('include-env')) {
@@ -105,6 +107,7 @@ class DeployZip extends Command
 
             $filePath = $file->getRealPath();
             $relativePath = substr($filePath, strlen($rootPath) + 1);
+            $relativePath = str_replace('\\', '/', $relativePath);
 
             // Verificar exclusiones
             foreach ($excludedPaths as $excluded) {
@@ -119,11 +122,18 @@ class DeployZip extends Command
             }
 
             // Excluir cualquier archivo ZIP o SQL en la raíz o subdirectorios
-            if (in_array(pathinfo($filePath, PATHINFO_EXTENSION), ['zip', 'sql', 'rar', '7z'])) {
+            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $filename = strtolower(pathinfo($filePath, PATHINFO_FILENAME));
+            if (in_array($extension, ['zip', 'sql', 'rar', '7z', 'sqlite', 'sqlite-journal', 'tmp', 'log', 'bak']) || str_starts_with($filename, 'deploy_')) {
                 continue;
             }
 
-            $zip->addFile($filePath, $relativePath);
+            if (! $zip->addFile($filePath, $relativePath)) {
+                $this->error("Error al añadir: {$relativePath}");
+
+                continue;
+            }
+
             $count++;
 
             if ($count % 100 === 0) {
@@ -131,7 +141,11 @@ class DeployZip extends Command
             }
         }
 
-        $zip->close();
+        if ($zip->close() === false) {
+            $this->error('Error al cerrar el archivo ZIP. Es posible que un archivo esté bloqueado o no haya permisos de escritura.');
+
+            return self::FAILURE;
+        }
 
         $this->info("¡Listo! Se han empaquetado {$count} archivos en {$zipName}");
         $this->info('Puedes descargar este archivo y subirlo a tu hosting compartido.');

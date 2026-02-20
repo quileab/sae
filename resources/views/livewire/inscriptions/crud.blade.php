@@ -17,17 +17,25 @@
     <x-card>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-3 sticky top-0 z-20 backdrop-blur-md
         pb-1 border-b border-black/20 dark:border-white/20">
-            <x-select wire:model.lazy="inscription_id" label="Inscripciones a" :options="$inscriptions"
+            <x-select wire:model.live="inscription_id" label="Inscripciones a" :options="$inscriptions"
                 option-value="id" option-label="description" />
-            <x-select wire:model.lazy="career_id" label="Carrera" :options="$careers" />
+            <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
             @if($user->enabled)
                 <div class="grid grid-cols-2 gap-2">
                     @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
-                        <x-select label="Tipo" wire:model.lazy="type" :options="$types" />
+                        <x-select label="Tipo" wire:model.live="type" :options="$types" />
                         <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
                     @else
-                        <x-button label="Confirmar" @click="$wire.drawer = true" icon="o-check"
-                            class="btn-primary mt-7" />
+                        <div class="flex gap-2 mt-7">
+                            @if($inscription_id && $career_id)
+                                <x-button label="Confirmar" wire:click="saveAndConfirm" icon="o-check"
+                                    class="btn-primary flex-1" />
+                            @endif
+                            @if($pdfExists)
+                                <x-button label="PDF" link="/inscriptions/pdf/{{ $pdfFileName }}" external icon="o-document-text"
+                                    class="btn-outline btn-info" target="_blank" />
+                            @endif
+                        </div>
                     @endif
                 </div>
             @else
@@ -67,17 +75,5 @@
             </x-table>
         </div>
     </x-card>
-
-    <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
-
-        <div class="grid grid-cols-2 gap-2">
-            <x-button label="Previsualizar" icon="o-eye" class="btn-warning"
-                wire:click="preview" />
-            <x-button label="Enviar" icon="o-paper-airplane" class="btn-success"
-                wire:click="saveAndConfirm" />
-        </div>
-
-    </x-drawer>
 
 </div>

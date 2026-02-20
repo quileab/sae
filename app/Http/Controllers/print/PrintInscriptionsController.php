@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\print;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\Career;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
@@ -11,7 +10,9 @@ use Illuminate\Support\Facades\Storage;
 class PrintInscriptionsController extends Controller
 {
     public $config;
+
     public $inscriptions;
+
     public function __construct()
     { // Constructor, obtengo de la configuracion los datos del
         //  grupo MAIN en forma de array asociativo ID => VALOR en This->Config
@@ -22,9 +23,9 @@ class PrintInscriptionsController extends Controller
     }
 
     public function inscriptions($student, $insc_conf_id)
-    { 
+    {
         return \App\Models\Inscriptions::where('user_id', $student->id)
-        ->where('configs_id', $insc_conf_id)->orderBy('subject_id')->get();
+            ->where('configs_id', $insc_conf_id)->orderBy('subject_id')->get();
     }
 
     public function index(User $student, Career $career, string $insc_conf_id)
@@ -55,6 +56,6 @@ class PrintInscriptionsController extends Controller
         $content = $pdf->download()->getOriginalContent();
         Storage::put("private/inscriptions/insc-$student->id-$career->id-$insc_conf_id-.pdf", $content);
 
-        return back()->with('success', 'Inscripción guardada con éxito');
+        return back();
     }
 }

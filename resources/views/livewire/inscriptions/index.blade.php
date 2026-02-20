@@ -5,7 +5,9 @@
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
         <x-slot:actions>
-            <x-button label="OPCIONES" @click="$wire.drawer = true" responsive icon="o-bars-3" class="btn-primary" />
+            @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+                <x-button label="OPCIONES" @click="$wire.drawer = true" responsive icon="o-bars-3" class="btn-primary" />
+            @endif
         </x-slot:actions>
     </x-header>
     {{-- if return with message --}}
@@ -19,13 +21,36 @@
         pb-1 border-b border-black/20 dark:border-white/20">
             <x-select wire:model.live="inscription_id" label="Inscripciones a" :options="$inscriptions"
                 option-value="id" option-label="description" />
-            <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
+            @if(auth()->user()->hasNotRole('teacher'))
+                <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
+            @endif
             <x-select wire:model.live="subject_id" label="Materia" :options="$subjects" placeholder="TODAS" />
         </div>
-        <div class="z-10">
-            <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" selectable wire:model="selectedRows"
-                striped>
+        <div class="z-10 relative">
+            <div wire:loading class="absolute inset-0 z-50 flex items-center justify-center bg-white/50 dark:bg-gray-800/50">
+                <span class="loading loading-spinner loading-lg text-primary"></span>
+            </div>
 
+            @php
+                $selectable = auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']);
+            @endphp
+            <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" :selectable="$selectable" wire:model="selectedRows"
+                striped>
+                @scope('cell_pdf', $item, $career_id, $inscription_id)
+                    @php
+                        $pdfFileName = "insc-{$item->user_id}-{$career_id}-{$inscription_id}-.pdf";
+                        $pdfExists = \Illuminate\Support\Facades\Storage::exists("private/inscriptions/$pdfFileName");
+                    @endphp
+                    @if($pdfExists)
+                        <x-button icon="o-document-text" link="/inscriptions/pdf/{{ $pdfFileName }}" external target="_blank" class="btn-sm btn-ghost text-info" />
+                    @endif
+                @endscope
+                <x-slot:empty>
+                    <div class="flex flex-col items-center justify-center py-10">
+                        <x-icon name="o-exclamation-circle" class="w-10 h-10 text-gray-400" />
+                        <p class="mt-2 text-gray-500">No se han encontrado inscripciones para los criterios seleccionados.</p>
+                    </div>
+                </x-slot:empty>
             </x-table>
         </div>
     </x-card>
