@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: [
             '/mercadopago/webhook',
+            '/pwa-attendance/sync',
         ]);
 
         // si es un middleware GLOBAL

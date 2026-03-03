@@ -16,6 +16,7 @@ class EventForm extends Component
     public $start;
     public $end;
     public $color = '#0C4767';
+    public $target = 'all';
     public $subject_id;
     public $description;
     public $presidente_id;
@@ -33,7 +34,7 @@ class EventForm extends Component
     {
         $this->reset();
         $user = Auth::user();
-        if ($user->hasAnyRole(['admin', 'director', 'administrative'])) {
+        if ($user->hasAnyRole(['admin', 'director', 'administrative', 'principal'])) {
             $this->careers = Career::all();
         } elseif ($user->hasRole('teacher')) {
             $subjects = $user->subjects()->with('career')->get();
@@ -72,6 +73,7 @@ class EventForm extends Component
                 $this->start = $event->start->format('Y-m-d\\TH:i');
                 $this->end = $event->end->format('Y-m-d\\TH:i');
                 $this->color = $event->color;
+                $this->target = $event->target ?? 'all';
                 $this->subject_id = $event->subject_id;
                 $this->description = $event->description;
                 $this->presidente_id = $event->presidente_id;
@@ -103,6 +105,7 @@ class EventForm extends Component
         'start' => 'required|date',
         'end' => 'required|date|after_or_equal:start',
         'color' => 'required|string|max:7',
+        'target' => 'required|in:students,teachers,all',
         'subject_id' => 'nullable|exists:subjects,id',
         'description' => 'nullable|string',
         'presidente_id' => 'nullable|exists:users,id',
@@ -150,12 +153,13 @@ class EventForm extends Component
             'start' => $this->start,
             'end' => $this->end,
             'color' => $this->color,
+            'target' => $this->target,
             'user_id' => Auth::id(),
             'subject_id' => $this->subject_id,
             'description' => $this->description,
         ];
 
-        if (Auth::user()->hasAnyRole(['admin', 'director', 'administrative'])) {
+        if (Auth::user()->hasAnyRole(['admin', 'director', 'administrative', 'principal'])) {
             $data['presidente_id'] = $this->presidente_id;
             $data['vocal1_id'] = $this->vocal1_id;
             $data['vocal2_id'] = $this->vocal2_id;

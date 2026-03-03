@@ -47,7 +47,7 @@ class Index extends Component
     {
         $this->user = auth()->user();
         // if user is NOT admin, principal, administrative or teacher return back
-        if (! $this->user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher'])) {
+        if (! $this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'teacher'])) {
             return redirect()->back();
         }
 
@@ -152,7 +152,7 @@ class Index extends Component
 
     public function deleteSelected(): void
     {
-        if (! $this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if (! $this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $this->warning('No tienes permisos para realizar esta acción.');
 
             return;

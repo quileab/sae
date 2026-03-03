@@ -65,6 +65,7 @@ class User extends Authenticatable
         ['id' => 5, 'name' => 'administrative', 'alias' => 'Administrativo'],
         ['id' => 6, 'name' => 'treasurer', 'alias' => 'Tesorero'],
         ['id' => 7, 'name' => 'user', 'alias' => 'Usuario'],
+        ['id' => 8, 'name' => 'preceptor', 'alias' => 'Preceptor'],
     ];
 
     // public static function that reurns role name from id
@@ -108,6 +109,11 @@ class User extends Authenticatable
     public function enrollments(): HasMany
     {
         return $this->hasMany(Enrollment::class);
+    }
+
+    public function userPayments(): HasMany
+    {
+        return $this->hasMany(UserPayments::class);
     }
 
     public function payments(): HasMany

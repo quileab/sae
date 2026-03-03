@@ -9,6 +9,7 @@ use App\Livewire\Subjects\Content as SubjectsContent;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 // Users will be redirected to this route if not logged in
 Route::livewire('/login', 'login')->name('login');
@@ -85,45 +86,54 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::livewire('/dashboard', 'dashboard');
-    Route::livewire('/users', 'users.index')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/user/{id?}', 'users.crud')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/users/import', 'users.import')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/careers', 'careers.index')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/career/{id?}', 'careers.crud')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/subjects', 'subjects.index')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/subjects-table', 'subjects.table-crud')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/subject/{id?}', 'subjects.crud')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,administrative');
-    Route::livewire('/configs', 'configs')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/inscriptions', 'inscriptions.crud')->middleware('roles:admin,student,principal,administrative');
-    Route::livewire('/inscriptions/list', 'inscriptions.index')->middleware('roles:admin,teacher,principal,administrative');
-    Route::livewire('/inscriptions/pdfs', 'inscriptions.indexpdfs')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/class-sessions', 'class_sessions.index')->middleware('roles:admin,teacher,principal,administrative');
-    Route::livewire('/class-session/{id?}', 'class_sessions.crud')->middleware('roles:admin,teacher,principal,administrative');
-    Route::livewire('/class-sessions/students/{id?}', 'class_sessions.students')->middleware('roles:admin,teacher,principal,administrative');
+    Route::livewire('/users', 'users.index')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/user/{id?}', 'users.crud')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/users/import', 'users.import')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/careers', 'careers.index')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/career/{id?}', 'careers.crud')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/subjects', 'subjects.index')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/subjects-table', 'subjects.table-crud')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/subject/{id?}', 'subjects.crud')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,director,administrative');
+    Route::livewire('/configs', 'configs')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/inscriptions', 'inscriptions.crud')->middleware('roles:admin,student,principal,director,administrative');
+    Route::livewire('/inscriptions/list', 'inscriptions.index')->middleware('roles:admin,teacher,principal,director,administrative');
+    Route::livewire('/inscriptions/pdfs', 'inscriptions.indexpdfs')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/class-sessions', 'class_sessions.index')->middleware('roles:admin,teacher,principal,director,administrative');
+    Route::livewire('/class-session/{id?}', 'class_sessions.crud')->middleware('roles:admin,teacher,principal,director,administrative');
+    Route::livewire('/class-sessions/students/{id?}', 'class_sessions.students')->middleware('roles:admin,teacher,principal,director,administrative');
     Route::get('/chat', Chat::class)->middleware('auth');
     Route::get('/print/student-report/{subject_id}', [PrintStudentReportController::class, 'generateReport'])->name('print.student-report');
     Route::get('/print/student-attendance-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateAttendanceReport'])->name('print.student-attendance-report');
     Route::get('/print/student-grades-report/{subject_id}', [\App\Http\Controllers\print\PrintStudentReportController::class, 'generateGradesReport'])->name('print.student-grades-report');
     Route::get('/print/students-payments', [\App\Http\Controllers\print\PrintStudentReportController::class, 'printStudentsPayments'])->name('printStudentsPayments');
-    Route::livewire('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal');
+    Route::livewire('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal,director');
     Route::get('/subjects/{subject}/content-manager', \App\Livewire\ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
     Route::livewire('/simplified-content/{subject}', 'simplified-content')->name('simplified-content')->middleware('roles:admin,teacher,director,student,principal');
-    Route::livewire('/calendar', 'calendar')->name('calendar')->middleware('roles:admin,teacher,principal,administrative,student');
+    Route::livewire('/calendar', 'calendar')->name('calendar')->middleware('roles:admin,teacher,principal,director,administrative,student');
+    Route::livewire('/attendance', 'attendance.index')->name('attendance')->middleware('roles:preceptor,admin,principal,director,administrative');
     Route::livewire('/profile', 'users.profile')->name('profile');
 
+    // Internal Routes for Attendance PWA (Full session support)
+    Route::prefix('pwa-attendance')->group(function () {
+        Route::get('/students', [\App\Http\Controllers\Api\AttendanceSyncController::class, 'students']);
+        Route::post('/sync', [\App\Http\Controllers\Api\AttendanceSyncController::class, 'store']);
+    });
+
     // Payment System Routes
-    Route::livewire('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,administrative');
+    Route::livewire('/pay-plans', 'pay-plans')->middleware('roles:admin,principal,director,administrative');
     Route::get('/user-payments-index', function () {
         return redirect()->route('user-payments');
-    })->middleware('roles:admin,principal,administrative');
-    Route::livewire('/user-payments/{user?}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,administrative');
-    Route::livewire('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,administrative,student');
-    Route::livewire('/report-payments', 'report-payments')->name('report-payments')->middleware('roles:admin,principal,administrative');
+    })->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/user-payments/{user?}', 'user-payment-component')->name('user-payments')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/payments-details/{user}', 'payments-details')->name('payments-details')->middleware('roles:admin,principal,director,administrative,student');
+    Route::livewire('/report-payments', 'report-payments')->name('report-payments')->middleware('roles:admin,principal,director,administrative');
+    Volt::route('/report-debts', 'report-debts-sfc')->name('report-debts')->middleware('roles:admin,principal,director,administrative');
 
     Route::livewire('/my-payment-plan', 'user-payment-component')->name('my-payment-plan')->middleware('roles:student');
 
     Route::get('/payments/receipt/{paymentRecord}', [\App\Http\Controllers\ReceiptController::class, 'show'])->name('payments.receipt');
+    Route::get('/payments/summary/{user}', [\App\Http\Controllers\print\PrintPaymentsController::class, 'summary'])->name('user-payments.summary');
 
     // Mercado Pago Routes
     Route::get('/mercadopago/success', [\App\Http\Controllers\MercadoPagoController::class, 'success'])->name('mercadopago.success');

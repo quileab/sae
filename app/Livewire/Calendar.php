@@ -8,11 +8,11 @@ use Carbon\Carbon;
 use Livewire\Component;
 
 use Livewire\Attributes\On;
+use Livewire\Attributes\Computed;
 
 class Calendar extends Component
 {
     public $date;
-    public $calendarGrid;
     public $selectedEvent = null;
     public $career_id;
     public $careers;
@@ -47,12 +47,28 @@ class Calendar extends Component
         $this->date->addMonth();
     }
 
-    public function generateCalendar()
+    #[Computed]
+    public function calendarGrid()
     {
         $startDate = $this->date->copy()->firstOfMonth()->startOfWeek(Carbon::SUNDAY);
         $endDate = $this->date->copy()->lastOfMonth()->endOfWeek(Carbon::SATURDAY);
+        $user = auth()->user();
 
         $events = Event::with('subject', 'presidente', 'vocal1', 'vocal2')->whereBetween('start', [$startDate, $endDate])
+            ->where(function ($query) use ($user) {
+                // Admin, director, etc. see everything
+                if ($user->hasAnyRole(['admin', 'director', 'administrative', 'principal'])) {
+                    return;
+                }
+
+                $query->where('target', 'all');
+
+                if ($user->hasRole('teacher')) {
+                    $query->orWhere('target', 'teachers');
+                } elseif ($user->hasRole('student')) {
+                    $query->orWhere('target', 'students');
+                }
+            })
             ->when($this->career_id, function ($query) {
                 $query->where(function ($q) {
                     $q->whereHas('subject', function ($q2) {
@@ -65,7 +81,7 @@ class Calendar extends Component
             })
             ->get();
 
-        $this->calendarGrid = collect();
+        $grid = collect();
         $currentDate = $startDate->copy();
 
         while ($currentDate <= $endDate) {
@@ -81,8 +97,9 @@ class Calendar extends Component
                 ]);
                 $currentDate->addDay();
             }
-            $this->calendarGrid->push($daysInWeek);
+            $grid->push($daysInWeek);
         }
+        return $grid;
     }
 
     public function eventClick($eventId)
@@ -103,7 +120,7 @@ class Calendar extends Component
     #[On('eventSaved')]
     public function render()
     {
-        $this->generateCalendar();
+        unset($this->calendarGrid);
         return view('livewire.calendar');
     }
 }

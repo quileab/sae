@@ -34,7 +34,7 @@ class Students extends Component
     public function mount($id = null)
     {
         // check if user is logged in and has teacher role
-        if (! auth()->user()->hasAnyRole(['teacher', 'admin', 'principal', 'administrative'])) {
+        if (! auth()->user()->hasAnyRole(['teacher', 'admin', 'principal', 'director', 'administrative'])) {
             return redirect()->back();
         }
 

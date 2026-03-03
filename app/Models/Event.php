@@ -11,6 +11,7 @@ class Event extends Model
         'start',
         'end',
         'color',
+        'target',
         'user_id',
         'subject_id',
         'description',

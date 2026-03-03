@@ -46,7 +46,7 @@ class Index extends Component
 
     public function mount()
     {
-        if (Auth::user()->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if (Auth::user()->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $this->tabs = [
                 'subjects-tab' => 'Materias',
                 'users-tab' => 'Contactos',

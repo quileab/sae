@@ -11,10 +11,7 @@ class DeployZip extends Command
      *
      * @var string
      */
-    protected $signature = 'make:deploy-zip 
-                            {--no-build : Skip running npm run build}
-                            {--no-optimize : Skip running php artisan optimize}
-                            {--include-env : Incluir el archivo .env actual}';
+    protected $signature = 'make:deploy-zip {--no-build : Skip running npm run build} {--no-optimize : Skip running php artisan optimize} {--include-env : Incluir el archivo .env actual}';
 
     /**
      * The console command description.
@@ -45,6 +42,7 @@ class DeployZip extends Command
             $this->call('optimize');
         }
 
+        $includeEnv = $this->option('include-env');
         $timestamp = now()->format('Y-m-d_H-i-s');
         $zipName = "deploy_{$timestamp}.zip";
         $zipPath = base_path($zipName);
@@ -79,18 +77,18 @@ class DeployZip extends Command
             '.gemini.rem/',
             '.opencode/',
             'node_modules/',
-            // 'vendor/', // Ya no lo excluimos
+            'vendor/',
             'tests/',
             'storage/logs/',
             'storage/framework/',
             'storage/app/public',
             'public/hot',
             'phpunit.xml',
-            '.editorconfig',
             'package-lock.json',
             'composer.lock',
             'respaldo_servidor.sql',
             'manual_usuario.md',
+            'nul',
             $zipName,
         ];
 
@@ -109,7 +107,24 @@ class DeployZip extends Command
             $relativePath = substr($filePath, strlen($rootPath) + 1);
             $relativePath = str_replace('\\', '/', $relativePath);
 
-            // Verificar exclusiones
+            // Excluir automáticamente todos los dot files y carpetas ocultas, excepto .env si es solicitado
+            $pathParts = explode('/', $relativePath);
+            $isHidden = false;
+            foreach ($pathParts as $part) {
+                if (str_starts_with($part, '.')) {
+                    if ($part === '.env' && $includeEnv) {
+                        continue;
+                    }
+                    $isHidden = true;
+                    break;
+                }
+            }
+
+            if ($isHidden) {
+                continue;
+            }
+
+            // Verificar exclusiones específicas
             foreach ($excludedPaths as $excluded) {
                 // Si termina en /, es un directorio
                 if (str_ends_with($excluded, '/')) {

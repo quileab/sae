@@ -22,11 +22,20 @@
                 <x-input type="datetime-local" label="Inicio" wire:model="start" :disabled="$isReadOnly" />
                 <x-input type="datetime-local" label="Fin" wire:model="end" :disabled="$isReadOnly" />
             </div>
+
             <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
 
                 @if(Auth::user()->hasAnyRole(['teacher', 'admin', 'principal']))
                     <x-select label="Carrera" wire:model.live="career_id" :options="$careers" option-value="id"
                         option-label="name" placeholder="Seleccione una carrera" :disabled="$isReadOnly" />
+
+                    @if(Auth::user()->hasAnyRole(['admin', 'director', 'administrative', 'principal']))
+                        <x-select label="Público Objetivo" wire:model="target" :options="[
+                            ['id' => 'all', 'name' => 'Todos'],
+                            ['id' => 'students', 'name' => 'Estudiantes'],
+                            ['id' => 'teachers', 'name' => 'Profesores'],
+                        ]" option-value="id" option-label="name" :disabled="$isReadOnly" />
+                    @endif
 
                     @if($career_id)
                         <x-select label="Materia" wire:model="subject_id" :options="$subjects" option-value="id"
@@ -35,7 +44,7 @@
                 @endif
             </div>
             <x-textarea label="Descripción" wire:model="description" :disabled="$isReadOnly" />
-            @if(Auth::user()->hasAnyRole(['admin', 'director', 'administrative']))
+            @if(Auth::user()->hasAnyRole(['admin', 'director', 'administrative', 'principal']))
             <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
                 <x-select label="Presidente" wire:model="presidente_id" :options="$teachers" option-value="id" option-label="name" placeholder="Seleccione un presidente" :disabled="$isReadOnly" />
                 <x-select label="Vocal 1" wire:model="vocal1_id" :options="$teachers" option-value="id" option-label="name" placeholder="Seleccione un vocal" :disabled="$isReadOnly" />

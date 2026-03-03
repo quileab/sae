@@ -1,6 +1,6 @@
 <div>
     <!-- HEADER -->
-    <x-header title="Inscripciones {{ $user->name }}" progress-indicator>
+    <x-header title="{{ $labels['label_subjects'] }} {{ $user->name }}" progress-indicator>
         <x-slot:middle class="!justify-end">
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
@@ -17,12 +17,12 @@
     <x-card>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-3 sticky top-0 z-20 backdrop-blur-md
         pb-1 border-b border-black/20 dark:border-white/20">
-            <x-select wire:model.live="inscription_id" label="Inscripciones a" :options="$inscriptions"
+            <x-select wire:model.live="inscription_id" label="{{ $labels['label_subjects'] }} a" :options="$inscriptions"
                 option-value="id" option-label="description" />
-            <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
+            <x-select wire:model.live="career_id" label="{{ $labels['label_career'] }}" :options="$careers" />
             @if($user->enabled)
                 <div class="grid grid-cols-2 gap-2">
-                    @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                    @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                         <x-select label="Tipo" wire:model.live="type" :options="$types" />
                         <x-button label="Guardar" icon="o-check" class="btn-primary mt-7" wire:click="save" />
                     @else
@@ -46,7 +46,7 @@
         <div class="z-10">
             <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" striped>
                 @scope('cell_value', $item, $user, $subjects, $type)
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                     <x-input icon="o-cube" :key="$item->id" wire:model="subjects.{{ $item->id }}.value" />
                 @else
                                 @php

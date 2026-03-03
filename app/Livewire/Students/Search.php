@@ -26,7 +26,8 @@ class Search extends Component
                     ->orWhere('firstname', 'like', "%{$this->search}%")
                     ->orWhere('id', 'like', "%{$this->search}%");
             })
-            ->take(10)
+            ->orderBy('lastname')
+            ->take(50)
             ->get()
             ->map(function ($user) {
                 return [

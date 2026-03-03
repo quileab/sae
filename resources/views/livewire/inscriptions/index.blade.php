@@ -5,7 +5,7 @@
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
         <x-slot:actions>
-            @if(auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']))
+            @if(auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                 <x-button label="OPCIONES" @click="$wire.drawer = true" responsive icon="o-bars-3" class="btn-primary" />
             @endif
         </x-slot:actions>
@@ -32,7 +32,7 @@
             </div>
 
             @php
-                $selectable = auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']);
+                $selectable = auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']);
             @endphp
             <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" :selectable="$selectable" wire:model="selectedRows"
                 striped>

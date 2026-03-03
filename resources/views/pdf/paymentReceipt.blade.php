@@ -268,7 +268,7 @@ $copy = 'SINGLE';
     <div style="height: 49%;">
       <div style="padding-top:1cm;">
         <div class="inline-block text-center">
-          <img style="height:3cm; width:auto;" src="./storage/imgs/logo.jpg"><br><br>
+          <img style="height:3cm; width:auto;" src="{{ public_path('imgs/logo.png') }}"><br><br>
           RECIBO Nº: {{ str_pad($data['payment']->id, 6, '0', STR_PAD_LEFT) }}
         </div>
         <div class="inline-block text-center">

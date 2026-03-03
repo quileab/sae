@@ -62,7 +62,7 @@ class Crud extends Component
             return;
         }
         // si es admin, principal o administrative
-        if ($this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if ($this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $this->inscriptions = Configs::where('group', 'inscriptions')->get();
             $this->careers = Career::where('allow_enrollments', true)
                 ->where('allow_evaluations', true)->get();
@@ -127,9 +127,11 @@ class Crud extends Component
     // Table headers
     public function headers(): array
     {
+        $labelSubject = Configs::where('id', 'label_subject')->value('value') ?? 'Materia';
+
         return [
             ['key' => 'id', 'label' => '#', 'class' => 'w-10'],
-            ['key' => 'name', 'label' => 'Materia'],
+            ['key' => 'name', 'label' => $labelSubject],
             ['key' => 'value', 'label' => 'Valor', 'sortable' => false],
         ];
     }
@@ -192,7 +194,7 @@ class Crud extends Component
             return;
         }
 
-        $isAdmin = auth()->user()->hasAnyRole(['admin', 'principal', 'administrative']);
+        $isAdmin = auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']);
         // which user Admin or Student?
         $isAdmin ? $user = $this->admin_id : $user = $this->user->id;
 
@@ -215,7 +217,7 @@ class Crud extends Component
                 ])->save();
             }
         }
-        if (auth()->user()->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if (auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $this->success('Inscripciones actualizadas');
         }
         // prevent reload / render

@@ -231,8 +231,8 @@ class UserPaymentComponent extends Component
                     $descriptionPrefix = 'par. ';
                 }
 
-                // Append the formatted date to the description
-                $description .= $descriptionPrefix.Carbon::parse($installment->date)->format('d/m/Y').' - ';
+                // Append the title to the description
+                $description .= $descriptionPrefix.$installment->title.' - ';
             }
 
             // Remove the trailing ' - ' from the description

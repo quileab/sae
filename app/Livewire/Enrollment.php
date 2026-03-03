@@ -26,14 +26,21 @@ class Enrollment extends Component
     public function mount()
     {
         $user = $this->getUser();
+
         if (! $user) {
-            $this->warning('No se ha seleccionado Usuario.');
             $this->modal = true;
+
+            return;
         }
+
         $this->careers = $user->careers;
 
         if ($this->careers->isEmpty()) {
-            $this->blocked = true;
+            if (auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
+                $this->modal = true;
+            } else {
+                $this->blocked = true;
+            }
 
             return;
         }

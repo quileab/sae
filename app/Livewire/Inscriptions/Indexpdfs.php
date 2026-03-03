@@ -38,7 +38,7 @@ class Indexpdfs extends Component
     public function mount()
     {
         $this->user = auth()->user();
-        if (! $this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if (! $this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             return redirect()->back();
         }
 
@@ -86,7 +86,7 @@ class Indexpdfs extends Component
         $pathToStorage = storage_path('app');
         $pathToFiles = '/private/private/inscriptions';
 
-        if ($this->user->hasAnyRole(['admin', 'principal', 'administrative'])) {
+        if ($this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $filter = "insc-*-{$this->career_id}-{$this->inscription_id}-*.pdf";
         } else {
             $filter = "insc-{$this->user->id}-*";

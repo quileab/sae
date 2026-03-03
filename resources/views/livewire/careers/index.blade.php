@@ -1,6 +1,6 @@
 <div>
     <!-- HEADER -->
-    <x-header title="Carreras">
+    <x-header title="{{ $labels['label_careers'] }}">
         <x-slot:middle class="!justify-end">
             <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>

@@ -16,26 +16,38 @@ class Bookmarks extends Component
     #[On('bookmarked')]
     public function updateBookmark($data): void
     {
+        if (empty($data['value'])) {
+            return;
+        }
+
         switch ($data['type']) {
             case 'user_id':
                 $user = User::find($data['value']);
-                $this->shortName = substr($user['lastname'].' '.$user['firstname'], 0, 30);
+                if ($user) {
+                    $this->shortName = substr($user['lastname'].' '.$user['firstname'], 0, 30);
+                }
                 break;
             case 'career_id':
                 $career = Career::find($data['value']);
-                $this->shortName = substr($career['id'].' '.$career['name'], 0, 30);
+                if ($career) {
+                    $this->shortName = substr($career['id'].' '.$career['name'], 0, 30);
+                }
                 break;
             case 'subject_id':
                 $subject = Subject::find($data['value']);
-                $this->shortName = substr($subject['id'].' '.$subject['name'], 0, 30);
+                if ($subject) {
+                    $this->shortName = substr($subject['id'].' '.$subject['name'], 0, 30);
+                }
                 break;
             case 'cycle_id':
                 $this->shortName = $data['value'];
                 break;
         }
-        // Si necesitas sincronizar con la sesión:
-        session()->put($data['type'], $data['value']);
-        session()->put($data['type'].'_name', $this->shortName);
+
+        if ($this->shortName) {
+            session()->put($data['type'], $data['value']);
+            session()->put($data['type'].'_name', $this->shortName);
+        }
     }
 
     public function clearBookmark($type): void

@@ -6,13 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($title) ? $title . ' - ' . config('app.name') : config('app.name') }}</title>
-    <script src="https://sdk.mercadopago.com/js/v2"></script>
-    <script>
-        const mp = new MercadoPago("{{ config('mercadopago.public_key') }}", {
-            locale: 'es-AR'
-        });
-    </script>
+    @if(config('mercadopago.public_key'))
+        <script src="https://sdk.mercadopago.com/js/v2"></script>
+        <script>
+            const mp = new MercadoPago("{{ config('mercadopago.public_key') }}", {
+                locale: 'es-AR'
+            });
+        </script>
+    @endif
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#570df8">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script src="{{ asset('js/tinymce/tinymce.min.js') }}" defer></script>
@@ -61,10 +65,10 @@
                 @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
                     <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
                 @endif
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                     <x-menu-item title="Usuarios" icon="o-users" link="/users" />
                     <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
-                        <x-menu-item title="Carreras" icon="o-academic-cap" link="/careers" />
+                        <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
                         <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
                         <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
                     </x-menu-sub>
@@ -75,7 +79,7 @@
                         <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
                     </x-menu-sub>
                 @endif
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative']))
+                @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                     <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
@@ -85,6 +89,7 @@
                         <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments" />
                         <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
                         <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
+                        <x-menu-item title="Reporte de Deudas" icon="o-exclamation-circle" link="/report-debts" />
                     </x-menu-sub>
                     <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
                         <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
@@ -100,6 +105,9 @@
                 @endif
                 @if($user->hasAnyRole(['teacher']))
                     <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
+                @endif
+                @if($user->hasAnyRole(['preceptor', 'admin', 'principal']))
+                    <x-menu-item title="Asistencia" icon="o-clipboard-document-check" link="/attendance" />
                 @endif
 
             </x-menu>
