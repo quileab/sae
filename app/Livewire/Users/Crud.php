@@ -112,6 +112,16 @@ class Crud extends Component
         }
     }
 
+    public function delete(): void
+    {
+        $user = User::find($this->data['id']);
+        if ($user) {
+            $user->delete();
+            $this->success('Usuario eliminado.');
+            $this->redirect('/users', navigate: true);
+        }
+    }
+
     public function render()
     {
         return view('livewire.users.crud');

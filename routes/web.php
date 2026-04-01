@@ -13,6 +13,7 @@ use Livewire\Volt\Volt;
 
 // Users will be redirected to this route if not logged in
 Route::livewire('/login', 'login')->name('login');
+Volt::route('/pago-online', 'public-payment')->name('public-payment');
 // Route::livewire('/register', 'register');
 Route::get('/', function () {
     return redirect('/dashboard'); // view('dashboard');
@@ -135,9 +136,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/payments/receipt/{paymentRecord}', [\App\Http\Controllers\ReceiptController::class, 'show'])->name('payments.receipt');
     Route::get('/payments/summary/{user}', [\App\Http\Controllers\print\PrintPaymentsController::class, 'summary'])->name('user-payments.summary');
 
-    // Mercado Pago Routes
-    Route::get('/mercadopago/success', [\App\Http\Controllers\MercadoPagoController::class, 'success'])->name('mercadopago.success');
-    Route::get('/mercadopago/failure', [\App\Http\Controllers\MercadoPagoController::class, 'failure'])->name('mercadopago.failure');
-    Route::get('/mercadopago/pending', [\App\Http\Controllers\MercadoPagoController::class, 'pending'])->name('mercadopago.pending');
-    Route::post('/mercadopago/webhook', [\App\Http\Controllers\MercadoPagoController::class, 'webhook'])->name('mercadopago.webhook');
+    // Biblioteca (Libros y Préstamos)
+    Route::livewire('/books', 'books.index')->name('books.index');
+    Route::livewire('/books/print', 'books.print')->name('books.print');
+    Route::livewire('/books/create', 'books.form')->name('books.create');
+    Route::livewire('/books/{id}/edit', 'books.form')->name('books.edit');
+    Route::livewire('/books/loans', 'books.loans')->name('books.loans');
 });
+
+// Mercado Pago Routes
+Route::get('/mercadopago/success', [\App\Http\Controllers\MercadoPagoController::class, 'success'])->name('mercadopago.success');
+Route::get('/mercadopago/failure', [\App\Http\Controllers\MercadoPagoController::class, 'failure'])->name('mercadopago.failure');
+Route::get('/mercadopago/pending', [\App\Http\Controllers\MercadoPagoController::class, 'pending'])->name('mercadopago.pending');
+Route::post('/mercadopago/webhook', [\App\Http\Controllers\MercadoPagoController::class, 'webhook'])->name('mercadopago.webhook');

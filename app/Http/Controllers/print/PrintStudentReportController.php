@@ -6,9 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
 use App\Models\Grade;
 use App\Models\Subject;
-use App\Models\Configs;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 
 class PrintStudentReportController extends Controller
 {
@@ -17,10 +15,10 @@ class PrintStudentReportController extends Controller
         $subject = Subject::with('career')->findOrFail($subject_id);
         $students = $subject->users()->where('role', 'student')->orderBy('lastname')->orderBy('firstname')->get();
 
-        $first_semester_start = date('Y') . '-03-01';
-        $first_semester_end = date('Y') . '-07-15';
-        $second_semester_start = date('Y') . '-07-16';
-        $second_semester_end = date('Y') . '-11-30';
+        $first_semester_start = date('Y').'-03-01';
+        $first_semester_end = date('Y').'-07-15';
+        $second_semester_start = date('Y').'-07-16';
+        $second_semester_end = date('Y').'-11-30';
 
         $class_sessions = ClassSession::where('subject_id', $subject_id)->where('unit', '!=', '0')->get();
         $total_classes_1 = $class_sessions->whereBetween('date', [$first_semester_start, $first_semester_end])->count();
@@ -63,7 +61,7 @@ class PrintStudentReportController extends Controller
             $reportData[$student->id]['student'] = $student;
         }
 
-        $config = new \stdClass();
+        $config = new \stdClass;
         $config->logo = 'imgs/logo.png'; // default logo
         $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
         $config->shortname = \App\Models\Configs::getValue('shortname')[0]->value;
@@ -88,7 +86,7 @@ class PrintStudentReportController extends Controller
             $reportData[$student->id]['student'] = $student;
         }
 
-        $config = new \stdClass();
+        $config = new \stdClass;
         $config->logo = 'imgs/logo.png'; // default logo
         $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
 
@@ -109,7 +107,6 @@ class PrintStudentReportController extends Controller
     }
 
     private function processGrades($grades, $class_sessions, $start_date, $end_date, $total_classes)
-
     {
         $semester_sessions = $class_sessions->whereBetween('date', [$start_date, $end_date])->pluck('id');
         $semester_grades = $grades->whereIn('class_session_id', $semester_sessions);
@@ -125,8 +122,6 @@ class PrintStudentReportController extends Controller
         ];
     }
 
-
-
     private function checkRegularization($studentData)
     {
         $first_ev = $studentData['first_semester']['ev'];
@@ -134,13 +129,13 @@ class PrintStudentReportController extends Controller
         $second_ev = $studentData['second_semester']['ev'];
         $second_rec_ev = $studentData['second_semester']['rec_ev'];
 
-        return ($first_ev >= 6 || $first_rec_ev >= 6 || $second_ev >= 6 || $second_rec_ev >= 6);
+        return $first_ev >= 6 || $first_rec_ev >= 6 || $second_ev >= 6 || $second_rec_ev >= 6;
     }
 
     private function getStudentGrades($student, $subject)
     {
         $cycle = session('cycle');
-        if (!$cycle) {
+        if (! $cycle) {
             $cycle = \App\Models\Configs::getValue('cycle')[0]->value;
             session(['cycle' => $cycle]);
         }
@@ -155,6 +150,7 @@ class PrintStudentReportController extends Controller
             $date = new \DateTime($session->date);
             $month = $date->format('m');
             $day = $date->format('d');
+
             return ($month == 3 && $day >= 1) || ($month > 3 && $month < 7) || ($month == 7 && $day <= 14);
         });
 
@@ -162,6 +158,7 @@ class PrintStudentReportController extends Controller
             $date = new \DateTime($session->date);
             $month = $date->format('m');
             $day = $date->format('d');
+
             return ($month == 7 && $day >= 15) || ($month > 7 && $month < 11) || ($month == 11 && $day <= 30);
         });
 
@@ -285,12 +282,13 @@ class PrintStudentReportController extends Controller
         $search = $request->input('search');
 
         $payments = \App\Models\PaymentRecord::with('user')
-            ->whereBetween('created_at', [Carbon::parse($dateFrom)->startOfDay(), Carbon::parse($dateTo)->endOfDay()])
+            ->whereDate('created_at', '>=', $dateFrom)
+            ->whereDate('created_at', '<=', $dateTo)
             ->when($search, function ($query, $search) {
                 $query->whereHas('user', function ($q) use ($search) {
-                    $q->where('name', 'like', '%' . $search . '%')
-                        ->orWhere('lastname', 'like', '%' . $search . '%')
-                        ->orWhere('firstname', 'like', '%' . $search . '%');
+                    $q->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('lastname', 'like', '%'.$search.'%')
+                        ->orWhere('firstname', 'like', '%'.$search.'%');
                 });
             })
             ->get();

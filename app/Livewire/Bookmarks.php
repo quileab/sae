@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Book;
 use App\Models\Career;
 use App\Models\Subject;
 use App\Models\User;
@@ -25,6 +26,12 @@ class Bookmarks extends Component
                 $user = User::find($data['value']);
                 if ($user) {
                     $this->shortName = substr($user['lastname'].' '.$user['firstname'], 0, 30);
+                }
+                break;
+            case 'book_id':
+                $book = Book::find($data['value']);
+                if ($book) {
+                    $this->shortName = substr($book->title, 0, 30);
                 }
                 break;
             case 'career_id':
@@ -57,6 +64,12 @@ class Bookmarks extends Component
         }
         session()->forget($type);
         session()->forget($type.'_name');
+    }
+
+    #[On('refresh-bookmarks')]
+    public function refresh(): void
+    {
+        // Este método simplemente dispara el re-renderizado del componente
     }
 
     public function render()

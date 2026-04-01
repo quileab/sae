@@ -15,15 +15,18 @@
                     <ul class="list-none list-inside ml-4">
                         @foreach($unit->topics as $topic)
                             <li>
-                                @if($topic->content)
+                                @if($topic->content || $topic->resources->count() > 0)
                                     <x-collapse separator>
                                         <x-slot:heading>
                                             <strong class="text-lg text-blue-500">{{ $topic->name }}</strong>
                                         </x-slot:heading>
                                         <x-slot:content>
-                                            <div class="prose prose-sm max-w-none ml-4 mb-4">{!! $topic->content !!}</div>
-                                            <p class="mt-4 text-lg font-bold text-warning border-b border-warning">Recursos:</p>
+                                            @if($topic->content)
+                                                <div class="prose prose-sm max-w-none ml-4 mb-4">{!! $topic->content !!}</div>
+                                            @endif
+
                                             @if($topic->resources->count() > 0)
+                                                <p class="mt-4 text-lg font-bold text-warning border-b border-warning">Recursos:</p>
                                                 <div class="flex flex-row flex-wrap gap-2 mt-4">
                                                     @foreach($topic->resources as $resource)
                                                         @if($resource->url)

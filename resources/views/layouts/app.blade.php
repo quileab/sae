@@ -80,6 +80,11 @@
                     </x-menu-sub>
                 @endif
                 @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                    <x-menu-sub title="Biblioteca" icon="o-book-open">
+                        <x-menu-item title="Libros" icon="o-book-open" link="/books" />
+                        <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
+                    </x-menu-sub>
+
                     <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />

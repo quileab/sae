@@ -90,6 +90,7 @@ El perfil de Estudiante permite gestionar la vida académica y administrativa de
 ### 5.1 Área Académica
 *   **Inscripciones**: Realice su inscripción a las materias habilitadas para su carrera en el periodo correspondiente.
 *   **Mis Materias**: Acceda al "Contenido Simplificado" de sus materias para ver y descargar el material de estudio proporcionado por los profesores.
+    *   *Nota: Los temas se muestran siempre que tengan contenido o recursos asociados.*
 *   **Calendario y Exámenes**: Consulte su horario de clases y fechas de entrega. Utilice el widget "Próximos Exámenes" en el inicio para estar al tanto de sus evaluaciones inminentes.
 
 ### 5.2 Área Administrativa / Financiera

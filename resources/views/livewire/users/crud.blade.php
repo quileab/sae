@@ -64,10 +64,22 @@
             </x-slot:append>
         </x-input>
         <x-slot:actions>
-            <x-dropdown label="ELIMINAR REGISTRO" class="btn-error w-full mt-1">
-                <x-menu-item title="Confirmar" wire:click.stop="delete" spinner="delete" icon="o-trash"
-                    class="bg-error text-white" />
-            </x-dropdown>
+            <div class="w-full p-4 border border-error/40 rounded-lg bg-error/10 space-y-3">
+                <div class="flex items-start gap-2 text-error">
+                    <x-icon name="o-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
+                    <div>
+                        <div class="font-bold text-sm">Zona de peligro</div>
+                        <p class="text-xs text-error/80 mt-1">
+                            Eliminar este usuario borrará <strong>permanentemente</strong> todos sus datos asociados:
+                            inscripciones, pagos, notas y asistencias. Esta acción <strong>no se puede deshacer</strong>.
+                        </p>
+                    </div>
+                </div>
+                <x-dropdown label="ELIMINAR USUARIO" class="btn-error w-full">
+                    <x-menu-item title="Confirmar eliminación" wire:click.stop="delete" spinner="delete" icon="o-trash"
+                        class="bg-error text-white" />
+                </x-dropdown>
+            </div>
         </x-slot:actions>
     </x-drawer>
 </div>

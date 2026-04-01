@@ -27,14 +27,18 @@ SAE is a comprehensive, modern web application designed to manage all aspects of
 
 ## Tech Stack
 
-- **Backend:** Laravel 11
+- **Backend:** Laravel 12
 - **Frontend:** 
-  - Livewire 3 & Volt
+  - Livewire 4 & Volt
   - MaryUI Component Library
   - Tailwind CSS 4
   - Alpine.js
 - **Database:** MySQL
 - **Development Environment:** Vite
+
+## Recent Changes
+
+- **Simplified Content Fix:** Topics with resources but no description are now correctly visible in the student view. Previously, these were hidden if the content field was empty.
 
 ## Getting Started
 

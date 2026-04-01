@@ -37,16 +37,9 @@ class Search extends Component
             });
     }
 
-    public function searchUsers(string $value = ''): void
+    public function selectUser($id): void
     {
-        $this->search = $value;
-    }
-
-    public function updatedSelectedUserId($value): void
-    {
-        if ($value) {
-            $this->redirect(route('user-payments', ['user' => $value]), navigate: true);
-        }
+        $this->redirect(route('user-payments', ['user' => $id]), navigate: true);
     }
 
     public function render()

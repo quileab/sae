@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sae-attendance-v2';
+const CACHE_NAME = 'sae-attendance-v6';
 const CACHED_URLS = [
     '/favicon.ico',
     '/images/icon-192x192.png',
@@ -23,7 +23,7 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch: network-first para navegación crítica, cache-first para el resto y assets
+// Fetch: network-first para navegación crítica, cache-first para assets
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
@@ -35,46 +35,55 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Las llamadas a la API, Livewire y PWA Sync siempre van a red
+    // EXCLUSIÓN DE RUTAS DINÁMICAS (No deben pasar por el Service Worker)
+    // Se usa un chequeo más amplio para Livewire ya que puede incluir hashes (ej: /livewire-xxxx/update)
     if (url.pathname.startsWith('/api/') || 
-        url.pathname.startsWith('/livewire/') || 
+        url.pathname.includes('/livewire') || 
         url.pathname.startsWith('/pwa-attendance/')) {
-        return;
-    }
-
-    // Estrategia Network-First para la página de asistencia (para evitar CSRF obsoletos)
-    if (url.pathname === '/attendance') {
-        event.respondWith(
-            fetch(event.request)
-                .then((response) => {
-                    if (response && response.status === 200 && response.type === 'basic') {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                    }
-                    return response;
-                })
-                .catch(() => caches.match(event.request))
-        );
         return;
     }
 
     // Cache-First para archivos de Build (Vite), imágenes y fuentes
     const isAsset = url.pathname.startsWith('/build/') || 
                     url.pathname.startsWith('/images/') || 
+                    url.pathname.startsWith('/imgs/') || 
                     url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ico)$/);
 
+    if (isAsset) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                if (cached) return cached;
+                return fetch(event.request).then((response) => {
+                    if (event.request.method === 'GET' && response && response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return response;
+                });
+            })
+        );
+        return;
+    }
+
+    // Estrategia Network-First para el resto (Páginas HTML)
     event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) return cached;
-            return fetch(event.request).then((response) => {
-                // SOLO CACHEAR SI ES GET y la respuesta es exitosa
-                if (event.request.method === 'GET' && response && response.status === 200) {
+        fetch(event.request)
+            .then((response) => {
+                // Manejo de redirecciones
+                if (response.redirected) {
+                    return response;
+                }
+                
+                // Solo cachear si es exitoso y es del mismo origen
+                if (event.request.method === 'GET' && response && response.status === 200 && response.type === 'basic') {
                     const clone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
                 }
                 return response;
-            });
-        })
+            })
+            .catch(() => {
+                return caches.match(event.request);
+            })
     );
 });
 

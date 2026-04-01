@@ -95,9 +95,18 @@ class TableCrud extends Component
             return;
         }
 
-        // Calculate next ID based on the maximum ID for this career
-        $lastId = Subject::where('career_id', $this->career_id)->max('id');
-        $newId = $lastId ? $lastId + 1 : 1;
+        // Logic: Try career_id * 100 + 1 as the starting point for each career
+        // But ensure it's higher than the current max ID for this career to follow sequence
+        // And higher than any existing ID globally just to be safe from collisions
+        $logicalStart = $this->career_id * 100;
+        $maxInCareer = Subject::where('career_id', $this->career_id)->max('id');
+        
+        $newId = $maxInCareer ? $maxInCareer + 1 : $logicalStart + 1;
+
+        // Final check to prevent collisions if IDs were used out of order
+        while (Subject::where('id', $newId)->exists()) {
+            $newId++;
+        }
 
         $newSubject = Subject::create([
             'id' => $newId,

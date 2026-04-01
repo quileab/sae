@@ -193,51 +193,6 @@
             </div>
         @endforeach
 
-        <h4>Detalle de Cuotas</h4>
-        <table>
-            <thead>
-                <tr>
-                    <th>Año</th>
-                    <th>Vencimiento</th>
-                    <th>Concepto</th>
-                    <th class="right">Monto</th>
-                    <th class="right">Pagado</th>
-                    <th class="right">Saldo</th>
-                </tr>
-            </thead>
-            <tbody>
-                @php 
-                    $totalAmount = 0;
-                    $totalPaid = 0;
-                @endphp
-                @foreach ($payments as $payment)
-                    @php
-                        $balance = $payment->amount - $payment->paid;
-                        $totalAmount += $payment->amount;
-                        $totalPaid += $payment->paid;
-                    @endphp
-                    <tr>
-                        <td class="center">{{ $payment->date->year }}</td>
-                        <td class="center">{{ $payment->date->format('d/m/Y') }}</td>
-                        <td>{{ $payment->title }}</td>
-                        <td class="right font-mono">$ {{ number_format($payment->amount, 2, ',', '.') }}</td>
-                        <td class="right font-mono text-success">$ {{ number_format($payment->paid, 2, ',', '.') }}</td>
-                        <td class="right font-mono {{ $balance > 0 ? 'text-error font-bold' : '' }}">
-                            $ {{ number_format($balance, 2, ',', '.') }}
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-            <tfoot>
-                <tr class="bg-gray-50">
-                    <th colspan="3" class="right">TOTALES</th>
-                    <th class="right font-mono">$ {{ number_format($totalAmount, 2, ',', '.') }}</th>
-                    <th class="right font-mono text-success">$ {{ number_format($totalPaid, 2, ',', '.') }}</th>
-                    <th class="right font-mono text-error">$ {{ number_format($totalAmount - $totalPaid, 2, ',', '.') }}</th>
-                </tr>
-            </tfoot>
-        </table>
-
         @if($receipts->isNotEmpty())
             <h4>Historial de Recibos de Pago</h4>
             <table>

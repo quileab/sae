@@ -1,9 +1,9 @@
 <div>
   <div class="flex flex-wrap gap-4 rounded bg-gray-300/10 shadow-md p-4">
-    <x-input label="{{ __('Fecha Desde') }}" type='date' wire:model.debounce='dateFrom' inline />
-    <x-input label="{{ __('Fecha Hasta') }}" type='date' wire:model.debounce='dateTo' inline />
+    <x-input label="{{ __('Fecha Desde') }}" type='date' wire:model.live='dateFrom' inline />
+    <x-input label="{{ __('Fecha Hasta') }}" type='date' wire:model.live='dateTo' inline />
     <x-input label="Buscar..." icon="o-magnifying-glass" placeholder="Buscar..." type="text"
-      wire:model.debounce='search' inline />
+      wire:model.live.debounce.300ms='search' inline />
     <div wire:loading.remove class="flex flex-wrap mx-3 justify-between">
       <a href="{{ route('printStudentsPayments', ['dateFrom' => $dateFrom, 'dateTo' => $dateTo, 'search' => $search]) }}"
         target='_blank'>

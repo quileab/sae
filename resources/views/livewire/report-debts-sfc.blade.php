@@ -6,6 +6,7 @@ use App\Models\UserPayments;
 use Illuminate\Support\Collection;
 use Mary\Traits\Toast;
 use Livewire\Attributes\Computed;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 new class extends Component {
     use Toast;
@@ -48,6 +49,18 @@ new class extends Component {
             ->filter(fn($user) => $user->total_debt > 0)
             ->sortBy($this->sortBy['column'], SORT_REGULAR, $this->sortBy['direction'] === 'desc')
             ->values();
+    }
+
+    public function export()
+    {
+        $students = $this->students;
+        $dateAsOf = $this->dateAsOf;
+
+        $pdf = Pdf::loadView('pdf.reportDebts', compact('students', 'dateAsOf'));
+        
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->output();
+        }, 'reporte-deudas-' . now()->format('Y-m-d') . '.pdf');
     }
 
     public function showDetail(int $userId)
@@ -94,7 +107,7 @@ new class extends Component {
 <div>
     <x-header title="Reporte de Deudas" subtitle="Control de saldos pendientes de estudiantes" separator progress-indicator>
         <x-slot:actions>
-            <x-button label="Exportar" icon="o-arrow-down-tray" class="btn-primary" disabled />
+            <x-button label="Exportar" icon="o-arrow-down-tray" class="btn-primary" wire:click="export" spinner="export" />
         </x-slot:actions>
     </x-header>
 
@@ -108,7 +121,7 @@ new class extends Component {
     </div>
 
     <x-card shadow>
-        <x-table :headers="$headers" :rows="$students" :sort-by="$sortBy" link="showDetail({id})">
+        <x-table :headers="$headers" :rows="$students" :sort-by="$sortBy" @row-click="showDetail($event.detail.id)">
             @scope('cell_fullname', $student)
                 <div class="flex items-center gap-3">
                     <x-avatar :placeholder="substr($student->firstname, 0, 1) . substr($student->lastname, 0, 1)" class="!w-9 !h-9" />

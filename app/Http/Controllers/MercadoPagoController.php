@@ -11,19 +11,22 @@ class MercadoPagoController extends Controller
     public function success(Request $request)
     {
         // Logic for successful payment
-        return redirect('/my-payment-plan')->with('success', '¡Pago realizado con éxito!');
+        $redirectUrl = \Illuminate\Support\Facades\Auth::check() ? '/my-payment-plan' : '/pago-online';
+        return redirect($redirectUrl)->with('success', '¡Pago realizado con éxito!');
     }
 
     public function failure(Request $request)
     {
         // Logic for failed payment
-        return redirect('/my-payment-plan')->with('error', 'El pago falló. Por favor, intenta de nuevo.');
+        $redirectUrl = \Illuminate\Support\Facades\Auth::check() ? '/my-payment-plan' : '/pago-online';
+        return redirect($redirectUrl)->with('error', 'El pago falló. Por favor, intenta de nuevo.');
     }
 
     public function pending(Request $request)
     {
         // Logic for pending payment
-        return redirect('/my-payment-plan')->with('info', 'El pago está pendiente de procesamiento.');
+        $redirectUrl = \Illuminate\Support\Facades\Auth::check() ? '/my-payment-plan' : '/pago-online';
+        return redirect($redirectUrl)->with('info', 'El pago está pendiente de procesamiento.');
     }
 
     public function webhook(Request $request)
