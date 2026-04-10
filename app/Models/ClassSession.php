@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ClassSession extends Model
 {
@@ -29,15 +29,13 @@ class ClassSession extends Model
     {
         return $this->belongsToMany(User::class, 'enrollments', 'class_session_id', 'user_id');
     }
-    public static function count($subject_id): int
+
+    public static function count($subject_id, ?int $year = null): int
     {
-        // check if session cycle is set, if not set it to the current year
-        if (!session()->has('cycle')) {
-            session(['cycle' => date('Y')]);
-        }
-        return \App\Models\ClassSession::where('subject_id', $subject_id)
-            // between dates
-            ->whereBetween('date', [session('cycle') . '-01-01', session('cycle') . '-12-31'])
+        $year ??= session('cycle_id') ?? session('cycle') ?? date('Y');
+
+        return self::where('subject_id', $subject_id)
+            ->whereYear('date', $year)
             ->count();
     }
 }

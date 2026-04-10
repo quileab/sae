@@ -154,16 +154,16 @@
         },
         {
             "name": "blade-ui-kit/blade-icons",
-            "version": "1.9.0",
+            "version": "1.9.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/driesvints/blade-icons.git",
-                "reference": "caa92fde675d7a651c38bf73ca582ddada56f318"
+                "reference": "377eede719f9690b03bbbfd516afef887e27634a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/driesvints/blade-icons/zipball/caa92fde675d7a651c38bf73ca582ddada56f318",
-                "reference": "caa92fde675d7a651c38bf73ca582ddada56f318",
+                "url": "https://api.github.com/repos/driesvints/blade-icons/zipball/377eede719f9690b03bbbfd516afef887e27634a",
+                "reference": "377eede719f9690b03bbbfd516afef887e27634a",
                 "shasum": ""
             },
             "require": {
@@ -231,7 +231,7 @@
                     "type": "paypal"
                 }
             ],
-            "time": "2026-02-23T10:42:23+00:00"
+            "time": "2026-04-07T17:56:48+00:00"
         },
         {
             "name": "brick/math",
@@ -2018,16 +2018,16 @@
         },
         {
             "name": "laravel/serializable-closure",
-            "version": "v2.0.10",
+            "version": "v2.0.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/serializable-closure.git",
-                "reference": "870fc81d2f879903dfc5b60bf8a0f94a1609e669"
+                "reference": "d1af40ac4a6ccc12bd062a7184f63c9995a63bdd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/serializable-closure/zipball/870fc81d2f879903dfc5b60bf8a0f94a1609e669",
-                "reference": "870fc81d2f879903dfc5b60bf8a0f94a1609e669",
+                "url": "https://api.github.com/repos/laravel/serializable-closure/zipball/d1af40ac4a6ccc12bd062a7184f63c9995a63bdd",
+                "reference": "d1af40ac4a6ccc12bd062a7184f63c9995a63bdd",
                 "shasum": ""
             },
             "require": {
@@ -2075,7 +2075,7 @@
                 "issues": "https://github.com/laravel/serializable-closure/issues",
                 "source": "https://github.com/laravel/serializable-closure"
             },
-            "time": "2026-02-20T19:59:49+00:00"
+            "time": "2026-04-07T13:32:18+00:00"
         },
         {
             "name": "laravel/tinker",
@@ -2704,16 +2704,16 @@
         },
         {
             "name": "livewire/livewire",
-            "version": "v4.2.3",
+            "version": "v4.2.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/livewire.git",
-                "reference": "d07bcb6fd04037a90ca5187b7857c7349a8e6d1e"
+                "reference": "7d0bfa46269b1ec186b8cdd38baffee5cc647d10"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/livewire/zipball/d07bcb6fd04037a90ca5187b7857c7349a8e6d1e",
-                "reference": "d07bcb6fd04037a90ca5187b7857c7349a8e6d1e",
+                "url": "https://api.github.com/repos/livewire/livewire/zipball/7d0bfa46269b1ec186b8cdd38baffee5cc647d10",
+                "reference": "7d0bfa46269b1ec186b8cdd38baffee5cc647d10",
                 "shasum": ""
             },
             "require": {
@@ -2768,7 +2768,7 @@
             "description": "A front-end framework for Laravel.",
             "support": {
                 "issues": "https://github.com/livewire/livewire/issues",
-                "source": "https://github.com/livewire/livewire/tree/v4.2.3"
+                "source": "https://github.com/livewire/livewire/tree/v4.2.4"
             },
             "funding": [
                 {
@@ -2776,7 +2776,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-30T22:17:37+00:00"
+            "time": "2026-04-02T20:48:35+00:00"
         },
         {
             "name": "livewire/volt",
@@ -3060,16 +3060,16 @@
         },
         {
             "name": "nesbot/carbon",
-            "version": "3.11.3",
+            "version": "3.11.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/CarbonPHP/carbon.git",
-                "reference": "6a7e652845bb018c668220c2a545aded8594fbbf"
+                "reference": "e890471a3494740f7d9326d72ce6a8c559ffee60"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/6a7e652845bb018c668220c2a545aded8594fbbf",
-                "reference": "6a7e652845bb018c668220c2a545aded8594fbbf",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon/zipball/e890471a3494740f7d9326d72ce6a8c559ffee60",
+                "reference": "e890471a3494740f7d9326d72ce6a8c559ffee60",
                 "shasum": ""
             },
             "require": {
@@ -3161,7 +3161,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-11T17:23:39+00:00"
+            "time": "2026-04-07T09:57:54+00:00"
         },
         {
             "name": "nette/schema",
@@ -7871,16 +7871,16 @@
         },
         {
             "name": "dragon-code/support",
-            "version": "6.17.0",
+            "version": "6.17.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/TheDragonCode/support.git",
-                "reference": "b1e076dc23bed84562af97ee03f8bd840a077706"
+                "reference": "82a465953267989883d64b921e9725600a5073b5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/TheDragonCode/support/zipball/b1e076dc23bed84562af97ee03f8bd840a077706",
-                "reference": "b1e076dc23bed84562af97ee03f8bd840a077706",
+                "url": "https://api.github.com/repos/TheDragonCode/support/zipball/82a465953267989883d64b921e9725600a5073b5",
+                "reference": "82a465953267989883d64b921e9725600a5073b5",
                 "shasum": ""
             },
             "require": {
@@ -7892,7 +7892,6 @@
                 "ext-mbstring": "*",
                 "php": "^8.1",
                 "psr/http-message": "^1.0.1 || ^2.0",
-                "symfony/polyfill-php81": "^1.25",
                 "voku/portable-ascii": "^1.4.8 || ^2.0.1"
             },
             "conflict": {
@@ -7962,7 +7961,7 @@
                     "type": "yoomoney"
                 }
             ],
-            "time": "2026-03-18T20:39:32+00:00"
+            "time": "2026-04-03T15:06:29+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -8272,16 +8271,16 @@
         },
         {
             "name": "laravel-lang/actions",
-            "version": "1.12.1",
+            "version": "1.12.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Laravel-Lang/actions.git",
-                "reference": "af2750ace5fd7655b696c39f3f6d0da9ce852d16"
+                "reference": "ef8847493e1c6a15e87667d64430e5312527b5e7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Laravel-Lang/actions/zipball/af2750ace5fd7655b696c39f3f6d0da9ce852d16",
-                "reference": "af2750ace5fd7655b696c39f3f6d0da9ce852d16",
+                "url": "https://api.github.com/repos/Laravel-Lang/actions/zipball/ef8847493e1c6a15e87667d64430e5312527b5e7",
+                "reference": "ef8847493e1c6a15e87667d64430e5312527b5e7",
                 "shasum": ""
             },
             "require": {
@@ -8333,7 +8332,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Laravel-Lang/actions/issues",
-                "source": "https://github.com/Laravel-Lang/actions/tree/1.12.1"
+                "source": "https://github.com/Laravel-Lang/actions/tree/1.12.2"
             },
             "funding": [
                 {
@@ -8345,7 +8344,7 @@
                     "type": "yoomoney"
                 }
             ],
-            "time": "2026-03-17T21:27:37+00:00"
+            "time": "2026-04-05T13:52:03+00:00"
         },
         {
             "name": "laravel-lang/attributes",
@@ -9557,16 +9556,16 @@
         },
         {
             "name": "laravel-lang/starter-kits",
-            "version": "1.10.3",
+            "version": "1.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Laravel-Lang/starter-kits.git",
-                "reference": "cc460c8295568a73a6525de624e09d5976d24fe8"
+                "reference": "4c54f1349e4354ed69cdf3a6c37d8bdf0c847790"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Laravel-Lang/starter-kits/zipball/cc460c8295568a73a6525de624e09d5976d24fe8",
-                "reference": "cc460c8295568a73a6525de624e09d5976d24fe8",
+                "url": "https://api.github.com/repos/Laravel-Lang/starter-kits/zipball/4c54f1349e4354ed69cdf3a6c37d8bdf0c847790",
+                "reference": "4c54f1349e4354ed69cdf3a6c37d8bdf0c847790",
                 "shasum": ""
             },
             "require": {
@@ -9618,7 +9617,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Laravel-Lang/starter-kits/issues",
-                "source": "https://github.com/Laravel-Lang/starter-kits/tree/1.10.3"
+                "source": "https://github.com/Laravel-Lang/starter-kits/tree/1.12.0"
             },
             "funding": [
                 {
@@ -9630,20 +9629,20 @@
                     "type": "yoomoney"
                 }
             ],
-            "time": "2026-03-29T11:52:22+00:00"
+            "time": "2026-04-08T09:37:11+00:00"
         },
         {
             "name": "laravel/boost",
-            "version": "v2.4.1",
+            "version": "v2.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/boost.git",
-                "reference": "f6241df9fd81a86d79a051851177d4ffe3e28506"
+                "reference": "74fedf18048d382e04eded004abe2ad1ee1d9a97"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/boost/zipball/f6241df9fd81a86d79a051851177d4ffe3e28506",
-                "reference": "f6241df9fd81a86d79a051851177d4ffe3e28506",
+                "url": "https://api.github.com/repos/laravel/boost/zipball/74fedf18048d382e04eded004abe2ad1ee1d9a97",
+                "reference": "74fedf18048d382e04eded004abe2ad1ee1d9a97",
                 "shasum": ""
             },
             "require": {
@@ -9696,7 +9695,7 @@
                 "issues": "https://github.com/laravel/boost/issues",
                 "source": "https://github.com/laravel/boost"
             },
-            "time": "2026-03-25T16:37:40+00:00"
+            "time": "2026-04-07T14:34:49+00:00"
         },
         {
             "name": "laravel/mcp",
@@ -9982,16 +9981,16 @@
         },
         {
             "name": "laravel/sail",
-            "version": "v1.55.0",
+            "version": "v1.56.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/sail.git",
-                "reference": "67dc1b72da4e066a2fb54c1c7582fd2f140ea191"
+                "reference": "f43426bb42a1cb7a51a3861d9138063e54766d28"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/sail/zipball/67dc1b72da4e066a2fb54c1c7582fd2f140ea191",
-                "reference": "67dc1b72da4e066a2fb54c1c7582fd2f140ea191",
+                "url": "https://api.github.com/repos/laravel/sail/zipball/f43426bb42a1cb7a51a3861d9138063e54766d28",
+                "reference": "f43426bb42a1cb7a51a3861d9138063e54766d28",
                 "shasum": ""
             },
             "require": {
@@ -10041,7 +10040,7 @@
                 "issues": "https://github.com/laravel/sail/issues",
                 "source": "https://github.com/laravel/sail"
             },
-            "time": "2026-03-23T15:56:34+00:00"
+            "time": "2026-04-01T15:17:32+00:00"
         },
         {
             "name": "mockery/mockery",
@@ -10188,16 +10187,16 @@
         },
         {
             "name": "nunomaduro/collision",
-            "version": "v8.9.2",
+            "version": "v8.9.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nunomaduro/collision.git",
-                "reference": "6eb16883e74fd725ac64dbe81544c961ab448ba5"
+                "reference": "b0d8ab95b29c3189aeeb902d81215231df4c1b64"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nunomaduro/collision/zipball/6eb16883e74fd725ac64dbe81544c961ab448ba5",
-                "reference": "6eb16883e74fd725ac64dbe81544c961ab448ba5",
+                "url": "https://api.github.com/repos/nunomaduro/collision/zipball/b0d8ab95b29c3189aeeb902d81215231df4c1b64",
+                "reference": "b0d8ab95b29c3189aeeb902d81215231df4c1b64",
                 "shasum": ""
             },
             "require": {
@@ -10280,7 +10279,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-03-31T21:51:27+00:00"
+            "time": "2026-04-06T19:25:53+00:00"
         },
         {
             "name": "pestphp/pest",
@@ -12514,86 +12513,6 @@
                 }
             ],
             "time": "2024-10-20T05:08:20+00:00"
-        },
-        {
-            "name": "symfony/polyfill-php81",
-            "version": "v1.33.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/polyfill-php81.git",
-                "reference": "4a4cfc2d253c21a5ad0e53071df248ed48c6ce5c"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php81/zipball/4a4cfc2d253c21a5ad0e53071df248ed48c6ce5c",
-                "reference": "4a4cfc2d253c21a5ad0e53071df248ed48c6ce5c",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.2"
-            },
-            "type": "library",
-            "extra": {
-                "thanks": {
-                    "url": "https://github.com/symfony/polyfill",
-                    "name": "symfony/polyfill"
-                }
-            },
-            "autoload": {
-                "files": [
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "Symfony\\Polyfill\\Php81\\": ""
-                },
-                "classmap": [
-                    "Resources/stubs"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Nicolas Grekas",
-                    "email": "p@tchwork.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Symfony polyfill backporting some PHP 8.1+ features to lower PHP versions",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "compatibility",
-                "polyfill",
-                "portable",
-                "shim"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/polyfill-php81/tree/v1.33.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://github.com/nicolas-grekas",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-09-09T11:45:10+00:00"
         },
         {
             "name": "symfony/yaml",

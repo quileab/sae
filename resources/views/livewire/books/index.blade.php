@@ -121,7 +121,9 @@ new class extends Component {
                 external
                 target="_blank"
             />
-            <x-button label="Nuevo Libro" icon="o-plus" class="btn-primary" link="/books/create" />
+            @if(auth()->user()->hasAnyRole(['admin', 'administrative', 'director', 'preceptor']))
+                <x-button label="Nuevo Libro" icon="o-plus" class="btn-primary" link="/books/create" />
+            @endif
         </x-slot:actions>
     </x-header>
 
@@ -132,7 +134,7 @@ new class extends Component {
             :rows="$books" 
             :sort-by="$sortBy" 
             with-pagination
-            link="/books/{id}/edit"
+            :link="auth()->user()->hasAnyRole(['admin', 'administrative', 'director', 'preceptor']) ? '/books/{id}/edit' : null"
             :row-decoration="['bg-warning/10 text-warning font-semibold' => fn($book) => $book->is_loaned]"
         >
             

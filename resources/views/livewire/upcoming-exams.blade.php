@@ -2,16 +2,16 @@
     <x-card title="Próximas Mesas de Examen" shadow separator class="bg-base-200">
         @if (auth()->user()->hasRole('student') || auth()->user()->hasAnyRole(['admin', 'director', 'administrative']))
             <div class="mb-4">
-                <x-select wire:model.live="selectedProfessorId" :options="$professors" option-value="id"
+                <x-select wire:model.live="selectedProfessorId" :options="$this->professors" option-value="id"
                     option-label="full_name" placeholder="Filtrar por profesor..." />
             </div>
         @endif
 
-        @if ($exams->isEmpty())
+        @if ($this->exams->isEmpty())
             <x-alert title="No hay mesas de examen próximas." icon="o-information-circle" />
         @else
             <div class="space-y-4">
-                @foreach ($exams as $exam)
+                @foreach ($this->exams as $exam)
                     <div wire:key="{{ $exam->id }}" class="p-4 rounded-lg shadow-md bg-gray-800 border border-gray-700">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div class="col-span-1">

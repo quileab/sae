@@ -12,7 +12,7 @@
 
     <!-- Filters -->
     <div class="mb-6 flex justify-end">
-        <x-select wire:model.live="career_id" :options="$careers" option-value="id" option-label="name"
+        <x-select wire:model.live="career_id" :options="$this->careers" option-value="id" option-label="name"
             placeholder="Todas las carreras" :disabled="auth()->user()->hasRole('student')" class="max-w-xs" icon="o-academic-cap" />
     </div>
 

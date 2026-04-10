@@ -21,6 +21,30 @@ class Bookmarks extends Component
             return;
         }
 
+        // Security check: Role-based permissions for bookmarking
+        $user = Auth::user();
+        $isAdmin = $user->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor']);
+        $isTeacher = $user->hasRole('teacher');
+
+        if (! $isAdmin) {
+            // Students can only bookmark themselves
+            if ($data['type'] === 'user_id') {
+                if ($data['value'] != $user->id && ! $isTeacher) {
+                    return;
+                }
+            }
+
+            // For subjects and careers, verify enrollment/ownership
+            if (in_array($data['type'], ['subject_id', 'career_id'])) {
+                if ($data['type'] === 'subject_id' && ! $user->hasSubject($data['value'])) {
+                    return;
+                }
+                if ($data['type'] === 'career_id' && ! $user->careers()->where('career_id', $data['value'])->exists()) {
+                    return;
+                }
+            }
+        }
+
         switch ($data['type']) {
             case 'user_id':
                 $user = User::find($data['value']);

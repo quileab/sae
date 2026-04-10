@@ -5,36 +5,52 @@ namespace App\Livewire;
 use App\Models\Career;
 use App\Models\Event;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Lazy;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
-use Livewire\Attributes\On;
-use Livewire\Attributes\Computed;
-
+#[Lazy]
 class Calendar extends Component
 {
     public $date;
+
     public $selectedEvent = null;
+
     public $career_id;
-    public $careers;
 
     public function mount()
     {
         $this->date = Carbon::now();
         $user = auth()->user();
 
-        if ($user->hasAnyRole(['admin', 'director', 'administrative'])) {
-            $this->careers = Career::all();
-        } elseif ($user->hasRole('teacher')) {
-            $subjects = $user->subjects()->with('career')->get();
-            $this->careers = $subjects->map(function ($subject) {
-                return $subject->career;
-            })->filter()->unique('id')->values();
-        } else { // student
-            $this->careers = $user->careers ?? collect();
-            if ($this->careers->isNotEmpty()) {
-                $this->career_id = $this->careers->first()->id;
+        if ($user->hasRole('student')) {
+            $careers = $user->careers ?? collect();
+            if ($careers->isNotEmpty()) {
+                $this->career_id = $careers->first()->id;
             }
         }
+    }
+
+    #[Computed]
+    public function careers()
+    {
+        $user = auth()->user();
+
+        return Cache::remember('user_careers_'.$user->id, 3600, function () use ($user) {
+            if ($user->hasAnyRole(['admin', 'director', 'administrative'])) {
+                return Career::all();
+            } elseif ($user->hasRole('teacher')) {
+                $subjects = $user->subjects()->with('career')->get();
+
+                return $subjects->map(function ($subject) {
+                    return $subject->career;
+                })->filter()->unique('id')->values();
+            } else { // student
+                return $user->careers ?? collect();
+            }
+        });
     }
 
     public function previousMonth()
@@ -99,6 +115,7 @@ class Calendar extends Component
             }
             $grid->push($daysInWeek);
         }
+
         return $grid;
     }
 
@@ -121,6 +138,7 @@ class Calendar extends Component
     public function render()
     {
         unset($this->calendarGrid);
+
         return view('livewire.calendar');
     }
 }

@@ -35,6 +35,9 @@ class Index extends Component
 
         try {
             $this->subject_id = session('subject_id') ?: ($this->subjects->isNotEmpty() ? $this->subjects->first()->id : null);
+            if (!session()->has('subject_id') && $this->subject_id) {
+                $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $this->subject_id]);
+            }
         } catch (\Exception $e) {
             $this->subject_id = null;
         }
@@ -65,7 +68,6 @@ class Index extends Component
 
     public function items(): Collection
     {
-        $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $this->subject_id]);
         $search = Str::of($this->search)->lower()->ascii();
         $query = ClassSession::whereYear('date', $this->cycle)
             ->where('subject_id', $this->subject_id);

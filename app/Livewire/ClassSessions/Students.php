@@ -56,7 +56,7 @@ class Students extends Component
         // check if class session subject_id belongs to this user
         if (
             $this->class_session->subject_id != session('subject_id') ||
-            auth()->user()->hasSubject(session('subject_id') == false)
+            auth()->user()->hasSubject(session('subject_id')) == false
         ) {
             $this->redirect('/class-sessions');
         }

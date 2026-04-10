@@ -15,7 +15,7 @@
         </x-input>
 
         <div class="grid grid-cols-1 gap-2 mt-4 md:grid-cols-2">
-            @foreach ($inscriptionsStatus as $inscription)
+            @foreach ($this->inscriptionsStatus as $inscription)
                 <x-stat
                     title="{{ $inscription['description'] }}"
                     value="{{ $inscription['value'] == 'true' ? 'Habilitadas' : 'Sin Fecha' }}"
@@ -28,7 +28,7 @@
                 <x-stat 
                     title="Sin carrera" 
                     description="Estudiantes sin inscripción"
-                    value="{{ $usersWithoutCareerCount }}" 
+                    value="{{ $this->usersWithoutCareerCount }}" 
                     icon="o-user-minus" 
                     class="text-warning"
                 />
@@ -37,7 +37,7 @@
     </x-card>
     <x-card title="Opciones Rápidas" shadow-md class="bg-base-200">
         LIBROS DE TEMAS
-        <x-select label="Materias" wire:model.live="subject_id" :options="$subjects" option-label="full_name"
+        <x-select label="Materias" wire:model.live="subject_id" :options="$this->subjects" option-label="full_name"
             option-value="id" icon="o-queue-list" />
         <div class="flex items-center mt-1 space-x-2">
             <x-button label="LIBRO" icon="o-book-open" class="btn-primary" wire:model="subject_id"
@@ -47,17 +47,17 @@
         </div>
     </x-card>
 
-    @if(auth()->user()->hasRole('student') && $nextPayment)
+    @if(auth()->user()->hasRole('student') && $this->nextPayment)
         <x-card title="Próximo Pago Pendiente" shadow-md>
             <div class="flex justify-between items-center">
                 <div>
-                    <h3 class="text-lg font-bold">{{ $nextPayment->title }}</h3>
-                    <p class="text-sm">Vencimiento: {{ \Carbon\Carbon::parse($nextPayment->date)->format('d/m/Y') }}</p>
+                    <h3 class="text-lg font-bold">{{ $this->nextPayment->title }}</h3>
+                    <p class="text-sm">Vencimiento: {{ \Carbon\Carbon::parse($this->nextPayment->date)->format('d/m/Y') }}</p>
                     <p class="text-xl font-bold mt-2">Monto:
-                        ${{ number_format($nextPayment->amount - $nextPayment->paid, 2) }}</p>
+                        ${{ number_format($this->nextPayment->amount - $this->nextPayment->paid, 2) }}</p>
                 </div>
                 <div>
-                    <livewire:online-payment :userPaymentId="$nextPayment->id" />
+                    <livewire:online-payment :userPaymentId="$this->nextPayment->id" />
                 </div>
             </div>
         </x-card>

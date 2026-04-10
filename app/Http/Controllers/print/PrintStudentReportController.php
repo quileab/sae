@@ -4,7 +4,9 @@ namespace App\Http\Controllers\print;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\Configs;
 use App\Models\Grade;
+use App\Models\PaymentRecord;
 use App\Models\Subject;
 use Illuminate\Http\Request;
 
@@ -12,6 +14,11 @@ class PrintStudentReportController extends Controller
 {
     public function generateReport(Request $request, $subject_id)
     {
+        // Authorization check
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'teacher', 'preceptor'])) {
+            abort(403);
+        }
+
         $subject = Subject::with('career')->findOrFail($subject_id);
         $students = $subject->users()->where('role', 'student')->orderBy('lastname')->orderBy('firstname')->get();
 
@@ -49,6 +56,11 @@ class PrintStudentReportController extends Controller
 
     public function generateAttendanceReport($subject_id)
     {
+        // Authorization check
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'teacher', 'preceptor'])) {
+            abort(403);
+        }
+
         $subject = Subject::with('enrollments.user')->findOrFail($subject_id);
 
         $students = $subject->enrollments->map(function ($enrollment) {
@@ -63,17 +75,22 @@ class PrintStudentReportController extends Controller
 
         $config = new \stdClass;
         $config->logo = 'imgs/logo.png'; // default logo
-        $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
-        $config->shortname = \App\Models\Configs::getValue('shortname')[0]->value;
+        $config->longname = Configs::getValue('longname')[0]->value;
+        $config->shortname = Configs::getValue('shortname')[0]->value;
 
-        $total_classes_q1 = reset($reportData)['total_classes_q1'];
-        $total_classes_q2 = reset($reportData)['total_classes_q2'];
+        $total_classes_q1 = reset($reportData)['total_classes_q1'] ?? 0;
+        $total_classes_q2 = reset($reportData)['total_classes_q2'] ?? 0;
 
         return view('print.student-attendance-report', compact('subject', 'reportData', 'config', 'total_classes_q1', 'total_classes_q2'));
     }
 
     public function generateGradesReport($subject_id)
     {
+        // Authorization check
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'teacher', 'preceptor'])) {
+            abort(403);
+        }
+
         $subject = Subject::with('enrollments.user')->findOrFail($subject_id);
 
         $students = $subject->enrollments->map(function ($enrollment) {
@@ -88,7 +105,7 @@ class PrintStudentReportController extends Controller
 
         $config = new \stdClass;
         $config->logo = 'imgs/logo.png'; // default logo
-        $config->longname = \App\Models\Configs::getValue('longname')[0]->value;
+        $config->longname = Configs::getValue('longname')[0]->value;
 
         return view('print.student-grades-report', compact('subject', 'reportData', 'config'));
     }
@@ -136,7 +153,7 @@ class PrintStudentReportController extends Controller
     {
         $cycle = session('cycle');
         if (! $cycle) {
-            $cycle = \App\Models\Configs::getValue('cycle')[0]->value;
+            $cycle = Configs::getValue('cycle')[0]->value ?? date('Y');
             session(['cycle' => $cycle]);
         }
 
@@ -277,11 +294,16 @@ class PrintStudentReportController extends Controller
 
     public function printStudentsPayments(Request $request)
     {
+        // Authorization check
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'treasurer'])) {
+            abort(403);
+        }
+
         $dateFrom = $request->input('dateFrom');
         $dateTo = $request->input('dateTo');
         $search = $request->input('search');
 
-        $payments = \App\Models\PaymentRecord::with('user')
+        $payments = PaymentRecord::with('user')
             ->whereDate('created_at', '>=', $dateFrom)
             ->whereDate('created_at', '<=', $dateTo)
             ->when($search, function ($query, $search) {

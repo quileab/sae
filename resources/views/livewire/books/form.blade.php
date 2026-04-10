@@ -3,6 +3,7 @@
 use Livewire\Volt\Component;
 use App\Models\Book;
 use Mary\Traits\Toast;
+use Illuminate\Support\Facades\Http;
 
 new class extends Component {
     use Toast;
@@ -28,8 +29,98 @@ new class extends Component {
     public string $synopsis = '';
     public ?string $note = null;
 
+    public function fetchFromGoogle(): void
+    {
+        if (!$this->isbn) {
+            $this->error('Por favor ingrese un ISBN.');
+            return;
+        }
+
+        $response = Http::get("https://www.googleapis.com/books/v1/volumes?q=isbn:{$this->isbn}");
+
+        if ($response->successful() && isset($response->json()['items'])) {
+            $this->mapGoogleBooksData($response->json()['items'][0]);
+            $this->success('Datos cargados desde Google Books.');
+        } else {
+            $this->error('No se encontró información en Google Books.');
+        }
+    }
+
+    public function fetchFromOpenLibrary(): void
+    {
+        if (!$this->isbn) {
+            $this->error('Por favor ingrese un ISBN.');
+            return;
+        }
+
+        $isbnKey = "ISBN:{$this->isbn}";
+        $response = Http::get("https://openlibrary.org/api/books?bibkeys={$isbnKey}&format=json&jscmd=data");
+
+        if ($response->successful() && isset($response->json()[$isbnKey])) {
+            $this->mapOpenLibraryData($response->json()[$isbnKey]);
+            $this->success('Datos cargados desde Open Library.');
+        } else {
+            $this->error('No se encontró información en Open Library.');
+        }
+    }
+
+    private function mapGoogleBooksData(array $item): void
+    {
+        $bookData = $item['volumeInfo'];
+        $accessData = $item['accessInfo'] ?? [];
+
+        $this->title = $bookData['title'] ?? $this->title;
+        $this->author = isset($bookData['authors']) ? implode(', ', $bookData['authors']) : $this->author;
+        $this->publisher = $bookData['publisher'] ?? $this->publisher;
+        $this->extent = $bookData['pageCount'] ?? $this->extent;
+        $this->synopsis = $bookData['description'] ?? $this->synopsis;
+        $this->gender = isset($bookData['categories']) ? implode(', ', $bookData['categories']) : $this->gender;
+
+        // Digital Link Selection
+        $this->digital = $accessData['pdf']['downloadLink'] 
+            ?? $accessData['pdf']['webReaderLink'] 
+            ?? $bookData['canonicalVolumeLink'] 
+            ?? $bookData['infoLink'] 
+            ?? $bookData['previewLink'] 
+            ?? $this->digital;
+
+        if (isset($bookData['publishedDate'])) {
+            $date = $bookData['publishedDate'];
+            if (strlen($date) === 4) {
+                $this->edition = "{$date}-01-01";
+            } elseif (strlen($date) === 7) {
+                $this->edition = "{$date}-01";
+            } else {
+                $this->edition = $date;
+            }
+        }
+    }
+
+    private function mapOpenLibraryData(array $bookData): void
+    {
+        $this->title = $bookData['title'] ?? $this->title;
+        $this->author = isset($bookData['authors']) ? collect($bookData['authors'])->pluck('name')->implode(', ') : $this->author;
+        $this->publisher = isset($bookData['publishers']) ? collect($bookData['publishers'])->pluck('name')->implode(', ') : $this->publisher;
+        $this->extent = $bookData['number_of_pages'] ?? $this->extent;
+        $this->synopsis = $bookData['notes'] ?? $this->synopsis;
+        $this->gender = isset($bookData['subjects']) ? collect($bookData['subjects'])->pluck('name')->take(5)->implode(', ') : $this->gender;
+        $this->digital = $bookData['url'] ?? $this->digital;
+
+        if (isset($bookData['publish_date'])) {
+            try {
+                $this->edition = \Carbon\Carbon::parse($bookData['publish_date'])->format('Y-m-d');
+            } catch (\Exception $e) {
+                // If parsing fails, we keep the original or a safe default
+            }
+        }
+    }
+
     public function mount(?int $id = null): void
     {
+        if (!auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor'])) {
+            abort(403, 'No tienes permiso para gestionar libros.');
+        }
+
         if ($id) {
             $this->book = Book::findOrFail($id);
             $this->fill($this->book->toArray());
@@ -48,6 +139,10 @@ new class extends Component {
 
     public function save(): void
     {
+        if (!auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor'])) {
+            abort(403);
+        }
+
         $data = $this->validate([
             'title' => 'required|max:120',
             'publisher' => 'required|max:60',
@@ -79,6 +174,10 @@ new class extends Component {
 
     public function delete(): void
     {
+        if (!auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor'])) {
+            abort(403);
+        }
+
         if (!$this->book) {
             return;
         }
@@ -108,7 +207,11 @@ new class extends Component {
                 <x-input label="Autor" wire:model="author" placeholder="Nombre del autor" />
                 <x-input label="Editorial" wire:model="publisher" placeholder="Editorial" />
                 <x-input label="Género" wire:model="gender" placeholder="Género literario" />
-                <x-input label="ISBN" wire:model="isbn" placeholder="ISBN" />
+                <div class="flex items-end gap-2">
+                    <x-input label="ISBN" wire:model="isbn" placeholder="ISBN" class="flex-1" />
+                    <x-button label="Google" icon="o-magnifying-glass" class="btn-primary" wire:click="fetchFromGoogle" spinner="fetchFromGoogle" />
+                    <x-button label="Open Library" icon="o-magnifying-glass" class="btn-secondary" wire:click="fetchFromOpenLibrary" spinner="fetchFromOpenLibrary" />
+                </div>
                 <x-input label="Páginas" type="number" wire:model="extent" />
                 <x-input label="Fecha de Edición" type="date" wire:model="edition" />
                 <x-input label="Origen" wire:model="origin" placeholder="Origen del libro" />

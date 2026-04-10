@@ -4,24 +4,31 @@ namespace App\Livewire;
 
 use App\Models\Event;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Livewire\Component;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
+#[Lazy]
 class UpcomingExams extends Component
 {
     public $selectedProfessorId = null;
-    public $professors;
 
-    public function mount()
+    #[Computed]
+    public function professors()
     {
-        $this->professors = User::where('role', 'teacher')
-            ->orderBy('lastname')
-            ->orderBy('firstname')
-            ->get();
+        return Cache::remember('professors_list', 3600, function () {
+            return User::where('role', 'teacher')
+                ->orderBy('lastname')
+                ->orderBy('firstname')
+                ->get();
+        });
     }
 
-    public function render()
+    #[Computed]
+    public function exams()
     {
         $user = Auth::user();
         $query = Event::where('start', '>=', Carbon::now())
@@ -49,12 +56,10 @@ class UpcomingExams extends Component
                 $q->whereIn('career_id', $careerIds);
             });
         }
-        // For admin and other roles, no additional filtering is applied, so they see all.
 
         $exams = $query->get();
 
         if ($user->hasRole('teacher')) {
-            // Add the role for the teacher
             $exams->each(function ($exam) use ($user) {
                 if ($exam->presidente_id == $user->id) {
                     $exam->teacher_role = 'Presidente';
@@ -66,8 +71,22 @@ class UpcomingExams extends Component
             });
         }
 
-        return view('livewire.upcoming-exams', [
-            'exams' => $exams,
-        ]);
+        return $exams;
+    }
+
+    public function placeholder()
+    {
+        return <<<'HTML'
+        <x-card title="Próximos Exámenes" shadow-md class="bg-base-200">
+            <div class="flex justify-center items-center h-32">
+                <x-loading class="loading-md text-primary" />
+            </div>
+        </x-card>
+        HTML;
+    }
+
+    public function render()
+    {
+        return view('livewire.upcoming-exams');
     }
 }

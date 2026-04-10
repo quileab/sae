@@ -53,9 +53,17 @@ class Crud extends Component
             $subject = Subject::find(session('subject_id'));
             if ($subject) {
                 $this->data['subject_id'] = $subject->id;
-                $this->data['class_number'] = ClassSession::where('subject_id', $subject->id)->count() + 1;
+                $this->data['class_number'] = ClassSession::count($subject->id) + 1;
             }
             $this->data['date'] = date('Y-m-d');
+        }
+    }
+
+    public function updatedData($value, $key)
+    {
+        if ($key === 'date' && $this->data['id'] === null && $this->data['subject_id']) {
+            $year = date('Y', strtotime($value));
+            $this->data['class_number'] = ClassSession::count($this->data['subject_id'], $year) + 1;
         }
     }
 
