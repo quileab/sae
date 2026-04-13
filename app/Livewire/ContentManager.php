@@ -2,24 +2,27 @@
 
 namespace App\Livewire;
 
-use App\Models\Subject;
-use App\Models\Unit;
-use App\Models\Topic;
 use App\Models\Resource;
+use App\Models\Subject;
+use App\Models\Topic;
+use App\Models\Unit;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Response;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Mary\Traits\Toast;
 
 class ContentManager extends Component
 {
+    use AuthorizesAccess;
     use Toast;
     use WithFileUploads;
 
-    public Subject $subject;
     public bool $showUnitModal = false;
+
     public bool $editingUnit = false;
+
     public array $unitForm = [
         'id' => null,
         'name' => '',
@@ -29,8 +32,11 @@ class ContentManager extends Component
     ];
 
     public ?int $selectedUnitId = null;
+
     public bool $showTopicModal = false;
+
     public bool $editingTopic = false;
+
     public array $topicForm = [
         'id' => null,
         'unit_id' => null,
@@ -41,8 +47,11 @@ class ContentManager extends Component
     ];
 
     public ?int $selectedTopicId = null;
+
     public bool $showResourceModal = false;
+
     public bool $editingResource = false;
+
     public array $resourceForm = [
         'id' => null,
         'topic_id' => null,
@@ -51,9 +60,46 @@ class ContentManager extends Component
         'is_visible' => true,
     ];
 
-    public function mount(Subject $subject)
+    public $upload;
+
+    public Subject $subject;
+
+    public $subject_id;
+
+    #[Computed]
+    public function subjects()
     {
-        $this->subject = $subject;
+        return auth()->user()->subjects;
+    }
+
+    public function mount($subject = null)
+    {
+        $user = auth()->user();
+
+        // Si recibimos 0 o null (desde el menú lateral), intentamos resolver la materia
+        if (!$subject || (is_numeric($subject) && $subject == 0) || (is_object($subject) && !$subject->exists)) {
+            $sid = session('subject_id') ?? ($user->subjects->first()->id ?? null);
+
+            if (!$sid) {
+                $this->error('Debe seleccionar una materia primero.');
+                return $this->redirect('/class-sessions', navigate: true);
+            }
+
+            $this->subject = Subject::findOrFail($sid);
+        } else {
+            // Caso normal: subject inyectado por Route Binding
+            $this->subject = $subject;
+        }
+
+        $this->subject_id = $this->subject->id;
+        $this->authorizeSubject($this->subject->id);
+    }
+
+    public function updatedSubjectId($value)
+    {
+        if ($value) {
+            return $this->redirect('/subjects-content/' . $value, navigate: true);
+        }
     }
 
     public function addUnit()
@@ -214,7 +260,7 @@ class ContentManager extends Component
     {
         $unit = Unit::find($unitId);
         if ($unit) {
-            $unit->is_visible = !$unit->is_visible;
+            $unit->is_visible = ! $unit->is_visible;
             $unit->save();
             $this->subject->refresh();
             $this->success('Visibilidad de la unidad actualizada.');
@@ -225,7 +271,7 @@ class ContentManager extends Component
     {
         $topic = Topic::find($topicId);
         if ($topic) {
-            $topic->is_visible = !$topic->is_visible;
+            $topic->is_visible = ! $topic->is_visible;
             $topic->save();
             $this->subject->refresh();
             $this->success('Visibilidad del tema actualizada.');
@@ -236,20 +282,18 @@ class ContentManager extends Component
     {
         $resource = Resource::find($resourceId);
         if ($resource) {
-            $resource->is_visible = !$resource->is_visible;
+            $resource->is_visible = ! $resource->is_visible;
             $resource->save();
             $this->subject->refresh();
             $this->success('Visibilidad del recurso actualizada.');
         }
     }
 
-    public $upload;
-
     public function exportContent()
     {
         $units = $this->subject->units()->with(['topics.resources'])->get();
 
-        $fileName = 'content-' . $this->subject->id . '-' . now()->format('Y-m-d') . '.json';
+        $fileName = 'content-'.$this->subject->id.'-'.now()->format('Y-m-d').'.json';
 
         return response()->streamDownload(function () use ($units) {
             echo json_encode($units, JSON_PRETTY_PRINT);
@@ -267,6 +311,7 @@ class ContentManager extends Component
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             $this->error('Error al decodificar el archivo JSON.');
+
             return;
         }
 

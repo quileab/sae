@@ -1,177 +1,236 @@
-<style>
-  * {
-    font-family: Arial, Helvetica, sans-serif;
-    padding:0px;
-    margin:0px;
-  }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Estadísticas Estudiante - {{ config('app.name') }}</title>
+  <style>
+    * {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+    }
 
-  hr {
-    height: 1rem;
-    border: 0px;
-  }
+    body {
+      margin: 2rem;
+      color: #1f2937;
+      background-color: #fff;
+    }
 
-  body {
-    margin:1rem;
-  }
+    h2 {
+      margin-bottom: 1rem;
+      color: #111827;
+    }
 
-  h2{
-    margin: 0rem;
-    padding: 0rem;
-  }
-  h4{
-    margin: 0rem;
-    padding: 0rem;
-  }
+    table {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+    }
 
-  table{
-    width:100%; border:2px solid; border-collapse:collapse;
-  }
+    table td, table th {
+      border: 1px solid #e5e7eb;
+      padding: 0.75rem;
+      font-size: 0.875rem;
+    }
 
-  table td, table th{
-    border:1px solid;
-    padding:0.4rem 0.5rem;
-  }
+    table th {
+      background-color: #f9fafb;
+      font-weight: 600;
+      text-align: left;
+    }
 
-  table th{
-    border-bottom: 2px solid black;
-    background-color:#eee;
-  }
-  
-  table tr{
-    page-break-inside: avoid !important;
-  }
+    table tr:nth-child(even) {
+      background-color: #fcfcfc;
+    }
 
-  .right{
-    text-align:right;
-  }
-  .center{
-    text-align:center;
-  }
+    table tr {
+      page-break-inside: avoid !important;
+    }
 
-  button {
-			color: #ffffff;
-			background-color: #2d63c8;
-			font-size: 19px;
-			border: 1px solid #1b3a75;
-			border-radius: 0.5rem;
-			padding: 0.5rem 2rem;
-			cursor: pointer
-		}
-	button:hover {
-    background-color: #3271e7;
-			color: #ffffff;
-	}
-/* Grade type */
-.EV{
-  background-color:rgb(214, 255, 208)
-}
-.TP{
-  background-color:rgb(255, 254, 221)
-}
-.FI{
-  background-color:rgb(221, 244, 255)
-}
+    .dontPrint {
+      position: fixed;
+      top: 1.5rem;
+      right: 2rem;
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem;
+      background-color: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 9999px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
 
-</style>
+    .right {
+      text-align: right;
+    }
+    .center {
+      text-align: center;
+    }
 
-<style media="print">
-@media print {
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+      border-radius: 9999px;
+      padding: 0.625rem 1.5rem;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
 
-@page {
-  size: A4 portrait;
-  max-height:100%;
-  max-width:100%;
-  margin: 1cm;
-}
+    .btn-print {
+      color: #ffffff;
+      background-color: #570df8;
+    }
 
-body {
-  width:100%;
-  height:100%;
-  margin: 0cm;
-  padding: 0cm;
-  }    
-}
+    .btn-print:hover {
+      background-color: #4506cb;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(87, 13, 248, 0.4);
+    }
 
-.dontPrint {
-     display:none;
-}
+    .btn-close {
+      color: #374151;
+      background-color: #ffffff;
+      border-color: #d1d5db;
+    }
 
-</style>   
-  <div class="dontPrint" style="position:relative; top:0px; left:0px; width:100%; text-align:right; padding:0.4rem; margin-bottom:1rem; background-color: #ddd; border:3px solid #aaa;">
-    <button type="button" onclick="window.print();return false;"
-      style=".">🖨️ Imprimir</button>
-    <button type="button" onclick="window.close();return false;"
-      style=".">❌ Cerrar</button>
+    .btn-close:hover {
+      background-color: #f3f4f6;
+      border-color: #9ca3af;
+      transform: translateY(-2px);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background-color: #f3f4f6;
+      color: #374151;
+    }
+
+    /* Grade types */
+    .EV { background-color: rgba(214, 255, 208, 0.3) !important; }
+    .TP { background-color: rgba(255, 254, 221, 0.3) !important; }
+    .FI { background-color: rgba(221, 244, 255, 0.3) !important; }
+  </style>
+
+  <style media="print">
+    @page {
+      size: A4 portrait;
+      margin: 1.5cm;
+    }
+
+    body {
+      margin: 0;
+      background-color: #fff;
+    }
+
+    .dontPrint {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dontPrint">
+    <button type="button" class="btn btn-print" onclick="window.print();return false;">
+      <span>🖨️</span> Imprimir Reporte
+    </button>
+    <button type="button" class="btn btn-close" onclick="window.close();">
+      <span>✕</span> Cerrar
+    </button>
   </div>
+
   <h2>{{ $data['config']['shortname'] }} - {{ $data['config']['longname'] }}</h2>
 
-  <table>
+  <table style="border: none; margin-bottom: 1.5rem;">
     <tr>
-      <td>
-        {{ $subject->id }}: {{ $subject->name }}
+      <td style="border: none; padding: 0;">
+        <span style="font-weight: 600; font-size: 1.1rem; color: #111827;">{{ $subject->name }}</span>
+        <span class="badge" style="margin-left: 0.5rem;">Materia ID: {{ $subject->id }}</span>
+        <div style="margin-top: 0.5rem; color: #374151;">
+          Estudiante: <span style="font-weight: 600;">{{ $student->lastname }}, {{ $student->firstname }}</span>
+          <br>
+          <span style="font-size: 0.8rem; color: #6b7280;">{{ $student->email }} • {{ $student->phone }}</span>
+        </div>
       </td>
-      <td class='right'>
-        {{ date('d-m-Y H:i', strtotime(now())) }}
-      </td>
-    </tr>
-    <tr>
-      <td>
-        {{ $student->id }}: {{ $student->lastname }}, {{ $student->firstname }}
-      </td>
-      <td class='right'>
-        {{ $student->email }} / {{ $student->phone }}
+      <td class='right' style="border: none; padding: 0; vertical-align: top; color: #6b7280;">
+        Generado: {{ date('d/m/Y H:i') }}
       </td>
     </tr>
   </table>
-  <hr />
+
+  <h4 style="margin-bottom: 0.5rem; color: #374151;">Desglose de Clases y Calificaciones</h4>
   <table>
     <thead>
       <tr>
-        <th>Fecha</th>
-        <th>Descripción</th>
-        <th>Calif.</th>
-        <th>Asistencia</th>
+        <th style="width: 100px;">Fecha</th>
+        <th>Descripción / Actividad</th>
+        <th style="width: 80px; text-align: center;">Calif.</th>
+        <th style="width: 100px; text-align: center;">Asistencia</th>
       </tr>
     </thead>
     <tbody>
       @foreach ($classes as $class)
         <tr class="{{ $class->type }}">
-          <td>{{ date('d-m-Y', strtotime($class->date_id)) }}</td>
-          <td>{{ $class->name }}</td>
-          <td class="right">@if ($class->approved) ✔️ @endif {{ $class->grade }}</td>
-          <td class="center">{{ $class->attendance }}%</td>
+          <td>{{ date('d/m/Y', strtotime($class->date_id)) }}</td>
+          <td>
+            <span class="badge" style="font-size: 0.65rem; margin-right: 0.25rem;">{{ $class->type }}</span>
+            {{ $class->name }}
+          </td>
+          <td class="center">
+            @if ($class->approved) <span style="color: #059669;">✔️</span> @endif 
+            <span style="font-weight: 600;">{{ $class->grade }}</span>
+          </td>
+          <td class="center" style="font-weight: 500;">{{ $class->attendance }}%</td>
         </tr>
       @endforeach
     </tbody>
   </table>
-  <hr />
-  <table>
+
+  <h4 style="margin-bottom: 0.5rem; color: #374151; margin-top: 2rem;">Resumen de Rendimiento</h4>
+  <table style="width: 50%; margin-left: 0;">
     <thead>
       <tr>
-        <th>Descripción</th>
-        <th>Cant.</th>
-        <th>%</th>
+        <th>Concepto</th>
+        <th style="text-align: center;">Cant.</th>
+        <th style="text-align: center;">Resultado / Promedio</th>
       </tr>
     </thead>
     <tbody>
     <tr>
-      <td>Promedio de Asistencias</td>
-      <td></td>
-      <td class="right">
+      <td style="font-weight: 600;">Promedio de Asistencias</td>
+      <td class="center">-</td>
+      <td class="center" style="font-weight: 700; color: #059669;">
         @if($data['classCount']>0)
         {{ceil($data['sumAttendance']/$data['classCount'])}}%
         @endif
       </td>
     </tr>
     <tr>
-      <td>Evaluaciones</td>
-      <td class="right">{{ $data['countEV'] }}</td>
-      <td class="right">Promedio {{ $data['countEV'] > 0 ? ceil($data['sumEV']/$data['countEV']) : '-'}}</td>
+      <td>Evaluaciones (EV)</td>
+      <td class="center">{{ $data['countEV'] }}</td>
+      <td class="center" style="font-weight: 600;">{{ $data['countEV'] > 0 ? number_format($data['sumEV']/$data['countEV'], 1) : '-'}}</td>
     </tr>
     <tr>
-      <td>Trabajos Prácticos</td>
-      <td class="right">{{ $data['countTP'] }}</td>
-      <td class="right">Promedio {{ $data['countTP'] > 0 ? ceil($data['sumTP']/$data['countTP']) : '-'}}</td>
+      <td>Trabajos Prácticos (TP)</td>
+      <td class="center">{{ $data['countTP'] }}</td>
+      <td class="center" style="font-weight: 600;">{{ $data['countTP'] > 0 ? number_format($data['sumTP']/$data['countTP'], 1) : '-'}}</td>
     </tr>
     </tbody>
   </table>
+
+</body>
+</html>

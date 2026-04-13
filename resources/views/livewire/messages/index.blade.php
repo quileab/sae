@@ -10,10 +10,9 @@
                 <div>
                     @forelse($subjectContacts as $subjectId => $contact)
                         <div @class([
-                            "flex items-center my-1 border-b border-white/10 cursor-pointer hover:bg-primary py-1 rounded-l-full pl-1",
-                            'font-semibold bg-white/30'=>$contact->user->hasNotRole('student')
-                            ])
-                            wire:click="selectContact({{ $contact->user->id }})">
+                           "flex items-center my-1 border-b border-white/10 cursor-pointer hover:bg-primary py-1 rounded-l-full pl-1",
+                           'font-semibold bg-white/30'=> !$contact->user->hasRole('student')
+                           ])                            wire:click="selectContact({{ $contact->user->id }})">
                             <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-semibold mr-2">
                                 {{ strtoupper(substr($contact->user->firstname ?? '', 0, 1)) }}
                             </div>

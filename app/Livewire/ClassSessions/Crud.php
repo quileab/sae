@@ -3,14 +3,15 @@
 namespace App\Livewire\ClassSessions;
 
 use App\Models\ClassSession;
-use App\Models\Subject;
-use App\Models\User;
+use App\Traits\AuthorizesAccess;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Crud extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public bool $drawer = false;
 
@@ -29,41 +30,49 @@ class Crud extends Component
         'observations' => '',
     ];
 
-    public $user;
-
-    public $subject;
-
-    public $subjects = [];
+    #[Url]
+    public $subject_id = null;
 
     public function mount($id = null)
     {
-        $user_id = session('user_id') ?? auth()->user()->id;
+        $user = auth()->user();
 
-        $this->user = User::find($user_id);
-        $this->subjects = $this->user->subjects;
         if ($id !== null) {
-            $class_session = ClassSession::find($id);
-            if ($this->subjects->contains($class_session->subject_id)) {
-                $this->data = $class_session->toArray();
-            } else {
-                $this->redirect('/class-sessions');
-            }
+            $class_session = ClassSession::findOrFail($id);
+            // Security check
+            $this->authorizeSubject($class_session->subject_id);
+
+            $this->data = $class_session->toArray();
+            $this->subject_id = $class_session->subject_id;
         } else {
-            $this->data['teacher_id'] = $user_id;
-            $subject = Subject::find(session('subject_id'));
-            if ($subject) {
-                $this->data['subject_id'] = $subject->id;
-                $this->data['class_number'] = ClassSession::count($subject->id) + 1;
+            if (! $this->subject_id) {
+                $this->redirect('/class-sessions');
+
+                return;
             }
+
+            $this->authorizeSubject($this->subject_id);
+
+            $this->data['teacher_id'] = $user->id;
+            $this->data['subject_id'] = $this->subject_id;
             $this->data['date'] = date('Y-m-d');
+            $this->data['class_number'] = ClassSession::where('subject_id', $this->subject_id)->count() + 1;
         }
+    }
+
+    #[Computed]
+    public function subjects()
+    {
+        return auth()->user()->subjects;
     }
 
     public function updatedData($value, $key)
     {
         if ($key === 'date' && $this->data['id'] === null && $this->data['subject_id']) {
             $year = date('Y', strtotime($value));
-            $this->data['class_number'] = ClassSession::count($this->data['subject_id'], $year) + 1;
+            $this->data['class_number'] = ClassSession::where('subject_id', $this->data['subject_id'])
+                ->whereYear('date', $year)
+                ->count() + 1;
         }
     }
 

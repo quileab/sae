@@ -4,14 +4,17 @@ namespace App\Livewire\ClassSessions;
 
 use App\Models\ClassSession;
 use App\Models\User;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Index extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public string $search = '';
 
@@ -19,40 +22,55 @@ class Index extends Component
 
     public array $sortBy = ['column' => 'date', 'direction' => 'desc'];
 
-    public $subjects = [];
-
+    #[Url]
     public $subject_id = null;
 
-    public $user;
-
-    public $cycle;
+    #[Url]
+    public $cycle_id = null;
 
     public function mount(): void
     {
-        $this->user = User::find(session('user_id')) ?: auth()->user();
-        $this->cycle = session('cycle_id');
-        $this->subjects = $this->user->subjects;
+        $user = auth()->user();
 
-        try {
-            $this->subject_id = session('subject_id') ?: ($this->subjects->isNotEmpty() ? $this->subjects->first()->id : null);
-            if (!session()->has('subject_id') && $this->subject_id) {
-                $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $this->subject_id]);
-            }
-        } catch (\Exception $e) {
-            $this->subject_id = null;
+        // Cycle ID initialization (URL > Current Year)
+        if (! $this->cycle_id) {
+            $this->cycle_id = $this->getCycleId();
         }
+
+        $subjects = $this->subjects;
+
+        // If no subject_id in URL, try to pick the first one available for the user
+        if (! $this->subject_id && $subjects->isNotEmpty()) {
+            $this->subject_id = $subjects->first()->id;
+        }
+
+        // Security check: If a subject_id is provided, verify ownership
+        if ($this->subject_id && ! $user->hasSubject($this->subject_id)) {
+            $this->subject_id = $subjects->isNotEmpty() ? $subjects->first()->id : null;
+        }
+    }
+
+    #[Computed]
+    public function subjects()
+    {
+        return auth()->user()->subjects;
+    }
+
+    #[Computed]
+    public function cycle()
+    {
+        return $this->cycle_id ?: $this->getCycleId();
     }
 
     public function updatedSubjectId($value): void
     {
-        $this->info('Materia Seleccionada.'.$value, position: 'toast-top toast-center');
-        $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $value]);
+        $this->info('Materia Seleccionada: '.$value, position: 'toast-top toast-center');
     }
 
     public function clear(): void
     {
-        $this->reset();
-        $this->success('Filters cleared.', position: 'toast-bottom');
+        $this->reset(['search', 'drawer']);
+        $this->success('Filtros limpiados.', position: 'toast-bottom');
     }
 
     public function headers(): array
@@ -66,8 +84,13 @@ class Index extends Component
         ];
     }
 
+    #[Computed]
     public function items(): Collection
     {
+        if (! $this->subject_id) {
+            return collect();
+        }
+
         $search = Str::of($this->search)->lower()->ascii();
         $query = ClassSession::whereYear('date', $this->cycle)
             ->where('subject_id', $this->subject_id);
@@ -86,7 +109,6 @@ class Index extends Component
     public function render()
     {
         return view('livewire.class_sessions.index', [
-            'items' => $this->items(),
             'headers' => $this->headers(),
         ]);
     }

@@ -28,30 +28,22 @@
                 <!-- Messages Tab -->
                 @if($activeTab === 'messages')
                     <div class="absolute inset-0 overflow-y-auto p-2 space-y-2">
-                        @foreach ($conversations as $key => $conversation)
-                                                                                                                                            @php
-                                                                                                                                                [$type, $id] = explode('_', $key);
-                                                                                                                                                $model = $type === 'user' ? App\Models\User::find($id) : App\Models\Subject::find($id);
-                                                                                                                                                $unreadCount = $conversation->filter(function($msg) {
-                                                                                                                                                    return $msg->sender_id !== auth()->id() && 
-                                                                                                                                                           $msg->recipients->first() && 
-                                                                                                                                                           is_null($msg->recipients->first()->pivot->read_at);
-                                                                                                                                                })->count();
-                                                                                                                                            @endphp
-                                                                                                                                            <div wire:click="selectConversation('{{ $type }}', {{ $id }})"
-                                                                                                                                                class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $id && $selectedConversation['type'] == $type ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
-                                                                                                                                                                                <div class="flex justify-between items-start">
-                                                                                                                                                                                    <div class="font-bold truncate max-w-[75%]">
-                                                                                                                                                                                        @if($type === 'subject' && $model)
-                                                                                                                                                                                            {{ $model->name }} <span class="text-xs font-normal opacity-70 block">{{ $model->career->name ?? '' }}</span>
-                                                                                                                                                                                        @else
-                                                                                                                                                                                            {{ $model ? $model->fullname : 'Usuario desconocido' }}
-                                                                                                                                                                                        @endif
-                                                                                                                                                                                    </div>
-                                                                                                                                                                                    @if($unreadCount > 0)
-                                                                                                                                                                                        <span class="badge badge-sm badge-error text-white">{{ $unreadCount }}</span>
-                                                                                                                                                                                    @endif
-                                                                                                                                                                                </div>                                                                                                                    <div class="text-xs opacity-70">                                    {{ $conversation->first()->created_at->format('d/m/Y H:i') }}
+                        @foreach ($conversationList as $conv)
+                            <div wire:click="selectConversation('{{ $conv['type'] }}', {{ $conv['id'] }})"
+                                class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $conv['id'] && $selectedConversation['type'] == $conv['type'] ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
+                                <div class="flex justify-between items-start">
+                                    <div class="font-bold truncate max-w-[75%]">
+                                        {{ $conv['label'] }}
+                                        @if($conv['subLabel'])
+                                            <span class="text-xs font-normal opacity-70 block">{{ $conv['subLabel'] }}</span>
+                                        @endif
+                                    </div>
+                                    @if($conv['unread'])
+                                        <span class="badge badge-sm badge-error text-white">!</span>
+                                    @endif
+                                </div>
+                                <div class="text-xs opacity-70">
+                                    {{ $conv['last_date']->format('d/m/Y H:i') }}
                                 </div>
                             </div>
                         @endforeach

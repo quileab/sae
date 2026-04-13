@@ -4,16 +4,16 @@ namespace App\Livewire\Users;
 
 use App\Models\Career;
 use App\Models\User;
+use App\Traits\AuthorizesAccess;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Crud extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public bool $drawer = false;
-
-    public $roles = [];
 
     public $data = [
         'id' => null,
@@ -29,97 +29,101 @@ class Crud extends Component
         'careers' => [],
     ];
 
-    public $careers = [];
-
     public $career_id = null;
 
     public $user_id = null;
 
     public function mount($id = null)
     {
-        $this->roles = User::$roles;
-        $this->careers = Career::where(
-            ['allow_enrollments' => true, 'allow_evaluations' => true]
-        )->get();
-        if ($this->careers->isNotEmpty()) {
-            $this->career_id = $this->careers->first()->id;
-        }
+        $this->authorizeStaff();
 
-        if ($id === null) {
-            $id = session('user_id');
-        }
         $this->user_id = $id;
 
         if ($id !== null) {
-            $user = User::find($id);
-            if ($user) {
-                $this->data = $user->toArray();
-                $this->data['careers'] = $user->careers;
-            }
+            $user = User::findOrFail($id);
+            $this->data = $user->toArray();
+            $this->data['careers'] = $user->careers;
         }
+
+        if ($this->careers->isNotEmpty()) {
+            $this->career_id = $this->careers->first()->id;
+        }
+    }
+
+    #[Computed]
+    public function roles()
+    {
+        return User::$roles;
+    }
+
+    #[Computed]
+    public function careers()
+    {
+        return Career::where(['allow_enrollments' => true, 'allow_evaluations' => true])->get();
     }
 
     public function save()
     {
-        $data = [];
-        // check if user not exists assign password
+        $this->authorizeStaff();
+
+        $saveData = [
+            'id' => $this->data['id'],
+            'name' => $this->data['name'],
+            'email' => $this->data['email'],
+            'firstname' => $this->data['firstname'],
+            'lastname' => $this->data['lastname'],
+            'phone' => $this->data['phone'],
+            'role' => $this->data['role'],
+            'enabled' => $this->data['enabled'],
+        ];
+
         if (! User::find($this->user_id)) {
-            $data['password'] = $this->data['id'];
+            $saveData['password'] = $this->data['id'];
         }
-        $data['id'] = $this->data['id'];
-        $data['name'] = $this->data['name'];
-        $data['email'] = $this->data['email'];
-        $data['firstname'] = $this->data['firstname'];
-        $data['lastname'] = $this->data['lastname'];
-        $data['phone'] = $this->data['phone'];
-        $data['role'] = $this->data['role'];
-        $data['enabled'] = $this->data['enabled'];
-        // dd($data, $this->user_id);
-        User::updateOrCreate(['id' => $this->user_id], $data);
+
+        User::updateOrCreate(['id' => $this->user_id], $saveData);
         $this->success('Usuario guardado.');
-        // $this->redirect('/users');
     }
 
     public function changePassword()
     {
-        $user = User::find($this->data['id']);
-        if ($user) {
-            $user->password = $this->data['password'];
-            $user->save();
-            $this->success('Contraseña cambiada.');
-            $this->drawer = false;
-            $this->skipRender();
-        }
+        $this->authorizeStaff();
+
+        $user = User::findOrFail($this->data['id']);
+        $user->password = $this->data['password'];
+        $user->save();
+
+        $this->success('Contraseña cambiada.');
+        $this->drawer = false;
     }
 
     public function assignCareer()
     {
-        $user = User::find($this->data['id']);
-        if ($user) {
-            $user->careers()->attach($this->career_id);
-            $this->data['careers'] = $user->careers;
-            $this->skipMount();
-        }
+        $this->authorizeStaff();
+
+        $user = User::findOrFail($this->data['id']);
+        $user->careers()->syncWithoutDetaching([$this->career_id]);
+        $this->data['careers'] = $user->careers()->get();
     }
 
     public function removeCareer($career_id)
     {
-        $user = User::find($this->data['id']);
-        if ($user) {
-            $user->careers()->detach($career_id);
-            $this->data['careers'] = $user->careers;
-            $this->skipMount();
-        }
+        $this->authorizeStaff();
+
+        $user = User::findOrFail($this->data['id']);
+        $user->careers()->detach($career_id);
+        $this->data['careers'] = $user->careers()->get();
     }
 
     public function delete(): void
     {
-        $user = User::find($this->data['id']);
-        if ($user) {
-            $user->delete();
-            $this->success('Usuario eliminado.');
-            $this->redirect('/users', navigate: true);
-        }
+        $this->authorizeStaff();
+
+        $user = User::findOrFail($this->data['id']);
+        $user->delete();
+
+        $this->success('Usuario eliminado.');
+        $this->redirect('/users', navigate: true);
     }
 
     public function render()

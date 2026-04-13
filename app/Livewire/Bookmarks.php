@@ -14,6 +14,23 @@ class Bookmarks extends Component
 {
     public $shortName;
 
+    #[On('context-batch-sync')]
+    public function syncBatch($items): void
+    {
+        foreach ($items as $item) {
+            if (isset($item['type'], $item['value'])) {
+                // Si el cliente ya tiene el nombre (caché), lo usamos directamente para ahorrar consultas DB
+                if (isset($item['name']) && !empty($item['name'])) {
+                    session()->put($item['type'], $item['value']);
+                    session()->put($item['type'].'_name', $item['name']);
+                } else {
+                    // Si no tiene nombre, lo procesamos normalmente para obtenerlo
+                    $this->updateBookmark($item);
+                }
+            }
+        }
+    }
+
     #[On('bookmarked')]
     public function updateBookmark($data): void
     {
@@ -78,6 +95,9 @@ class Bookmarks extends Component
         if ($this->shortName) {
             session()->put($data['type'], $data['value']);
             session()->put($data['type'].'_name', $this->shortName);
+            
+            // Emitir evento para sincronizar con localStorage incluyendo el nombre
+            $this->dispatch('context-updated', type: $data['type'], value: $data['value'], name: $this->shortName);
         }
     }
 
@@ -88,6 +108,9 @@ class Bookmarks extends Component
         }
         session()->forget($type);
         session()->forget($type.'_name');
+
+        // Emitir evento para eliminar de localStorage
+        $this->dispatch('context-cleared', type: $type);
     }
 
     #[On('refresh-bookmarks')]

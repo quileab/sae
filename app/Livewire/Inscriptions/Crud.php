@@ -7,32 +7,32 @@ use App\Models\Configs;
 use App\Models\Inscriptions;
 use App\Models\Subject;
 use App\Models\User;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Crud extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public string $search = '';
 
     public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
 
-    public $inscriptions = [];
-
     public $inscription_id = null;
 
-    public $careers = [];
-
+    #[Url]
     public $career_id = null;
 
-    public $subjects = [];
+    #[Url]
+    public $user_id = null;
 
     public $subject_id = null;
-
-    public $user = null;
 
     public $type = 'csv-1';
 
@@ -49,6 +49,8 @@ class Crud extends Component
 
     public $temp = [];
 
+    public $subjects = [];
+
     public $pdfExists = false;
 
     public $pdfFileName = '';
@@ -57,25 +59,15 @@ class Crud extends Component
 
     public function mount()
     {
-        $this->user = User::find(session('user_id')) ?: auth()->user();
-        if ($this->user->enabled == false) {
+        $user = $this->targetUser;
+
+        if ($user->enabled == false) {
             return;
         }
-        // si es admin, principal o administrative
-        if ($this->user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
-            $this->inscriptions = Configs::where('group', 'inscriptions')->get();
-            $this->careers = Career::where('allow_enrollments', true)
-                ->where('allow_evaluations', true)->get();
 
-            $admin = User::where('name', 'admin')->first();
-            if ($admin) {
-                $this->admin_id = $admin->id;
-            }
-        } else {
-            $this->inscriptions = Configs::where('group', 'inscriptions')
-                ->where('value', 'true')
-                ->get();
-            $this->careers = $this->user->careers ?? [];
+        // Default career if not in URL
+        if (! $this->career_id && $this->careers->isNotEmpty()) {
+            $this->career_id = $this->careers->first()->id;
         }
 
         if ($this->inscriptions->isEmpty()) {
@@ -85,22 +77,43 @@ class Crud extends Component
             $this->inscription_id = $this->inscriptions->first()->id;
         }
 
-        if ($this->careers->isEmpty()) {
-            // return error message
-            $this->warning('No se han encontrado Carreras.');
-            $this->career_id = null;
-        } else {
-            $this->career_id = $this->careers->first()->id;
+        $this->checkPdf();
+    }
+
+    #[Computed]
+    public function targetUser()
+    {
+        return $this->getTargetUser($this->user_id);
+    }
+
+    #[Computed]
+    public function inscriptions()
+    {
+        if ($this->targetUser->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
+            return Configs::where('group', 'inscriptions')->get();
         }
 
-        $this->checkPdf();
+        return Configs::where('group', 'inscriptions')
+            ->where('value', 'true')
+            ->get();
+    }
+
+    #[Computed]
+    public function careers()
+    {
+        if ($this->targetUser->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
+            return Career::where('allow_enrollments', true)
+                ->where('allow_evaluations', true)->get();
+        }
+
+        return $this->targetUser->careers ?? collect();
     }
 
     public function checkPdf(): void
     {
-        if ($this->user && $this->career_id && $this->inscription_id) {
-            $this->pdfFileName = "insc-{$this->user->id}-{$this->career_id}-{$this->inscription_id}-.pdf";
-            $this->pdfExists = \Illuminate\Support\Facades\Storage::exists("private/inscriptions/{$this->pdfFileName}");
+        if ($this->targetUser && $this->career_id && $this->inscription_id) {
+            $this->pdfFileName = "insc-{$this->targetUser->id}-{$this->career_id}-{$this->inscription_id}-.pdf";
+            $this->pdfExists = Storage::exists("private/inscriptions/{$this->pdfFileName}");
         } else {
             $this->pdfExists = false;
         }
@@ -108,11 +121,13 @@ class Crud extends Component
 
     public function updatedCareerId(): void
     {
+        $this->subjects = [];
         $this->checkPdf();
     }
 
     public function updatedInscriptionId(): void
     {
+        $this->subjects = [];
         $this->checkPdf();
     }
 
@@ -160,9 +175,9 @@ class Crud extends Component
             ->toArray();
 
         $selected = [];
-        if ($this->user->hasRole('student')) {
+        if ($this->targetUser->hasRole('student')) {
             $selected = Inscriptions::where('configs_id', $this->inscription_id)
-                ->where('user_id', $this->user->id)
+                ->where('user_id', $this->targetUser->id)
                 ->whereIn('subject_id', $subjects->pluck('id')
                     ->toArray())->get()->keyBy('subject_id')
                 ->toArray();
@@ -177,10 +192,19 @@ class Crud extends Component
             } else {
                 $subject->selected = $selected[$subject->id]['value'] ?? null;
             }
+
+            // Sync with public $subjects property for wire:model
+            if (!isset($this->subjects[$subject->id])) {
+                $this->subjects[$subject->id] = [
+                    'value' => $subject->value,
+                    'selected' => $subject->selected,
+                ];
+            } else {
+                // If it's already set (e.g. from previous request), only update the static 'value' from DB
+                $this->subjects[$subject->id]['value'] = $subject->value;
+            }
         }
 
-        $this->subjects = $subjects->keyBy('id')->toArray();
-        // dump($this->admin_id, $this->subjects, $subjects, $inscriptions);
         $this->skipMount();
 
         return $subjects;
@@ -196,7 +220,7 @@ class Crud extends Component
 
         $isAdmin = auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']);
         // which user Admin or Student?
-        $isAdmin ? $user = $this->admin_id : $user = $this->user->id;
+        $isAdmin ? $user = $this->admin_id : $user = $this->targetUser->id;
 
         foreach ($this->subjects as $subject_id => $value) {
             // dd($subject_id, $value);
@@ -235,7 +259,7 @@ class Crud extends Component
         $this->save();
 
         return redirect()->route('inscriptionsSavePDF', [
-            'student' => $this->user->id,
+            'student' => $this->targetUser->id,
             'career' => $this->career_id,
             'inscription' => $this->inscription_id,
         ]);

@@ -21,7 +21,7 @@
         pb-1 border-b border-black/20 dark:border-white/20">
             <x-select wire:model.live="inscription_id" label="Inscripciones a" :options="$inscriptions"
                 option-value="id" option-label="description" />
-            @if(auth()->user()->hasNotRole('teacher'))
+            @if(!auth()->user()->hasRole('teacher'))
                 <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
             @endif
             <x-select wire:model.live="subject_id" label="Materia" :options="$subjects" placeholder="TODAS" />

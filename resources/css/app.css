@@ -1,9 +1,8 @@
 /* Tailwind */
 @import "tailwindcss";
 /* DaisyUI */
-@plugin "daisyui" {
-    themes: light --default, dark --prefersdark;
-}
+@plugin "daisyui";
+
 /* maryUI */
 @source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
 

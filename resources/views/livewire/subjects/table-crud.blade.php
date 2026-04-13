@@ -1,7 +1,7 @@
 <div>
     <x-header title="Editor Rápido de Materias" subtitle="Carrera ID: {{ $career_id }}" separator progress-indicator>
         <x-slot:middle class="!justify-end">
-            <x-select wire:model.live="career_id" :options="$careers" icon="o-academic-cap" />
+            <x-select wire:model.live="career_id" :options="$this->careers" icon="o-academic-cap" />
         </x-slot:middle>
         <x-slot:actions>
             <x-button label="VOLVER" icon="o-arrow-left" link="/subjects" />
@@ -29,13 +29,15 @@
                             </td>
                             <td class="p-1">
                                 <div class="flex gap-1">
-                                    <x-button icon="o-check" class="btn-xs btn-success" wire:click="save({{ $index }})" spinner />
-                                    
+                                    <x-button icon="o-check" class="btn-xs btn-success" wire:click="save({{ $index }})"
+                                        spinner />
+
                                     <x-dropdown>
                                         <x-slot:trigger>
                                             <x-button icon="o-trash" class="btn-xs btn-error btn-outline" />
                                         </x-slot:trigger>
-                                        <x-menu-item title="Confirmar" icon="o-trash" wire:click="delete({{ $index }})" class="text-error" />
+                                        <x-menu-item title="Confirmar" icon="o-trash" wire:click="delete({{ $index }})"
+                                            class="text-error" />
                                     </x-dropdown>
                                 </div>
                             </td>

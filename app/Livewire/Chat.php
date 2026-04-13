@@ -7,11 +7,15 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.chat')]
 class Chat extends Component
 {
+    #[Url]
+    public $user_id;
+
     public $content = '';
 
     public $recipient_type = 'user';
@@ -88,6 +92,12 @@ class Chat extends Component
             // For teachers and admins, users are loaded on subject selection.
             $this->users = [];
         }
+
+        // Auto-select conversation if user_id is provided in URL
+        if ($this->user_id) {
+            $this->selectConversation('user', $this->user_id);
+            $this->activeTab = 'messages';
+        }
     }
 
     public function updatedSelectedCareerId($careerId)
@@ -151,32 +161,70 @@ class Chat extends Component
     {
         $userId = Auth::id();
 
-        // Get all messages where the user is the sender or a recipient
-        // Note: This is still heavy for the conversation list, but requested optimization is for the chat view pagination.
-        $allMessages = Message::where('sender_id', $userId)
-            ->orWhereHas('recipients', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
+        // Optimización avanzada: Obtener el ID del último mensaje de cada conversación
+        // Esto reduce drásticamente el uso de memoria al no cargar miles de mensajes.
+        $subquery = Message::selectRaw('MAX(id) as id')
+            ->where('sender_id', $userId)
+            ->orWhereHas('recipients', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
             })
-            ->with(['recipients' => function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            }])
+            ->groupBy(\DB::raw('COALESCE(subject_id, IF(sender_id = '.$userId.', (SELECT user_id FROM message_user WHERE message_id = messages.id LIMIT 1), sender_id))'));
+
+        $recentMessages = Message::whereIn('id', $subquery)
+            ->with(['sender', 'recipients', 'subject.career'])
             ->latest()
             ->get();
 
-        // Group messages into conversations
-        $conversations = $allMessages->groupBy(function ($message) use ($userId) {
+        $conversations = [];
+        $processedKeys = [];
+
+        foreach ($recentMessages as $message) {
+            $key = '';
+            $label = '';
+            $subLabel = '';
+            $id = 0;
+            $type = '';
+
             if ($message->subject_id) {
-                return 'subject_'.$message->subject_id;
-            }
-            // If the user is the sender, group by the first recipient
-            if ($message->sender_id == $userId) {
-                // Fallback if recipients is empty (shouldn't happen in valid chat)
-                return 'user_'.($message->recipients->first()->id ?? 0);
+                $type = 'subject';
+                $id = $message->subject_id;
+                $key = 'subject_'.$id;
+                $label = $message->subject->name ?? 'Curso';
+                $subLabel = $message->subject->career->name ?? '';
+            } else {
+                $type = 'user';
+                if ($message->sender_id == $userId) {
+                    $recipient = $message->recipients->where('id', '!=', $userId)->first();
+                    $id = $recipient->id ?? 0;
+                    $label = $recipient->fullname ?? 'Usuario';
+                } else {
+                    $id = $message->sender_id;
+                    $label = $message->sender->fullname ?? 'Usuario';
+                }
+                $key = 'user_'.$id;
             }
 
-            // If the user is the recipient, group by the sender
-            return 'user_'.$message->sender_id;
-        });
+            if (!in_array($key, $processedKeys)) {
+                $unreadCount = 0;
+                if ($message->sender_id !== $userId) {
+                    $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
+                    if ($myPivot && is_null($myPivot->read_at)) {
+                        $unreadCount = 1; 
+                    }
+                }
+
+                $conversations[] = [
+                    'key' => $key,
+                    'type' => $type,
+                    'id' => $id,
+                    'label' => $label,
+                    'subLabel' => $subLabel,
+                    'last_date' => $message->created_at,
+                    'unread' => $unreadCount > 0
+                ];
+                $processedKeys[] = $key;
+            }
+        }
 
         // Filter messages for the selected conversation
         $filteredMessages = collect();
@@ -214,7 +262,7 @@ class Chat extends Component
         }
 
         return view('livewire.chat', [
-            'conversations' => $conversations,
+            'conversationList' => $conversations,
             'receivedMessages' => $filteredMessages,
         ])->layout('layouts.chat');
     }

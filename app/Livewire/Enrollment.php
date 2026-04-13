@@ -3,40 +3,43 @@
 namespace App\Livewire;
 
 use App\Models\Subject;
-use App\Models\User;
+use App\Traits\AuthorizesAccess;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Enrollment extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public $modal = false;
 
-    public $careerId; // Carrera seleccionada
+    #[Url]
+    public $careerId = null;
 
-    public $careers;
-
-    public $enrolledSubjects = []; // Materias en las que está matriculado
-
-    public $subjects = []; // Todas las materias de la carrera seleccionada
+    #[Url]
+    public $user_id = null;
 
     public $blocked = false;
 
+    public $modalMessage = 'Haga click para ser redirigido';
+
     public function mount()
     {
-        $user = $this->getUser();
+        $user = $this->targetUser;
 
         if (! $user) {
+            $this->user_id = request()->query('user_id');
+            $this->modalMessage = 'Usuario no encontrado.';
             $this->modal = true;
 
             return;
         }
 
-        $this->careers = $user->careers;
-
         if ($this->careers->isEmpty()) {
             if (auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
+                $this->modalMessage = 'El usuario seleccionado no tiene una carrera asignada. Asigne una carrera antes de matricularlo.';
                 $this->modal = true;
             } else {
                 $this->blocked = true;
@@ -45,68 +48,68 @@ class Enrollment extends Component
             return;
         }
 
-        $careerId = (session()->has('career_id')) ? session('career_id') : $this->careers->first()->id;
-
-        $this->careerId = $careerId;
-
-        // Cargar las materias de la carrera
-        $this->loadSubjects();
-        $this->loadEnrollments();
+        if (! $this->careerId) {
+            $this->careerId = $this->careers->first()->id;
+        }
     }
 
-    public function getUser()
+    #[Computed]
+    public function targetUser()
     {
-        if (session()->has('user_id')) {
-            $user = User::find(session('user_id'));
-        } else {
-            $user = auth()->user();
-            // save user to session
+        return $this->getTargetUser($this->user_id);
+    }
+
+    #[Computed]
+    public function careers()
+    {
+        return $this->targetUser->careers;
+    }
+
+    #[Computed]
+    public function subjects()
+    {
+        if (! $this->careerId) {
+            return collect();
         }
 
-        return $user;
+        return Subject::where('career_id', $this->careerId)->get();
     }
 
-    public function loadSubjects()
+    #[Computed]
+    public function enrolledSubjectIds()
     {
-        $this->subjects = Subject::where('career_id', $this->careerId)->get();
-    }
+        if (! $this->targetUser || ! $this->careerId) {
+            return [];
+        }
 
-    public function loadEnrollments()
-    {
-        $user_id = $this->getUser()->id;
-        $this->enrolledSubjects = \App\Models\Enrollment::where('user_id', $user_id)
+        return \App\Models\Enrollment::where('user_id', $this->targetUser->id)
             ->whereHas('subject', function ($query) {
                 $query->where('career_id', $this->careerId);
             })
-            ->pluck('subject_id') // Solo obtiene los IDs de las materias matriculadas
+            ->pluck('subject_id')
             ->toArray();
     }
 
     public function toggleEnrollment($subjectId)
     {
-        $user_id = $this->getUser()->id;
-        if (in_array($subjectId, $this->enrolledSubjects)) {
-            // Si ya está matriculado, eliminar la inscripción
-            \App\Models\Enrollment::where('user_id', $user_id)
+        $targetId = $this->targetUser->id;
+
+        if (in_array($subjectId, $this->enrolledSubjectIds)) {
+            \App\Models\Enrollment::where('user_id', $targetId)
                 ->where('subject_id', $subjectId)
                 ->delete();
-            $this->enrolledSubjects = array_diff($this->enrolledSubjects, [$subjectId]);
+            $this->success('Desmatriculado correctamente.');
         } else {
-            // Si no está matriculado, agregar la inscripción
             \App\Models\Enrollment::create([
-                'user_id' => $user_id,
+                'user_id' => $targetId,
                 'subject_id' => $subjectId,
-                'status' => 'active', // Por defecto
+                'status' => 'active',
             ]);
-            $this->enrolledSubjects[] = $subjectId;
+            $this->success('Matriculado correctamente.');
         }
-    }
 
-    public function updated()
-    {
-        $this->loadSubjects();
-        $this->loadEnrollments();
-        $this->skipMount();
+        // Clear computed property cache to reflect changes in UI
+        unset($this->enrolledSubjectIds);
     }
 
     public function render()

@@ -1,15 +1,16 @@
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 
     @if($showCareerWarning)
-        <x-alert title="Advertencia: Usuario sin carrera asociada. Informe a la Institución" icon="o-exclamation-triangle"
+        <x-alert title="Advertencia: Usuario sin carrera asociada. Informe a la Institución" icon="o-exclamation-triangle"
             class="alert-warning md:col-span-2 mb-4" />
     @endif
-    <x-card title="{{ config('app.name') }}" shadow-md class="bg-base-200">
+
+    {{-- Panel de Ciclo Lectivo --}}
+    <x-card title="{{ config('app.name') }}" shadow-md class="bg-primary/5 border-t-4 border-t-primary">
         {{-- Select Cycle Year --}}
-        <x-input label="Ciclo lectivo" wire:model="cycleYear" icon="o-calendar" type="number" min="2023" max="2030"
+        <x-input label="Ciclo lectivo" wire:model.live="cycle_id" icon="o-calendar" type="number" min="2023" max="2030"
             step="1">
             <x-slot:append>
-                {{-- Add `rounded-s-none` class (RTL support) --}}
                 <x-button label="Cambiar" icon="o-check" class="btn-primary rounded-r" wire:click="saveCycleYear" />
             </x-slot:append>
         </x-input>
@@ -35,25 +36,31 @@
             @endif
         </div>
     </x-card>
-    <x-card title="Opciones Rápidas" shadow-md class="bg-base-200">
-        LIBROS DE TEMAS
-        <x-select label="Materias" wire:model.live="subject_id" :options="$this->subjects" option-label="full_name"
+
+    {{-- Panel de Mis Materias --}}
+    <x-card title="Mis Materias" shadow-md class="bg-orange-500/5 border-t-4 border-t-orange-500">
+        <div class="mb-2 font-semibold text-orange-600 flex items-center gap-2">
+            <x-icon name="o-book-open" class="w-4 h-4" />
+            GESTIÓN DE CLASES
+        </div>
+        <x-select label="Seleccionar Materia" wire:model.live="subject_id" :options="$this->subjects" option-label="full_name"
             option-value="id" icon="o-queue-list" />
-        <div class="flex items-center mt-1 space-x-2">
-            <x-button label="LIBRO" icon="o-book-open" class="btn-primary" wire:model="subject_id"
-                link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}" external no-wire-navigate />
-            <x-button label="CONTENIDO" icon="o-document-text" class="btn-primary"
-                link="/simplified-content/{{ $subject_id }}" no-wire-navigate />
+        <div class="grid grid-cols-2 gap-2 mt-4">
+            <x-button label="VER LIBRO" icon="o-book-open" class="btn-warning btn-sm text-white w-full" 
+                link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}?cycle={{ $this->cycleYear }}" 
+                external no-wire-navigate />
+            <x-button label="CONTENIDO" icon="o-document-text" class="btn-outline border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white btn-sm w-full"
+                link="/subjects-content/{{ $subject_id }}" no-wire-navigate />
         </div>
     </x-card>
 
     @if(auth()->user()->hasRole('student') && $this->nextPayment)
-        <x-card title="Próximo Pago Pendiente" shadow-md>
+        <x-card title="Próximo Pago Pendiente" shadow-md class="bg-warning/5 border-t-4 border-t-warning">
             <div class="flex justify-between items-center">
                 <div>
                     <h3 class="text-lg font-bold">{{ $this->nextPayment->title }}</h3>
                     <p class="text-sm">Vencimiento: {{ \Carbon\Carbon::parse($this->nextPayment->date)->format('d/m/Y') }}</p>
-                    <p class="text-xl font-bold mt-2">Monto:
+                    <p class="text-xl font-bold mt-2 text-warning">Monto:
                         ${{ number_format($this->nextPayment->amount - $this->nextPayment->paid, 2) }}</p>
                 </div>
                 <div>
@@ -66,7 +73,8 @@
     <div class="md:col-span-2">
         <livewire:upcoming-exams />
     </div>
-    <div class="w-full text-xs text-primary">
+    
+    <div class="w-full text-xs text-primary opacity-50 mt-4">
         fwk:{{ app()->version() }}/{{ phpversion() }}/{{ env('APP_ENV') }}/{{ env('APP_DEBUG') == 1 ? 'Debug' : 'Release' }}
     </div>
 

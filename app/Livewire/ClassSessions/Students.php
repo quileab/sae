@@ -6,14 +6,17 @@ use App\Models\ClassSession;
 use App\Models\Enrollment;
 use App\Models\Grade;
 use App\Models\User;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Students extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public string $search = '';
 
@@ -31,33 +34,50 @@ class Students extends Component
 
     public $data = [];
 
+    #[Url(as: 'subject_id')]
+    public $subject_id = null;
+
+    #[Computed]
+    public function subject()
+    {
+        return \App\Models\Subject::find($this->subject_id);
+    }
+
     public function mount($id = null)
     {
-        // check if user is logged in and has teacher role
-        if (! auth()->user()->hasAnyRole(['teacher', 'admin', 'principal', 'director', 'administrative'])) {
-            return redirect()->back();
-        }
+        $this->authorizeStaff();
+        $user = auth()->user();
 
-        if (session()->get('subject_id', false) == false) {
-            $this->redirect('/class-sessions');
-        }
         if ($id !== null) {
-            $this->class_session = ClassSession::find($id);
+            $this->class_session = ClassSession::findOrFail($id);
+            if (! $this->subject_id) {
+                $this->subject_id = $this->class_session->subject_id;
+            }
         } else {
+            // Si no hay subject_id por URL, intentar sesión o primera materia disponible
+            if (! $this->subject_id) {
+                $this->subject_id = session('subject_id') ?? ($user->subjects->first()->id ?? null);
+            }
+
+            if (! $this->subject_id) {
+                $this->redirect('/class-sessions');
+
+                return;
+            }
+
             $this->class_session = new ClassSession;
             $this->class_session->id = null;
-            $this->class_session->subject_id = session('subject_id');
-            $this->class_session->teacher_id = session('user_id');
+            $this->class_session->subject_id = $this->subject_id;
+            $this->class_session->teacher_id = $user->id;
             $this->class_session->date = now();
             $this->class_session->class_number = 0;
             $this->class_session->unit = '';
             $this->class_session->content = '';
         }
-        // check if class session subject_id belongs to this user
-        if (
-            $this->class_session->subject_id != session('subject_id') ||
-            auth()->user()->hasSubject(session('subject_id')) == false
-        ) {
+
+        $this->authorizeSubject($this->subject_id);
+
+        if ($this->class_session->subject_id != $this->subject_id) {
             $this->redirect('/class-sessions');
         }
     }
@@ -77,10 +97,10 @@ class Students extends Component
         ];
     }
 
+    #[Computed]
     public function items(): Collection
     {
         $search = Str::of($this->search)->lower()->ascii();
-        $subjectId = session('subject_id');
 
         $query = User::query()
             ->select('users.id', 'users.lastname', 'users.firstname', 'users.email', 'users.phone')
@@ -89,29 +109,43 @@ class Students extends Component
                 $join->on('users.id', '=', 'grades.user_id')
                     ->where('grades.class_session_id', '=', $this->class_session->id);
             })
-            ->where('enrollments.subject_id', $subjectId)
+            ->where('enrollments.subject_id', $this->subject_id)
             ->where('enrollments.status', 'active')
             ->where('users.role', $this->role_student)
             ->orderBy($this->sortBy['column'], $this->sortBy['direction'])
             ->addSelect('grades.grade as grade', 'grades.attendance as attendance');
 
+        if ($this->search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('lastname', 'like', '%'.$search.'%')
+                    ->orWhere('firstname', 'like', '%'.$search.'%');
+            });
+        }
+
         return $query->get();
     }
 
-    public function attendance($item): void
+    public function attendance($userId): void
     {
         if (isset($this->class_session->id) == false) {
             $this->error('No se ha seleccionado una clase.');
 
             return;
         }
-        $this->data = $item;
+
+        $user = User::find($userId);
+        if (!$user) {
+            $this->error('Usuario no encontrado.');
+            return;
+        }
+
+        $this->data = $user->toArray();
         try {
-            $grade = Grade::where('user_id', $item['id'])
+            $grade = Grade::where('user_id', $userId)
                 ->where('class_session_id', $this->class_session->id)
                 ->first();
             $this->grades = $grade ? $grade->toArray() : [
-                'user_id' => $item['id'],
+                'user_id' => $userId,
                 'class_session_id' => $this->class_session->id,
                 'attendance' => 0,
                 'grade' => 0,
@@ -120,7 +154,7 @@ class Students extends Component
             ];
         } catch (\Throwable $th) {
             $this->grades = [
-                'user_id' => $item['id'],
+                'user_id' => $userId,
                 'class_session_id' => $this->class_session->id,
                 'attendance' => 0,
                 'grade' => 0,
@@ -131,9 +165,9 @@ class Students extends Component
         $this->drawer = true;
     }
 
-    public function attendanceSet($item, $value): void
+    public function attendanceSet($userId, $value): void
     {
-        $this->attendance($item);
+        $this->attendance($userId);
         $this->saveGrade($value);
     }
 
@@ -142,36 +176,68 @@ class Students extends Component
         if ($value !== null) {
             $this->grades['attendance'] = $value;
         }
+        
         $this->validate([
             'grades.attendance' => ['required', 'integer', 'min:0', 'max:100'],
             'grades.grade' => ['required', 'integer', 'min:0', 'max:10'],
             'grades.comments' => ['nullable', 'string', 'max:255'],
         ]);
 
-        Grade::updateOrCreate(
-            ['user_id' => $this->data['id'], 'class_session_id' => $this->class_session->id],
-            [
-                'user_id' => $this->data['id'],
-                'class_session_id' => $this->class_session->id,
-                'attendance' => $this->grades['attendance'],
-                'grade' => $this->grades['grade'],
-                'approved' => $this->grades['approved'],
-                'comments' => $this->grades['comments'],
-            ]
-        );
+        $attendance = (int) $this->grades['attendance'];
+        $gradeValue = (int) $this->grades['grade'];
+        $approved = (int) ($this->grades['approved'] ?? 0);
+        $comments = trim($this->grades['comments'] ?? '');
+
+        // Economy/Optimization: If all values are zero/empty, delete the record to save space
+        if ($attendance === 0 && $gradeValue === 0 && $approved === 0 && empty($comments)) {
+            Grade::where('user_id', $this->data['id'])
+                ->where('class_session_id', $this->class_session->id)
+                ->delete();
+        } else {
+            Grade::updateOrCreate(
+                ['user_id' => $this->data['id'], 'class_session_id' => $this->class_session->id],
+                [
+                    'user_id' => $this->data['id'],
+                    'class_session_id' => $this->class_session->id,
+                    'attendance' => $attendance,
+                    'grade' => $gradeValue,
+                    'approved' => $approved,
+                    'comments' => $comments,
+                ]
+            );
+        }
+
         $this->drawer = false;
         $this->success('Registrado.');
+        
+        // Refrescar la propiedad computada para reflejar el cambio (especialmente si se eliminó)
+        unset($this->items);
+    }
+
+    public bool $profileModal = false;
+
+    public $studentProfile = null;
+
+    public function viewProfile($userId): void
+    {
+        $this->studentProfile = User::with('careers')->find($userId);
+        if ($this->studentProfile) {
+            $this->profileModal = true;
+        } else {
+            $this->error('Estudiante no encontrado.');
+        }
     }
 
     public function bookmark($id): void
     {
         $this->dispatch('bookmarked', ['type' => 'user_id', 'value' => $id]);
+        $this->success('Usuario marcado como contexto actual.');
     }
 
     public function deregister(): void
     {
         Enrollment::where('user_id', $this->data['id'])
-            ->where('subject_id', session('subject_id'))
+            ->where('subject_id', $this->subject_id)
             ->delete();
         $this->success('Estudiante desmatriculado.');
         $this->drawer = false;
@@ -180,7 +246,6 @@ class Students extends Component
     public function render()
     {
         return view('livewire.class_sessions.students', [
-            'items' => $this->items(),
             'headers' => $this->headers(),
         ]);
     }

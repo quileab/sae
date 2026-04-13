@@ -4,30 +4,41 @@ namespace App\Livewire\Subjects;
 
 use App\Models\Career;
 use App\Models\Subject;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class TableCrud extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
-    public $career_id;
-
-    public $careers;
+    #[Url]
+    public $career_id = null;
 
     public $subjects = [];
 
     public function mount()
     {
-        $this->careers = Career::all();
-        $this->career_id = session('career_id') ?? ($this->careers->first()->id ?? null);
+        $this->authorizeStaff();
+
+        if (! $this->career_id && $this->careers->isNotEmpty()) {
+            $this->career_id = $this->careers->first()->id;
+        }
+
         $this->loadSubjects();
+    }
+
+    #[Computed]
+    public function careers()
+    {
+        return Career::all();
     }
 
     public function updatedCareerId()
     {
-        session(['career_id' => $this->career_id]);
         $this->loadSubjects();
     }
 
@@ -52,6 +63,8 @@ class TableCrud extends Component
 
     public function save($index)
     {
+        $this->authorizeStaff();
+
         $data = $this->subjects[$index];
 
         try {
@@ -81,6 +94,8 @@ class TableCrud extends Component
 
     public function delete($index)
     {
+        $this->authorizeStaff();
+
         $id = $this->subjects[$index]['original_id'];
         Subject::where('id', $id)->delete();
         $this->success('Materia eliminada.');
@@ -89,26 +104,24 @@ class TableCrud extends Component
 
     public function add()
     {
+        $this->authorizeStaff();
+
         if (! $this->career_id) {
             $this->error('Seleccione una carrera primero.');
 
             return;
         }
 
-        // Logic: Try career_id * 100 + 1 as the starting point for each career
-        // But ensure it's higher than the current max ID for this career to follow sequence
-        // And higher than any existing ID globally just to be safe from collisions
         $logicalStart = $this->career_id * 100;
         $maxInCareer = Subject::where('career_id', $this->career_id)->max('id');
-        
+
         $newId = $maxInCareer ? $maxInCareer + 1 : $logicalStart + 1;
 
-        // Final check to prevent collisions if IDs were used out of order
         while (Subject::where('id', $newId)->exists()) {
             $newId++;
         }
 
-        $newSubject = Subject::create([
+        Subject::create([
             'id' => $newId,
             'career_id' => $this->career_id,
             'name' => 'Nueva Materia',

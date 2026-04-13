@@ -4,12 +4,15 @@ namespace App\Livewire\Subjects;
 
 use App\Models\Career;
 use App\Models\Subject;
+use App\Traits\AuthorizesAccess;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Crud extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public $original_id = null;
 
@@ -20,62 +23,54 @@ class Crud extends Component
         'prerequisite' => '',
     ];
 
-    public $careers;
-
-    public $subjects;
-
     public $subjectsToStudy = [];
 
     public $subjectsToExam = [];
 
     public function mount($id = null)
     {
-        if ($id === null) {
-            $id = session('subject_id');
-        }
+        $this->authorizeStaff();
 
         if ($id !== null) {
-            $subject = Subject::find($id);
-            if ($subject) {
-                $this->data = $subject->toArray();
-                $this->original_id = $id;
-            }
+            $subject = Subject::findOrFail($id);
+            $this->data = $subject->toArray();
+            $this->original_id = $id;
         }
 
-        $this->careers = Career::all();
-        $this->refreshSubjects();
         $this->createPrequisite();
     }
 
-    public function updatedDataCareerId()
+    #[Computed]
+    public function careers()
     {
-        $this->refreshSubjects();
+        return Career::all();
     }
 
-    public function refreshSubjects()
+    #[Computed]
+    public function subjects()
     {
         if ($this->data['career_id']) {
-            $this->subjects = Subject::where('career_id', $this->data['career_id'])
+            return Subject::where('career_id', $this->data['career_id'])
                 ->where('id', '!=', $this->data['id'])
                 ->get();
-        } else {
-            $this->subjects = collect();
         }
+
+        return collect();
     }
 
     public function save()
     {
+        $this->authorizeStaff();
+
         // If we are editing and the ID has changed
         if ($this->original_id && $this->data['id'] != $this->original_id) {
-            // Check if the new ID already exists to avoid conflict
             if (Subject::where('id', $this->data['id'])->exists()) {
                 $this->error('El nuevo ID ya está en uso por otra materia.');
 
                 return;
             }
 
-            // Perform manual update of the ID directly in DB to trigger ON UPDATE CASCADE
-            \Illuminate\Support\Facades\DB::table('subjects')
+            DB::table('subjects')
                 ->where('id', $this->original_id)
                 ->update(['id' => $this->data['id']]);
         }
@@ -88,6 +83,8 @@ class Crud extends Component
 
     public function delete()
     {
+        $this->authorizeStaff();
+
         $item = Subject::find($this->data['id']);
         if ($item) {
             $item->delete();
@@ -99,22 +96,16 @@ class Crud extends Component
 
     private function createPrequisite()
     {
-        // if prerequisite not empty, and array is empty, create arrays
         if (! empty($this->data['prerequisite']) && empty($this->subjectsToStudy) && empty($this->subjectsToExam)) {
-            // split prerequisite study/exam by '/'
             $prerequisite = explode('/', $this->data['prerequisite']);
-
-            // split prerequisite study/exam by ' '
             $this->subjectsToStudy = explode(' ', $prerequisite[0]);
-            $this->subjectsToExam = explode(' ', $prerequisite[1]);
+            $this->subjectsToExam = isset($prerequisite[1]) ? explode(' ', $prerequisite[1]) : [];
         }
 
-        // order by value subjectsStudy and subjectsToExam
         sort($this->subjectsToStudy);
         sort($this->subjectsToExam);
-        // Create prequisite string from array of subjects
-        $this->data['prerequisite'] =
-            implode(' ', $this->subjectsToStudy).'/'.implode(' ', $this->subjectsToExam);
+
+        $this->data['prerequisite'] = implode(' ', $this->subjectsToStudy).'/'.implode(' ', $this->subjectsToExam);
     }
 
     public function toggleSubjectTo($to, $subject_id)

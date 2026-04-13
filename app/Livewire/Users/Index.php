@@ -57,9 +57,9 @@ class Index extends Component
             })->take(20);
     }
 
-    public function bookmark($id): void
+    public function selectForEnrollment($id): void
     {
-        $this->dispatch('bookmarked', ['type' => 'user_id', 'value' => $id]);
+        $this->redirect('/enrollments?user_id='.$id);
     }
 
     public function render()

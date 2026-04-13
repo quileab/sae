@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Traits\AuthorizesAccess;
 use App\Models\Configs;
 use App\Models\User;
 use App\Models\UserPayments;
@@ -9,15 +10,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 #[Lazy]
 class Dashboard extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
-    public $cycleYear = null;
+    #[Url]
+    public $cycle_id = null;
 
     public $subject_id;
 
@@ -34,28 +37,27 @@ class Dashboard extends Component
 
         $user = Auth::user();
 
+        // Cycle ID initialization (URL > Default)
+        if (! $this->cycle_id) {
+            $this->cycle_id = $this->getCycleId();
+        }
+
         // Check if user has no career (only for students)
         if ($user->hasRole('student')) {
-            // Eagerly check for careers to avoid N+1 if this was in a loop,
-            // but here it's just one check. Still, let's keep it clean.
             if ($user->careers()->count() == 0) {
                 $this->showCareerWarning = true;
             }
         }
 
-        // if session cycle is set, use it
-        if (session()->has('cycle_id')) {
-            $this->cycleYear = session('cycle_id');
-        } else {
-            // if not, set it to the current year
-            $this->cycleYear = date('Y');
-            session()->put('cycle_id', $this->cycleYear);
-            session()->put('cycle_name', $this->cycleYear);
-        }
-
         if ($this->subjects->isNotEmpty()) {
             $this->subject_id = $this->subjects->first()->id;
         }
+    }
+
+    #[Computed]
+    public function cycleYear()
+    {
+        return $this->cycle_id ?: $this->getCycleId();
     }
 
     #[Computed]
@@ -99,11 +101,9 @@ class Dashboard extends Component
 
     public function saveCycleYear(): void
     {
-        $id = $this->cycleYear;
-        // emit change
-        $this->dispatch('bookmarked', ['type' => 'cycle_id', 'value' => $id]);
-
-        $this->success("Ciclo lectivo cambiado a $id", position: 'toast-bottom toast-end');
+        session()->put('cycle_id', $this->cycle_id);
+        $this->dispatch('cycle-updated', cycle: $this->cycle_id);
+        $this->success("Ciclo lectivo aplicado: $this->cycle_id", position: 'toast-bottom toast-end');
     }
 
     public function placeholder()

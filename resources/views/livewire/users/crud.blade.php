@@ -20,7 +20,7 @@
             <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
                 <x-input label="E-mail" type="email" wire:model="data.email" />
                 <x-input label="Teléfono" type="tel" wire:model="data.phone" />
-                <x-select label="Rol" icon="o-user" :options="$roles" wire:model="data.role" option-value="name"
+                <x-select label="Rol" icon="o-user" :options="$this->roles" wire:model="data.role" option-value="name"
                     option-label="alias" />
             </div>
 
@@ -44,7 +44,7 @@
             </div>
 
             <x-form wire:submit.prevent="assignCareer" no-separator>
-                <x-select label="Carrera Disponibles" icon="o-academic-cap" :options="$careers" wire:model.lazy="career_id">
+                <x-select label="Carrera Disponibles" icon="o-academic-cap" :options="$this->careers" wire:model.lazy="career_id">
                     <x-slot:append>
                         <x-button label="Asignar" icon="o-plus" class="rounded-s-none btn-primary" type="submit"
                             spinner="assignCareer" />

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,7 +13,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
@@ -121,19 +122,23 @@ class User extends Authenticatable
         return $this->hasMany('App\Models\PaymentRecord');
     }
 
-    public function hasRole($role)
+    public function hasRole(string $role): bool
     {
         return $this->role === $role;
     }
 
-    public function hasNotRole($role)
+    public function hasAnyRole(array|string $roles): bool
     {
-        return $this->role !== $role;
+        if (is_string($roles)) {
+            return $this->hasRole($roles);
+        }
+
+        return in_array($this->role, $roles);
     }
 
-    public function hasAnyRole($roles)
+    public function isStaff(): bool
     {
-        return in_array($this->role, $roles);
+        return $this->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor', 'treasurer']);
     }
 
     // full name attribute

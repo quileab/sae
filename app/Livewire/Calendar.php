@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Lazy]
@@ -18,15 +19,32 @@ class Calendar extends Component
 
     public $selectedEvent = null;
 
-    public $career_id;
+    #[Url]
+    public $career_id = null;
+
+    #[Url(as: 'day')]
+    public $date_string = null;
 
     public function mount()
     {
-        $this->date = Carbon::now();
         $user = auth()->user();
 
-        if ($user->hasRole('student')) {
-            $careers = $user->careers ?? collect();
+        // Initialize date from URL or current time
+        if ($this->date_string) {
+            try {
+                $this->date = Carbon::parse($this->date_string);
+            } catch (\Exception $e) {
+                $this->date = Carbon::now();
+                $this->date_string = $this->date->toDateString();
+            }
+        } else {
+            $this->date = Carbon::now();
+            $this->date_string = $this->date->toDateString();
+        }
+
+        // Default career for students if not in URL
+        if (! $this->career_id && $user->hasRole('student')) {
+            $careers = $this->careers;
             if ($careers->isNotEmpty()) {
                 $this->career_id = $careers->first()->id;
             }
@@ -56,11 +74,13 @@ class Calendar extends Component
     public function previousMonth()
     {
         $this->date->subMonth();
+        $this->date_string = $this->date->toDateString();
     }
 
     public function nextMonth()
     {
         $this->date->addMonth();
+        $this->date_string = $this->date->toDateString();
     }
 
     #[Computed]

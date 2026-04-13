@@ -2,15 +2,19 @@
 
 namespace App\Livewire\Subjects;
 
+use App\Models\Career;
 use App\Models\Subject;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
 class Index extends Component
 {
-    use Toast;
+    use AuthorizesAccess, Toast;
 
     public string $search = '';
 
@@ -18,30 +22,44 @@ class Index extends Component
 
     public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
 
-    public $career_id;
-
-    public $careers;
+    #[Url]
+    public $career_id = null;
 
     public function mount(): void
     {
-        $this->careers = \App\Models\Career::all();
-        // if session career_id is set, use it
-        if (session()->has('career_id')) {
-            $this->career_id = session('career_id');
-        } elseif ($this->careers->isNotEmpty()) {
+        $this->authorizeStaff();
+
+        if (! $this->career_id && $this->careers->isNotEmpty()) {
             $this->career_id = $this->careers->first()->id;
         }
     }
 
-    public function clear(): void
+    #[Computed]
+    public function careers()
     {
-        $this->reset();
-        $this->success('Filters cleared.', position: 'toast-bottom');
+        return Career::all();
     }
 
-    public function delete($id): void
+    #[Computed]
+    public function subjects(): Collection
     {
-        $this->warning("Will delete #$id", 'It is fake.', position: 'toast-bottom');
+        $search = Str::of($this->search)->lower()->ascii();
+
+        return Subject::where('career_id', $this->career_id)
+            ->when($this->search, function ($query) use ($search) {
+                return $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('id', 'like', '%'.$search.'%');
+                });
+            })
+            ->get()
+            ->sortBy($this->sortBy['column'], SORT_REGULAR, $this->sortBy['direction'] === 'desc');
+    }
+
+    public function clear(): void
+    {
+        $this->reset(['search', 'drawer']);
+        $this->success('Filtros limpiados.', position: 'toast-bottom');
     }
 
     public function headers(): array
@@ -52,37 +70,11 @@ class Index extends Component
         ];
     }
 
-    public function subjects(): Collection
-    {
-        $search = Str::of($this->search)->lower()->ascii();
-
-        return Subject::get()
-            ->where('career_id', $this->career_id)
-            ->sortBy($this->sortBy)
-            ->when($this->search, function (Collection $collection) use ($search) {
-                return $collection->filter(function ($item) use ($search) {
-                    $fullSearch = Str::of($item['name'].' '.$item['id'])->lower()->ascii();
-
-                    return $fullSearch->contains($search);
-                });
-            });
-    }
-
-    public function updated($career_id, $value)
-    {
-        $this->subjects();
-    }
-
-    public function bookmark($id): void
-    {
-        $this->dispatch('bookmarked', ['type' => 'subject_id', 'value' => $id]);
-    }
-
     public function render()
     {
         return view('livewire.subjects.index', [
-            'subjects' => $this->subjects(),
             'headers' => $this->headers(),
+            'subjects' => $this->subjects,
         ]);
     }
 }

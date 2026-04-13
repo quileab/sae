@@ -46,8 +46,9 @@
             {{-- MENU --}}
             <x-menu activate-by-route>
 
-                {{-- SETEO User --}}
-                @if($user = auth()->user())
+                @auth
+                    @php $user = auth()->user(); @endphp
+                    {{-- SETEO User --}}
                     <x-list-item :item="$user" value="name" sub-value="email" no-separator no-hover
                         class="-mx-2 !-mt-2 rounded bg-black/20">
                         <x-slot:actions>
@@ -57,63 +58,75 @@
                                 tooltip-left="SALIR" no-wire-navigate link="/logout" />
                         </x-slot:actions>
                     </x-list-item>
+                    
                     <livewire:bookmarks />
-                @endif
 
-                <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
-                <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" no-wire-navigate />
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
-                    <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
-                @endif
-                @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
-                    <x-menu-item title="Usuarios" icon="o-users" link="/users" />
-                    <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
-                        <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
-                        <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
-                        <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
-                    </x-menu-sub>
-                @endif
-                @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
-                    <x-menu-sub title="Clases" icon="o-document-duplicate">
-                        <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
-                        <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
-                    </x-menu-sub>
-                @endif
-                @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
-                    <x-menu-sub title="Biblioteca" icon="o-book-open">
-                        <x-menu-item title="Libros" icon="o-book-open" link="/books" />
-                        <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
-                    </x-menu-sub>
+                    <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
+                    
+                    <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" no-wire-navigate />
+                    
+                    @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
+                        <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
+                    @endif
 
-                    <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
+                    @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                        <x-menu-item title="Usuarios" icon="o-users" link="/users" />
+                        <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
+                            <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
+                            <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
+                            <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
+                        </x-menu-sub>
+                    @endif
+
+                    @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
+                        <x-menu-sub title="Clases" icon="o-document-duplicate">
+                            <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
+                            <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
+                            <x-menu-item title="Contenidos" icon="o-academic-cap" link="/subjects-content" />
+                        </x-menu-sub>
+                    @endif
+
+                    @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                        <x-menu-sub title="Biblioteca" icon="o-book-open">
+                            <x-menu-item title="Libros" icon="o-book-open" link="/books" />
+                            <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
+                        </x-menu-sub>
+
+                        <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
+                            <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
+                            <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
+                            <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
+                        </x-menu-sub>
+                        
+                        <x-menu-sub title="Pagos" icon="o-currency-dollar">
+                            <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments" />
+                            <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
+                            <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
+                            <x-menu-item title="Reporte de Deudas" icon="o-exclamation-circle" link="/report-debts" />
+                        </x-menu-sub>
+                        
+                        <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
+                            <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
+                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
+                            <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
+                        </x-menu-sub>
+                    @endif
+
+                    @if($user->hasAnyRole(['student']))
+                        <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
+                        <x-menu-item title="Matricularse" icon="o-academic-cap" link="/enrollments" />
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
+                        <x-menu-item title="Mis Pagos" icon="o-currency-dollar" link="{{ route('my-payment-plan') }}" />
+                    @endif
+
+                    @if($user->hasAnyRole(['teacher']))
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
-                        <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
-                    </x-menu-sub>
-                    <x-menu-sub title="Pagos" icon="o-currency-dollar">
-                        <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments" />
-                        <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
-                        <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
-                        <x-menu-item title="Reporte de Deudas" icon="o-exclamation-circle" link="/report-debts" />
-                    </x-menu-sub>
-                    <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
-                        <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
-                        <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
-                        <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
-                    </x-menu-sub>
-                @endif
-                @if($user->hasAnyRole(['student']))
-                    <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
-                    <x-menu-item title="Matricularse" icon="o-academic-cap" link="/enrollments" />
-                    <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
-                    <x-menu-item title="Mis Pagos" icon="o-currency-dollar" link="{{ route('my-payment-plan') }}" />
-                @endif
-                @if($user->hasAnyRole(['teacher']))
-                    <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
-                @endif
-                @if($user->hasAnyRole(['preceptor', 'admin', 'principal']))
-                    <x-menu-item title="Asistencia" icon="o-clipboard-document-check" link="/attendance" />
-                @endif
+                    @endif
+
+                    @if($user->hasAnyRole(['preceptor', 'admin', 'principal']))
+                        <x-menu-item title="Asistencia" icon="o-clipboard-document-check" link="/attendance" />
+                    @endif
+                @endauth
 
             </x-menu>
         </x-slot:sidebar>
@@ -127,6 +140,77 @@
     {{-- TOAST area --}}
     <x-toast />
     @stack('scripts')
+
+    {{-- Lógica de Sincronización LocalStorage --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const keys = ['cycle_id', 'user_id', 'career_id', 'subject_id'];
+            const sessions = {
+                cycle_id: {{ json_encode(session('cycle_id')) }},
+                user_id: {{ json_encode(session('user_id')) }},
+                career_id: {{ json_encode(session('career_id')) }},
+                subject_id: {{ json_encode(session('subject_id')) }}
+            };
+
+            // Inicializar cycle_id si no existe
+            if (!localStorage.getItem('cycle_id')) {
+                localStorage.setItem('cycle_id', sessions.cycle_id || new Date().getFullYear());
+            }
+
+            // Sincronizar contexto en LOTE (Batch) para reducir roundtrips
+            const toSync = [];
+            keys.forEach(key => {
+                const val = localStorage.getItem(key);
+                if (val && val != sessions[key]) {
+                    toSync.push({ 
+                        type: key, 
+                        value: val, 
+                        name: localStorage.getItem(key + '_name') // Enviar nombre cacheado
+                    });
+                }
+            });
+
+            if (toSync.length > 0) {
+                window.Livewire.dispatch('context-batch-sync', { items: toSync });
+            }
+
+            // Actualizar visualmente el Dashboard en el menú
+            const updateDashboardUI = () => {
+                const dashboardTitle = document.querySelector('[title^="Dashboard"]');
+                if (dashboardTitle) {
+                    const cycle = localStorage.getItem('cycle_id');
+                    dashboardTitle.innerText = `Dashboard ${cycle}`;
+                }
+            };
+            
+            updateDashboardUI();
+
+            // Escuchar actualizaciones de contexto
+            window.addEventListener('context-updated', event => {
+                localStorage.setItem(event.detail.type, event.detail.value);
+                if (event.detail.name) {
+                    localStorage.setItem(event.detail.type + '_name', event.detail.name);
+                }
+                if (event.detail.type === 'cycle_id') updateDashboardUI();
+                
+                // Si se actualizó la materia, recargar para que aparezca "Contenidos" en el menú
+                if (event.detail.type === 'subject_id') {
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            });
+
+            window.addEventListener('context-cleared', event => {
+                localStorage.removeItem(event.detail.type);
+                localStorage.removeItem(event.detail.type + '_name');
+                if (event.detail.type === 'subject_id') window.location.reload();
+            });
+            
+            window.addEventListener('cycle-updated', event => {
+                localStorage.setItem('cycle_id', event.detail.cycle);
+                updateDashboardUI();
+            });
+        });
+    </script>
 </body>
 
 </html>

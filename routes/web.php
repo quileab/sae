@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\AttendanceSyncController;
-use App\Http\Controllers\BookmarkController;
 use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\print\PrintClassbookController;
 use App\Http\Controllers\print\PrintInscriptionsController;
@@ -69,13 +68,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/inscriptionsPDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'index'])->name('inscriptionsPDF');
     Route::get('/inscriptionsSavePDF/{student}/{career}/{inscription}', [PrintInscriptionsController::class, 'savePDF'])->name('inscriptionsSavePDF');
-    Route::get('/printClassbooks/{subject?}/{id?}', [PrintClassbookController::class, 'printClassbooks'])->name('printclassbooks')->middleware('roles:admin,teacher,principal,director,administrative');
-
-    Route::prefix('bookmark')->group(function () {
-        Route::get('/', [BookmarkController::class, 'index']);        // Ver el bookmark actual
-        Route::post('/update', [BookmarkController::class, 'update']); // Actualizar un bookmark
-        Route::post('/clear', [BookmarkController::class, 'clear']);  // Limpiar los bookmarks
-    });
+    Route::get('/printClassbooks/{subject?}/{id?}', [PrintClassbookController::class, 'printClassbooks'])->name('printclassbooks')->middleware('roles:admin,teacher,principal,director,administrative,student');
 
     // route for pdfs stored in private storage
     Route::get('inscriptions/pdf/{file}', function ($file) {
@@ -131,7 +124,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/print/student-grades-report/{subject_id}', [PrintStudentReportController::class, 'generateGradesReport'])->name('print.student-grades-report')->middleware('roles:admin,teacher,principal,director,administrative');
     Route::get('/print/students-payments', [PrintStudentReportController::class, 'printStudentsPayments'])->name('printStudentsPayments')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/subjects/{subject}/content', SubjectsContent::class)->name('subjects.content')->middleware('roles:admin,teacher,principal,director');
-    Route::get('/subjects/{subject}/content-manager', ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher');
+    Route::get('/subjects-content/{subject?}', ContentManager::class)->name('subjects.content-manager')->middleware('roles:admin,teacher,principal,director,administrative,student');
     Route::livewire('/simplified-content/{subject}', 'simplified-content')->name('simplified-content')->middleware('roles:admin,teacher,director,student,principal');
     Route::livewire('/calendar', 'calendar')->name('calendar')->middleware('roles:admin,teacher,principal,director,administrative,student');
     Route::livewire('/attendance', 'attendance.index')->name('attendance')->middleware('roles:preceptor,admin,principal,director,administrative');

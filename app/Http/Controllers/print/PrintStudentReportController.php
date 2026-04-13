@@ -151,11 +151,7 @@ class PrintStudentReportController extends Controller
 
     private function getStudentGrades($student, $subject)
     {
-        $cycle = session('cycle');
-        if (! $cycle) {
-            $cycle = Configs::getValue('cycle')[0]->value ?? date('Y');
-            session(['cycle' => $cycle]);
-        }
+        $cycle = Configs::getValue('cycle')[0]->value ?? date('Y');
 
         $classSessions = ClassSession::where('subject_id', $subject->id)
             ->where('unit', '!=', '0')

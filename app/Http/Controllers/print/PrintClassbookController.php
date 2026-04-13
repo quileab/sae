@@ -18,27 +18,27 @@ class PrintClassbookController extends Controller
         }
 
         // Authorization check: Only admins or the user themselves
-        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor']) && auth()->id() != $user) {
+        $authUser = auth()->user();
+        if (! $authUser->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor', 'teacher']) && $authUser->id != $user) {
             abort(403, 'No tienes permiso para ver el libro de clases de otro usuario.');
         }
 
-        if (! $subject || ! is_numeric($subject)) {
-            $subject = session('subject_id', null);
+        // Subject enrollment check for students
+        if ($subject && $authUser->hasRole('student') && ! $authUser->hasSubject($subject)) {
+            abort(403, 'No estás matriculado en esta materia.');
         }
-        // dd('printClassbooks', 'Subj:' . $subject, 'User:' . $user);
+
+        if (! $subject || ! is_numeric($subject)) {
+            $subject = null;
+        }
 
         $config = Configs::where('group', 'main')->get()->pluck('value', 'id')->toArray();
 
-        // if session cycle is set, use it else set it to the current year
-        if (session()->has('cycle')) {
-            $cycle = session('cycle');
-        } else {
-            $cycle = date('Y');
-            session()->put('cycle', $cycle);
-        }
+        // Prioritize: 1. URL Parameter, 2. Session, 3. DB default
+        $cycle = request()->query('cycle') ?? session('cycle_id') ?? (Configs::getValue('cycle')[0]->value ?? date('Y'));
 
-        $dateFrom = session('cycle').'-01-01';
-        $dateTo = session('cycle').'-12-31';
+        $dateFrom = $cycle.'-01-01';
+        $dateTo = $cycle.'-12-31';
 
         // Obtener todas las sesiones de clase para la materia con datos de calificaciones del usuario
         // with user -> teacher_id
