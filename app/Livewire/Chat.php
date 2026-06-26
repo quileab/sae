@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Models\Career;
+use App\Models\Enrollment;
 use App\Models\Message;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -16,27 +19,46 @@ class Chat extends Component
     #[Url]
     public $user_id;
 
+    #[Url]
+    public $subject_id;
+
     public $content = '';
 
+    /** @var string 'user'|'subject'|'career'|'teachers' */
     public $recipient_type = 'user';
 
     public $recipient_id;
 
+    /** @var array<int, array{id: int, name: string}> */
     public $users = [];
 
+    /** @var array<int, array{id: int, name: string}> */
+    public $staffUsers = [];
+
+    /** @var array<int, array{id: int, name: string, career_id: int}> */
     public $subjects = [];
 
     public $selectedSubjectId;
 
+    /** @var array<int, array{id: int, name: string}> */
     public $careers = [];
 
     public $selectedCareerId;
 
+    /** @var array<int, array{id: int, name: string, career_id: int}> */
     public $allSubjects = [];
 
     public $amount = 20;
 
     public $activeTab = 'messages';
+
+    /** @var array{type: string, id: int}|null */
+    public $selectedConversation = null;
+
+    private function isStaff(): bool
+    {
+        return Auth::user()->hasAnyRole(['admin', 'director', 'administrative', 'treasurer', 'preceptor']);
+    }
 
     private function getRoleEmoji(string $role): string
     {
@@ -45,6 +67,9 @@ class Chat extends Component
             'teacher' => '🧑‍🏫',
             'admin' => '👑',
             'director' => '⭐',
+            'administrative' => '🏢',
+            'preceptor' => '📋',
+            'treasurer' => '💰',
             default => '👤',
         };
     }
@@ -59,43 +84,105 @@ class Chat extends Component
     {
         $user = Auth::user();
 
-        $subjects = $user->subjects()->with('career')->get();
+        if ($this->isStaff()) {
+            // El personal administrativo/directivo tiene acceso a todas las carreras y materias.
+            $allCareers = Career::orderBy('name')->get();
 
-        $this->careers = $subjects->pluck('career')->unique('id')->filter()->map(function ($career) {
-            return ['id' => $career->id, 'name' => $career->name];
-        })->sortBy('name')->values()->all();
+            $this->careers = $allCareers->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+            ])->all();
 
-        $this->allSubjects = $subjects->map(function ($subject) {
-            return [
-                'id' => $subject->id,
-                'name' => $subject->name,
-                'career_id' => $subject->career_id,
-            ];
-        })->all();
+            $allSubjectsQuery = Subject::with('career')->orderBy('name')->get();
 
-        $this->subjects = $this->allSubjects;
+            $this->allSubjects = $allSubjectsQuery->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'career_id' => $s->career_id,
+            ])->all();
 
-        if ($user->hasRole('student')) {
+            $this->subjects = $this->allSubjects;
+            $this->users = [];
+        } elseif ($user->hasRole('teacher')) {
+            // Los docentes ven sus materias asignadas.
+            $subjects = $user->subjects()->with('career')->get();
+
+            $this->careers = $subjects->pluck('career')->unique('id')->filter()->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+            ])->sortBy('name')->values()->all();
+
+            $this->allSubjects = $subjects->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'career_id' => $s->career_id,
+            ])->all();
+
+            $this->subjects = $this->allSubjects;
+
+            // Estudiantes de sus materias se cargarán al seleccionar curso.
+            $this->users = [];
+
+            // Personal / Staff para el docente.
+            $this->staffUsers = User::all()
+                ->filter(fn ($u) => $u->isStaff())
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
+                ])
+                ->sortBy('name')
+                ->values()
+                ->all();
+        } elseif ($user->hasRole('student')) {
+            // Los estudiantes ven sus materias y sus docentes + personal administrativo/directivo.
+            $subjects = $user->subjects()->with('career')->get();
+
+            $this->careers = [];
+            $this->allSubjects = $subjects->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'career_id' => $s->career_id,
+            ])->all();
+            $this->subjects = $this->allSubjects;
+
+            // Solo docentes de sus materias.
             $teacherIds = collect();
-            foreach ($user->subjects as $subject) {
-                $teacherIds = $teacherIds->merge($subject->users()->where('role', 'teacher')->pluck('users.id'));
+            foreach ($subjects as $subject) {
+                $teacherIds = $teacherIds->merge(
+                    $subject->users()->where('role', 'teacher')->pluck('users.id')
+                );
             }
 
-            $directorAndAdminIds = User::whereIn('role', ['director', 'admin'])->pluck('id');
+            $this->users = User::whereIn('id', $teacherIds->unique())
+                ->get()
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
+                ])
+                ->sortBy('name')
+                ->values()
+                ->all();
 
-            $allIds = $teacherIds->merge($directorAndAdminIds)->unique();
-
-            $this->users = User::whereIn('id', $allIds)->get()->map(function ($user) {
-                return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role).' '.$user->fullname];
-            })->sortBy('name')->values()->all();
-        } else {
-            // For teachers and admins, users are loaded on subject selection.
-            $this->users = [];
+            // Personal / Staff para el estudiante.
+            $this->staffUsers = User::all()
+                ->filter(fn ($u) => $u->isStaff())
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
+                ])
+                ->sortBy('name')
+                ->values()
+                ->all();
         }
 
-        // Auto-select conversation if user_id is provided in URL
+        // Auto-seleccionar conversación desde URL.
         if ($this->user_id) {
             $this->selectConversation('user', $this->user_id);
+            $this->activeTab = 'messages';
+        }
+
+        if ($this->subject_id) {
+            $this->selectConversation('subject', $this->subject_id);
             $this->activeTab = 'messages';
         }
     }
@@ -107,7 +194,9 @@ class Chat extends Component
         } else {
             $this->subjects = $this->allSubjects;
         }
+
         $this->selectedSubjectId = null;
+
         if (! Auth::user()->hasRole('student')) {
             $this->users = [];
         }
@@ -115,24 +204,90 @@ class Chat extends Component
 
     public function updatedSelectedSubjectId($subjectId)
     {
-        if (! Auth::user()->hasRole('student')) {
-            if ($subjectId) {
-                $subject = Subject::find($subjectId);
-                if ($subject) {
-                    $this->users = $subject->users()->where('users.id', '!=', Auth::id())->get()->map(function ($user) {
-                        return ['id' => $user->id, 'name' => $this->getRoleEmoji($user->role).' '.$user->fullname];
-                    })->sortBy('name')->values()->all();
+        $user = Auth::user();
+
+        if ($user->hasRole('student')) {
+            return;
+        }
+
+        if ($subjectId) {
+            $subject = Subject::find($subjectId);
+            if ($subject) {
+                if ($user->hasRole('teacher')) {
+                    // El docente solo puede ver a los estudiantes del curso.
+                    $this->users = $subject->users()
+                        ->where('role', 'student')
+                        ->where('users.id', '!=', Auth::id())
+                        ->get()
+                        ->map(fn ($u) => [
+                            'id' => $u->id,
+                            'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
+                        ])
+                        ->sortBy('name')
+                        ->values()
+                        ->all();
+                } else {
+                    // El personal ve a todos los usuarios del curso.
+                    $this->users = $subject->users()
+                        ->where('users.id', '!=', Auth::id())
+                        ->get()
+                        ->map(fn ($u) => [
+                            'id' => $u->id,
+                            'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
+                        ])
+                        ->sortBy('name')
+                        ->values()
+                        ->all();
                 }
-            } else {
-                $this->users = [];
             }
+        } else {
+            $this->users = [];
         }
     }
 
-    public $selectedConversation = null;
+    public function updatedRecipientType($type)
+    {
+        // Al cambiar el tipo de destinatario, limpiar la selección previa.
+        $this->recipient_id = null;
+
+        if (! in_array($type, ['user', 'staff'])) {
+            $this->selectedSubjectId = null;
+            if (! Auth::user()->hasRole('student')) {
+                $this->users = [];
+            }
+        }
+
+        // Si el docente selecciona "Estudiante" (user), preseleccionar la primera carrera disponible.
+        if ($type === 'user' && Auth::user()->hasRole('teacher') && ! empty($this->careers)) {
+            $this->selectedCareerId = $this->careers[0]['id'];
+            $this->updatedSelectedCareerId($this->selectedCareerId);
+        }
+    }
 
     public function selectConversation($type, $id)
     {
+        if ($type === 'user') {
+            $recipient = User::find($id);
+            if (! $recipient || ! $this->canChatWithUser(Auth::user(), $recipient)) {
+                session()->flash('error', 'No tienes permiso para iniciar una conversación con este usuario.');
+
+                return;
+            }
+        } elseif ($type === 'subject') {
+            $subject = Subject::find($id);
+            if (! $subject || ! $this->canChatWithSubject(Auth::user(), $subject)) {
+                session()->flash('error', 'No tienes permiso para iniciar una conversación en este curso.');
+
+                return;
+            }
+        } elseif ($type === 'career') {
+            if (! $this->isStaff()) {
+                session()->flash('error', 'No tienes permiso para enviar mensajes a una carrera.');
+
+                return;
+            }
+        }
+
         $this->selectedConversation = [
             'type' => $type,
             'id' => $id,
@@ -140,19 +295,21 @@ class Chat extends Component
 
         $this->recipient_type = $type;
         $this->recipient_id = $id;
-        $this->amount = 20; // Reset pagination
+        $this->amount = 20;
 
-        // Mark messages as read
-        Auth::user()->receivedMessages()
-            ->where(function ($query) use ($type, $id) {
-                if ($type === 'user') {
-                    $query->where('sender_id', $id)->whereNull('subject_id');
-                } else { // type is 'subject'
-                    $query->where('subject_id', $id);
-                }
-            })
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        if (in_array($type, ['user', 'subject'])) {
+            // Marcar mensajes como leídos.
+            Auth::user()->receivedMessages()
+                ->where(function ($query) use ($type, $id) {
+                    if ($type === 'user') {
+                        $query->where('sender_id', $id)->whereNull('subject_id');
+                    } else {
+                        $query->where('subject_id', $id);
+                    }
+                })
+                ->whereNull('read_at')
+                ->update(['read_at' => now()]);
+        }
 
         $this->dispatch('scroll-to-bottom');
     }
@@ -161,14 +318,12 @@ class Chat extends Component
     {
         $userId = Auth::id();
 
-        // Optimización avanzada: Obtener el ID del último mensaje de cada conversación
-        // Esto reduce drásticamente el uso de memoria al no cargar miles de mensajes.
         $subquery = Message::selectRaw('MAX(id) as id')
             ->where('sender_id', $userId)
             ->orWhereHas('recipients', function ($q) use ($userId) {
                 $q->where('user_id', $userId);
             })
-            ->groupBy(\DB::raw('COALESCE(subject_id, IF(sender_id = '.$userId.', (SELECT user_id FROM message_user WHERE message_id = messages.id LIMIT 1), sender_id))'));
+            ->groupBy(DB::raw('COALESCE(subject_id, IF(sender_id = '.$userId.', (SELECT user_id FROM message_user WHERE message_id = messages.id LIMIT 1), sender_id))'));
 
         $recentMessages = Message::whereIn('id', $subquery)
             ->with(['sender', 'recipients', 'subject.career'])
@@ -204,12 +359,12 @@ class Chat extends Component
                 $key = 'user_'.$id;
             }
 
-            if (!in_array($key, $processedKeys)) {
+            if (! in_array($key, $processedKeys)) {
                 $unreadCount = 0;
                 if ($message->sender_id !== $userId) {
                     $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
                     if ($myPivot && is_null($myPivot->read_at)) {
-                        $unreadCount = 1; 
+                        $unreadCount = 1;
                     }
                 }
 
@@ -220,13 +375,12 @@ class Chat extends Component
                     'label' => $label,
                     'subLabel' => $subLabel,
                     'last_date' => $message->created_at,
-                    'unread' => $unreadCount > 0
+                    'unread' => $unreadCount > 0,
                 ];
                 $processedKeys[] = $key;
             }
         }
 
-        // Filter messages for the selected conversation
         $filteredMessages = collect();
         if ($this->selectedConversation) {
             $type = $this->selectedConversation['type'];
@@ -267,73 +421,198 @@ class Chat extends Component
         ])->layout('layouts.chat');
     }
 
+    private function canChatWithUser(User $user, User $recipient): bool
+    {
+        if ($user->id === $recipient->id) {
+            return false;
+        }
+
+        // El personal siempre puede chatear con cualquiera.
+        if ($this->isStaff()) {
+            return true;
+        }
+
+        // Cualquiera puede chatear con el personal.
+        if ($recipient->isStaff()) {
+            return true;
+        }
+
+        // Los estudiantes NO pueden chatear entre sí.
+        if ($user->hasRole('student') && $recipient->hasRole('student')) {
+            return false;
+        }
+
+        // Docente ↔ Docente: permitido si comparten materia.
+        // Docente ↔ Estudiante: permitido si comparten materia.
+        return Enrollment::where('user_id', $user->id)
+            ->whereIn('subject_id', function ($query) use ($recipient) {
+                $query->select('subject_id')
+                    ->from('enrollments')
+                    ->where('user_id', $recipient->id);
+            })->exists();
+    }
+
+    private function canChatWithSubject(User $user, Subject $subject): bool
+    {
+        if ($this->isStaff()) {
+            return true;
+        }
+
+        return $user->hasSubject($subject->id);
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string}>
+     */
+    public function getRecipientTypeOptions(): array
+    {
+        $user = Auth::user();
+
+        if ($user->hasRole('student')) {
+            return [
+                ['id' => 'staff', 'name' => 'Personal / Staff'],
+                ['id' => 'user', 'name' => 'Docentes'],
+                ['id' => 'subject', 'name' => 'Curso (mi materia)'],
+            ];
+        }
+
+        if ($user->hasRole('teacher')) {
+            return [
+                ['id' => 'staff', 'name' => 'Personal / Staff'],
+                ['id' => 'user', 'name' => 'Estudiante'],
+                ['id' => 'subject', 'name' => 'Curso completo'],
+            ];
+        }
+
+        // Staff: opciones completas.
+        return [
+            ['id' => 'user', 'name' => 'Usuario específico'],
+            ['id' => 'subject', 'name' => 'Curso completo'],
+            ['id' => 'career', 'name' => 'Carrera completa'],
+            ['id' => 'teachers', 'name' => 'Todos los docentes'],
+            ['id' => 'all', 'name' => 'Todos los usuarios'],
+        ];
+    }
+
     public function sendMessage()
     {
-        // Step 1: Validate the basic input.
+        $user = Auth::user();
+
+        $validTypes = $user->hasRole('student')
+            ? 'in:user,subject,staff'
+            : ($user->hasRole('teacher')
+                ? 'in:user,subject,staff'
+                : 'in:user,subject,career,teachers,all');
+
         $validated = $this->validate([
             'content' => 'required|string',
+            'recipient_type' => ['required', $validTypes],
             'recipient_id' => [
-                'required_if:recipient_type,user,subject',
+                'nullable',
                 function ($attribute, $value, $fail) {
-                    if ($this->recipient_type === 'user') {
-                        if (! User::where('id', $value)->exists()) {
+                    $type = $this->recipient_type;
+
+                    if (in_array($type, ['all', 'teachers'])) {
+                        return; // Sin ID específica para estos tipos.
+                    }
+
+                    if (! $value) {
+                        $fail('Debes seleccionar un destinatario.');
+
+                        return;
+                    }
+
+                    if ($type === 'user' || $type === 'staff') {
+                        $recipient = User::find($value);
+                        if (! $recipient) {
                             $fail('El usuario seleccionado no existe.');
+                        } elseif (! $this->canChatWithUser(Auth::user(), $recipient)) {
+                            $fail('No tienes permiso para chatear con este usuario.');
                         }
-                    } elseif ($this->recipient_type === 'subject') {
-                        if (! Subject::where('id', $value)->exists()) {
+                    } elseif ($type === 'subject') {
+                        $subject = Subject::find($value);
+                        if (! $subject) {
                             $fail('El curso seleccionado no existe.');
+                        } elseif (! $this->canChatWithSubject(Auth::user(), $subject)) {
+                            $fail('No tienes permiso para chatear en este curso.');
+                        }
+                    } elseif ($type === 'career') {
+                        if (! $this->isStaff()) {
+                            $fail('No tienes permiso para enviar mensajes a una carrera.');
+                        } elseif (! Career::find($value)) {
+                            $fail('La carrera seleccionada no existe.');
                         }
                     }
                 },
             ],
-            'recipient_type' => 'required|in:user,subject,all', // Keep validation for now
         ]);
 
-        // Prevent students from sending messages to other students
-        if (Auth::user()->hasRole('student') && $validated['recipient_type'] === 'user') {
-            $recipient = User::find($validated['recipient_id']);
-            if ($recipient && $recipient->hasRole('student')) {
-                session()->flash('error', 'No puedes enviar mensajes a otros estudiantes.');
+        // Crear el mensaje. Los mensajes de tipo "subject" llevan subject_id.
+        $subjectId = $validated['recipient_type'] === 'subject' ? $validated['recipient_id'] : null;
 
-                return;
-            }
-        }
-
-        // Step 2: Create the message.
         $message = Message::create([
             'sender_id' => Auth::id(),
             'content' => $validated['content'],
-            'subject_id' => $validated['recipient_type'] === 'subject' ? $validated['recipient_id'] : null,
+            'subject_id' => $subjectId,
         ]);
 
-        // Step 3: Determine recipients based on the type.
+        // Determinar los destinatarios según el tipo.
         $recipients = collect();
+
         switch ($validated['recipient_type']) {
             case 'user':
+            case 'staff':
                 $recipients = User::where('id', $validated['recipient_id'])->get();
                 break;
+
             case 'subject':
                 $subject = Subject::find($validated['recipient_id']);
                 if ($subject) {
-                    $recipients = $subject->users;
+                    // Todos los inscritos en el curso excepto el remitente.
+                    $recipients = $subject->users()->where('users.id', '!=', Auth::id())->get();
                 }
                 break;
+
+            case 'career':
+                // Solo el personal puede hacer esto.
+                if ($this->isStaff()) {
+                    $career = Career::find($validated['recipient_id']);
+                    if ($career) {
+                        // Todos los estudiantes de la carrera.
+                        $recipients = User::whereHas('careers', fn ($q) => $q->where('careers.id', $career->id))
+                            ->where('role', 'student')
+                            ->get();
+                    }
+                }
+                break;
+
+            case 'teachers':
+                if ($this->isStaff()) {
+                    $recipients = User::where('role', 'teacher')->get();
+                }
+                break;
+
             case 'all':
-                // For safety, only non-students can send to all.
-                if (! Auth::user()->hasRole('student')) {
-                    $recipients = User::select('id')->get();
+                if ($this->isStaff()) {
+                    $recipients = User::where('id', '!=', Auth::id())->get();
                 }
                 break;
         }
 
-        // Step 4: Attach the recipients to the message.
         if ($recipients->isNotEmpty()) {
             $message->recipients()->attach($recipients->pluck('id'));
         }
 
-        // Step 5: Reset the form fields.
         $this->reset('content');
-        // Don't reset recipient info so user can continue chatting
+
+        // Si era un mensaje nuevo, seleccionar la conversación.
+        if ($validated['recipient_type'] === 'user' || $validated['recipient_type'] === 'staff') {
+            $this->selectConversation('user', $validated['recipient_id']);
+            $this->activeTab = 'messages';
+        } elseif ($validated['recipient_type'] === 'subject') {
+            $this->selectConversation('subject', $validated['recipient_id']);
+            $this->activeTab = 'messages';
+        }
 
         $this->dispatch('scroll-to-bottom');
     }
