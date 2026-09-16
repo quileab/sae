@@ -263,6 +263,44 @@ class Chat extends Component
         }
     }
 
+    public $editingMessageId = null;
+
+    public $editingContent = '';
+
+    public function editMessage($id)
+    {
+        $msg = Message::find($id);
+        if ($msg && ($msg->sender_id === Auth::id() || Auth::user()->hasRole('admin'))) {
+            $this->editingMessageId = $id;
+            $this->editingContent = $msg->content;
+        }
+    }
+
+    public function saveEditedMessage()
+    {
+        $msg = Message::find($this->editingMessageId);
+        if ($msg && ($msg->sender_id === Auth::id() || Auth::user()->hasRole('admin'))) {
+            $msg->update(['content' => $this->editingContent]);
+            $this->editingMessageId = null;
+            $this->editingContent = '';
+        }
+    }
+
+    public function cancelEdit()
+    {
+        $this->editingMessageId = null;
+        $this->editingContent = '';
+    }
+
+    public function deleteMessage($id)
+    {
+        $msg = Message::find($id);
+        if ($msg && ($msg->sender_id === Auth::id() || Auth::user()->hasRole('admin'))) {
+            $msg->recipients()->detach();
+            $msg->delete();
+        }
+    }
+
     public function selectConversation($type, $id)
     {
         if ($type === 'user') {
@@ -328,11 +366,11 @@ class Chat extends Component
                 });
         })
             ->with([
-            'sender:id,firstname,lastname,role,name',
-            'recipients:id,firstname,lastname,role,name',
-            'subject:id,name,career_id',
-            'subject.career:id,name',
-        ])
+                'sender:id,firstname,lastname,role,name',
+                'recipients:id,firstname,lastname,role,name',
+                'subject:id,name,career_id',
+                'subject.career:id,name',
+            ])
             ->latest()
             ->take(200)
             ->get();

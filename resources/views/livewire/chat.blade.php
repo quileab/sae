@@ -286,34 +286,76 @@
                     @endif
 
                     @forelse ($receivedMessages->sortBy('created_at') as $message)
-                        <div wire:key="msg-{{ $message->id }}" class="flex {{ $message->sender_id == auth()->id() ? 'justify-end' : 'justify-start' }} gap-2">
-                            @if ($message->sender_id != auth()->id())
-                                <div class="shrink-0 mt-auto">
-                                    <img src="{{ $message->sender->avatar_url }}" class="w-8 h-8 rounded-full object-cover" />
+                        @php
+                            $isMe = $message->sender_id == auth()->id();
+                            $bubbleClass = $isMe 
+                                ? 'bg-success/20 text-base-content border border-success/30 rounded-[22px] rounded-br-[4px] shadow-sm'
+                                : 'bg-info/10 text-base-content border border-info/20 rounded-[22px] rounded-bl-[4px] shadow-sm';
+                            
+                            $linkClass = $isMe 
+                                ? 'link link-success font-semibold break-all'
+                                : 'link link-info font-semibold break-all';
+                            
+                            $content = e($message->content);
+                            $content = preg_replace(
+                                '/(https?:\/\/[^\s]+)/',
+                                '<a href="$0" target="_blank" rel="noopener noreferrer" class="' . $linkClass . '">$0</a>',
+                                $content
+                            );
+                        @endphp
+                        
+                        <div wire:key="msg-{{ $message->id }}" class="flex {{ $isMe ? 'justify-end' : 'justify-start' }} gap-2 group">
+                            @if (!$isMe)
+                                <div class="shrink-0 mt-auto tooltip tooltip-right" data-tip="{{ $message->sender->fullname }}">
+                                    <div class="avatar">
+                                        <div class="w-8 h-8 rounded-full ring-2 ring-info/30 ring-offset-2 ring-offset-base-200 shadow-md drop-shadow-sm transition-transform hover:scale-105">
+                                            <img src="{{ $message->sender->avatar_url }}" class="object-cover bg-base-100" alt="Avatar" />
+                                        </div>
+                                    </div>
                                 </div>
                             @endif
-                            <div class="max-w-[85%] lg:max-w-[70%] {{ $message->sender_id == auth()->id() ? 'bg-primary text-primary-content' : 'bg-base-100' }} rounded-lg p-3 shadow-sm">
+                            <div class="max-w-[85%] lg:max-w-[70%] {{ $bubbleClass }} px-4 py-3 relative">
                                 @if ($message->subject)
-                                    <div class="text-xs font-bold opacity-70 mb-1">
-                                        📚 Curso: {{ $message->subject->name }} — {{ $message->subject->career->name ?? 'N/A' }}
+                                    <div class="text-[11px] font-bold opacity-75 mb-1 flex items-center gap-1">
+                                        <x-icon name="o-book-open" class="w-3 h-3" /> 
+                                        {{ $message->subject->name }} — {{ $message->subject->career->name ?? 'N/A' }}
                                     </div>
                                 @endif
-                                @if ($message->sender_id != auth()->id())
-                                    <div class="text-xs font-bold opacity-70 mb-1">{{ $message->sender->fullname }}</div>
+                                @if (!$isMe)
+                                    <div class="text-[11px] font-bold opacity-70 mb-1 text-info">{{ $message->sender->fullname }}</div>
                                 @endif
-                                @php
-                                    $content = e($message->content);
-                                    $content = preg_replace(
-                                        '/(https?:\/\/[^\s]+)/',
-                                        '<a href="$0" target="_blank" rel="noopener noreferrer" class="link link-primary break-all">$0</a>',
-                                        $content
-                                    );
-                                @endphp
-                                <p class="text-sm whitespace-pre-wrap">{!! $content !!}</p>
-                                <div class="text-xs opacity-70 text-right mt-1">
+                                
+                                @if($editingMessageId === $message->id)
+                                    <div class="mt-2 min-w-[200px]">
+                                        <x-textarea wire:model.defer="editingContent" rows="3" class="w-full text-base-content bg-base-100/90 mb-2 focus:bg-base-100" />
+                                        <div class="flex justify-end gap-2">
+                                            <x-button label="Cancelar" wire:click="cancelEdit" class="btn-xs btn-ghost text-current opacity-80 hover:opacity-100" />
+                                            <x-button label="Guardar" wire:click="saveEditedMessage" class="btn-xs btn-neutral" spinner />
+                                        </div>
+                                    </div>
+                                @else
+                                    <p class="text-sm whitespace-pre-wrap leading-relaxed">{!! $content !!}</p>
+                                @endif
+                                
+                                <div class="text-[10px] opacity-60 text-right mt-1.5 flex items-center justify-end gap-1">
                                     {{ $message->created_at->format('H:i') }}
+                                    @if($isMe)
+                                        <x-icon name="o-check-circle" class="w-3 h-3 opacity-100 text-success" />
+                                    @endif
                                 </div>
                             </div>
+
+                            @if($isMe || auth()->user()->hasRole('admin'))
+                                <div class="opacity-0 group-hover:opacity-100 transition-opacity mt-auto mb-2 {{ $isMe ? '-order-1' : '' }}">
+                                    <x-dropdown>
+                                        <x-slot:trigger>
+                                            <x-button icon="o-ellipsis-vertical" class="btn-ghost btn-xs btn-circle" />
+                                        </x-slot:trigger>
+                                        <x-menu-item title="Editar" icon="o-pencil" wire:click="editMessage({{ $message->id }})" />
+                                        <x-menu-item title="Eliminar" icon="o-trash" class="text-error" wire:click="deleteMessage({{ $message->id }})" wire:confirm="¿Seguro que deseas eliminar este mensaje de forma permanente?" />
+                                    </x-dropdown>
+                                </div>
+                            @endif
                         </div>
                     @empty
                         <div class="flex h-full items-center justify-center text-base-content/50">

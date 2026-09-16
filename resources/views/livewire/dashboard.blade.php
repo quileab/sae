@@ -15,21 +15,29 @@
             </x-slot:append>
         </x-input>
 
-        <div class="grid grid-cols-1 gap-2 mt-4 md:grid-cols-2">
-            @foreach ($this->inscriptionsStatus as $inscription)
-                <div wire:key="inscription-{{ $inscription['id'] ?? $loop->index }}">
-                    <x-stat title="{{ $inscription['description'] }}"
-                        value="{{ $inscription['value'] == 'true' ? 'Habilitadas' : 'Sin Fecha' }}"
-                        icon="o-clipboard-document-check"
-                        class="{{ $inscription['value'] == 'true' ? 'text-success' : 'text-gray-400' }}" />
-                </div>
-            @endforeach
+        @island(lazy: true)
+            <div class="grid grid-cols-1 gap-2 mt-4 md:grid-cols-2">
+                @foreach ($this->inscriptionsStatus as $inscription)
+                    <div wire:key="inscription-{{ $inscription['id'] ?? $loop->index }}">
+                        <x-stat title="{{ $inscription['description'] }}"
+                            value="{{ $inscription['value'] == 'true' ? 'Habilitadas' : 'Sin Fecha' }}"
+                            icon="o-clipboard-document-check"
+                            class="{{ $inscription['value'] == 'true' ? 'text-success' : 'text-gray-400' }}" />
+                    </div>
+                @endforeach
 
-            @if(!auth()->user()->hasRole('student'))
-                <x-stat title="Sin carrera" description="Estudiantes sin inscripción"
-                    value="{{ $this->usersWithoutCareerCount }}" icon="o-user-minus" class="text-warning" />
-            @endif
-        </div>
+                @if(!auth()->user()->hasRole('student'))
+                    <x-stat title="Sin carrera" description="Estudiantes sin inscripción"
+                        value="{{ $this->usersWithoutCareerCount }}" icon="o-user-minus" class="text-warning" />
+                @endif
+            </div>
+            @placeholder
+                <div class="grid grid-cols-1 gap-2 mt-4 md:grid-cols-2 w-full">
+                    <div class="skeleton h-24 w-full bg-base-300"></div>
+                    <div class="skeleton h-24 w-full bg-base-300"></div>
+                </div>
+            @endplaceholder
+        @endisland
     </x-card>
 
     {{-- Panel de Mis Materias --}}

@@ -147,7 +147,9 @@ class User extends Authenticatable
             return asset('storage/'.$path).'?v='.$timestamp;
         }
 
-        return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=7F9CF5&background=EBF4FF';
+        $fullNameForAvatar = trim($this->firstname.' '.$this->lastname);
+
+        return 'https://ui-avatars.com/api/?name='.urlencode($fullNameForAvatar).'&background=random&color=fff';
     }
 
     public function classSessions()

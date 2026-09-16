@@ -14,7 +14,6 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
-#[Lazy]
 class Dashboard extends Component
 {
     use AuthorizesAccess, Toast;
@@ -113,15 +112,6 @@ class Dashboard extends Component
         session()->put('cycle_id', $this->cycle_id);
         $this->dispatch('cycle-updated', cycle: $this->cycle_id);
         $this->success("Ciclo lectivo aplicado: $this->cycle_id", position: 'toast-bottom toast-end');
-    }
-
-    public function placeholder()
-    {
-        return <<<'HTML'
-        <div class="flex justify-center items-center h-64">
-            <x-loading class="loading-lg text-primary" />
-        </div>
-        HTML;
     }
 
     public function render()

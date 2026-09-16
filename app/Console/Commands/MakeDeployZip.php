@@ -86,9 +86,10 @@ class MakeDeployZip extends Command
                 continue;
             }
 
-            // 2. Excluir TODA la carpeta storage y bootstrap/cache
+            // 2. Excluir TODA la carpeta storage y bootstrap/cache, y public/hot
             if (Str::startsWith($zipPath, 'storage/') ||
-                Str::startsWith($zipPath, 'bootstrap/cache/')) {
+                Str::startsWith($zipPath, 'bootstrap/cache/') ||
+                $zipPath === 'public/hot') {
                 continue;
             }
 
