@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\BookLoanFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BookLoan extends Model
 {
-    /** @use HasFactory<\Database\Factories\BookLoanFactory> */
+    /** @use HasFactory<BookLoanFactory> */
     use HasFactory;
 
     protected $fillable = [

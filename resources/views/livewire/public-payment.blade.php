@@ -3,7 +3,7 @@
 use Livewire\Volt\Component;
 use Livewire\Attributes\Layout;
 use App\Models\User;
-use App\Models\UserPayments;
+use App\Models\UserPayment;
 use Mary\Traits\Toast;
 use MercadoPago\Client\Preference\PreferenceClient;
 use MercadoPago\MercadoPagoConfig;
@@ -14,7 +14,7 @@ new #[Layout('layouts.guest')] class extends Component {
     public string $email = '';
     public string $student_id = '';
     public ?User $user = null;
-    public ?UserPayments $nextPayment = null;
+    public ?UserPayment $nextPayment = null;
     public ?string $preferenceId = null;
     public ?string $checkoutUrl = null;
     public ?string $error = null;
@@ -38,7 +38,7 @@ new #[Layout('layouts.guest')] class extends Component {
             return;
         }
 
-        $this->nextPayment = UserPayments::where('user_id', $this->user->id)
+        $this->nextPayment = UserPayment::where('user_id', $this->user->id)
             ->whereRaw('paid < amount')
             ->orderBy('date')
             ->first();

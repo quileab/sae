@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\BookFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Book extends Model
 {
-    /** @use HasFactory<\Database\Factories\BookFactory> */
+    /** @use HasFactory<BookFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -44,5 +45,10 @@ class Book extends Model
     public function loans(): HasMany
     {
         return $this->hasMany(BookLoan::class);
+    }
+
+    public function getIsLoanedAttribute(): bool
+    {
+        return $this->loans()->whereNull('returned_at')->exists();
     }
 }

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="csrf-token" content="bWQrW2QQRMKVZ13UHDLeZWCfR3YoYuElbluugB1e">
+    <title>SAE4013</title>
+            <script src="https://sdk.mercadopago.com/js/v2"></script>
+        <script>
+            const mp = new MercadoPago("APP_USR-4e5504f3-935d-42fa-9664-fce017dbdce4", {
+                locale: 'es-AR'
+            });
+        </script>
+        <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#570df8">
+
+    <link rel="preload" as="style" href="http://localhost/build/assets/app-C64NXqxY.css" /><link rel="modulepreload" as="script" href="http://localhost/build/assets/app-CEYjPJlN.js" /><link rel="stylesheet" href="http://localhost/build/assets/app-C64NXqxY.css" data-navigate-track="reload" /><script type="module" src="http://localhost/build/assets/app-CEYjPJlN.js" data-navigate-track="reload"></script>    <script src="http://localhost/js/tinymce/tinymce.min.js" defer></script>
+<script id="browser-logger-active">
+(function() {
+    const ENDPOINT = 'http://localhost/_boost/browser-logs';
+    const logQueue = [];
+    let flushTimeout = null;
+
+    console.log('🔍 Browser logger active (MCP server detected). Posting to: ' + ENDPOINT);
+
+    // Store original console methods
+    const originalConsole = {
+        log: console.log,
+        info: console.info,
+        error: console.error,
+        warn: console.warn,
+        table: console.table
+    };
+
+    // Helper to safely stringify values
+    function safeStringify(obj) {
+        const seen = new WeakSet();
+        return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) return '[Circular]';
+                seen.add(value);
+            }
+            if (value instanceof Error) {
+                return {
+                    name: value.name,
+                    message: value.message,
+                    stack: value.stack
+                };
+            }
+            return value;
+        });
+    }
+
+    // Batch and send logs
+    function flushLogs() {
+        if (logQueue.length === 0) return;
+
+        const batch = logQueue.splice(0, logQueue.length);
+
+        fetch(ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ logs: batch })
+        }).catch(err => {
+            // Silently fail to avoid infinite loops
+            originalConsole.error('Failed to send logs:', err);
+        });
+    }
+
+    // Debounced flush (100ms)
+    function scheduleFlush() {
+        if (flushTimeout) clearTimeout(flushTimeout);
+        flushTimeout = setTimeout(flushLogs, 100);
+    }
+
+    // Intercept console methods
+    ['log', 'info', 'error', 'warn', 'table'].forEach(method => {
+        console[method] = function(...args) {
+            // Call original method
+            originalConsole[method].apply(console, args);
+
+            // Capture log data
+            try {
+                logQueue.push({
+                    type: method,
+                    timestamp: new Date().toISOString(),
+                    data: args.map(arg => {
+                        try {
+                            return typeof arg === 'object' ? JSON.parse(safeStringify(arg)) : arg;
+                        } catch (e) {
+                            return String(arg);
+                        }
+                    }),
+                    url: window.location.href,
+                    userAgent: navigator.userAgent
+                });
+
+                scheduleFlush();
+            } catch (e) {
+                // Fail silently
+            }
+        };
+    });
+
+    // Global error handlers for uncaught errors
+    const originalOnError = window.onerror;
+    window.onerror = function boostErrorHandler(errorMsg, url, lineNumber, colNumber, error) {
+        try {
+            logQueue.push({
+                type: 'uncaught_error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: errorMsg,
+                    filename: url,
+                    lineno: lineNumber,
+                    colno: colNumber,
+                    error: error ? {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    } : null
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Call original handler if it exists
+        if (originalOnError && typeof originalOnError === 'function') {
+            return originalOnError(errorMsg, url, lineNumber, colNumber, error);
+        }
+
+        // Let the error continue to propagate
+        return false;
+    }
+    window.addEventListener('error', (event) => {
+        try {
+            logQueue.push({
+                type: 'window_error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    error: event.error ? {
+                        name: event.error.name,
+                        message: event.error.message,
+                        stack: event.error.stack
+                    } : null
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Let the error continue to propagate
+        return false;
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        try {
+            logQueue.push({
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: 'Unhandled Promise Rejection',
+                    reason: event.reason instanceof Error ? {
+                        name: event.reason.name,
+                        message: event.reason.message,
+                        stack: event.reason.stack
+                    } : event.reason
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Let the rejection continue to propagate
+        return false;
+    });
+
+    // Flush on page unload
+    window.addEventListener('beforeunload', () => {
+        if (logQueue.length > 0) {
+            navigator.sendBeacon(ENDPOINT, JSON.stringify({ logs: logQueue }));
+        }
+    });
+})();
+</script>
+<!-- Livewire Styles --><style >[wire\:loading][wire\:loading], [wire\:loading\.delay][wire\:loading\.delay], [wire\:loading\.list-item][wire\:loading\.list-item], [wire\:loading\.inline-block][wire\:loading\.inline-block], [wire\:loading\.inline][wire\:loading\.inline], [wire\:loading\.block][wire\:loading\.block], [wire\:loading\.flex][wire\:loading\.flex], [wire\:loading\.table][wire\:loading\.table], [wire\:loading\.grid][wire\:loading\.grid], [wire\:loading\.inline-flex][wire\:loading\.inline-flex] {display: none;}[wire\:loading\.delay\.none][wire\:loading\.delay\.none], [wire\:loading\.delay\.shortest][wire\:loading\.delay\.shortest], [wire\:loading\.delay\.shorter][wire\:loading\.delay\.shorter], [wire\:loading\.delay\.short][wire\:loading\.delay\.short], [wire\:loading\.delay\.default][wire\:loading\.delay\.default], [wire\:loading\.delay\.long][wire\:loading\.delay\.long], [wire\:loading\.delay\.longer][wire\:loading\.delay\.longer], [wire\:loading\.delay\.longest][wire\:loading\.delay\.longest] {display: none;}[wire\:offline][wire\:offline] {display: none;}[wire\:dirty]:not(textarea):not(input):not(select) {display: none;}:root {--livewire-progress-bar-color: #2299dd;}[x-cloak] {display: none !important;}[wire\:cloak] {display: none !important;}dialog#livewire-error::backdrop {background-color: rgba(0, 0, 0, .6);}</style>
+</head>
+
+<body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
+    
+    <div class="bg-base-100 border-base-content/10 border-b sticky top-0 z-10 lg:hidden">
+        <div class="flex items-center px-6 py-3 max-w-screen-2xl mx-auto">
+            <div class="flex-1 flex items-center">
+                <a href="/" wire:navigate>
+        <!-- Hidden when collapsed -->
+        <div class="hidden-when-collapsed">
+            <div class="flex items-center gap-2">
+                <svg class="inline w-6 -mb-1 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/>
+</svg>
+                    <span class="font-bold text-3xl me-3 bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent ">
+                    SAE4013
+                </span>
+            </div>
+        </div>
+
+        <!-- Display when collapsed -->
+        <div class="display-when-collapsed hidden mx-5 mt-4 lg:mb-6 h-[28px]">
+            <svg class="inline w-6 -mb-1 text-purple-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" data-slot="icon">
+  <path d="M11.644 1.59a.75.75 0 0 1 .712 0l9.75 5.25a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.712 0l-9.75-5.25a.75.75 0 0 1 0-1.32l9.75-5.25Z"/>
+  <path d="m3.265 10.602 7.668 4.129a2.25 2.25 0 0 0 2.134 0l7.668-4.13 1.37.739a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.71 0l-9.75-5.25a.75.75 0 0 1 0-1.32l1.37-.738Z"/>
+  <path d="m10.933 19.231-7.668-4.13-1.37.739a.75.75 0 0 0 0 1.32l9.75 5.25c.221.12.489.12.71 0l9.75-5.25a.75.75 0 0 0 0-1.32l-1.37-.738-7.668 4.13a2.25 2.25 0 0 1-2.134-.001Z"/>
+</svg>
+            </div>
+    </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <!--[if BLOCK]><![endif]-->    <div wire:poll.30s class="inline-flex items-center">
+        <!--[if BLOCK]><![endif]-->            <!--[if BLOCK]><![endif]-->        <a href="/chat"
+    
+        wire:key="marydb56937ed97f3c979502234ba618988c"
+        type="button"
+        class="btn btn-ghost btn-sm text-primary relative me-2"
+
+        
+        
+        
+            >
+
+        <!-- SPINNER LEFT -->
+        <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->
+        <!-- ICON -->
+        <!--[if BLOCK]><![endif]-->            <span class="block" >
+                <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->        <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path wire:key="lw-2067018863-0" wire:snapshot="{&quot;data&quot;:{&quot;type&quot;:&quot;mobile&quot;},&quot;memo&quot;:{&quot;id&quot;:&quot;rvYQnVqkM4B0QAOGypaz&quot;,&quot;name&quot;:&quot;unread-messages-indicator&quot;,&quot;path&quot;:&quot;dashboard&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;es&quot;,&quot;islands&quot;:[]},&quot;checksum&quot;:&quot;6bf458f151e5e321e16e08f5e6a45869ff58b0065696b20742e253db83b79383&quot;}" wire:effects="[]" wire:id="rvYQnVqkM4B0QAOGypaz" wire:name="unread-messages-indicator" stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/>
+</svg>
+    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->            </span>
+        <!--[if ENDBLOCK]><![endif]-->
+        <!-- LABEL / SLOT -->
+        <!--[if BLOCK]><![endif]-->            <span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[9px] font-bold text-white">
+                    1
+                </span>
+        <!--[if ENDBLOCK]><![endif]-->
+        <!-- ICON RIGHT -->
+        <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->
+        <!-- SPINNER RIGHT -->
+        <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->
+    <!--[if BLOCK]><![endif]-->        </a>
+    <!--[if ENDBLOCK]><![endif]-->        <!--[if ENDBLOCK]><![endif]-->    </div>
+<!--[if ENDBLOCK]><![endif]-->                        <label for="main-drawer" class="lg:hidden me-3">
+                <svg class="inline w-5 h-5 cursor-pointer" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+</svg>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <main class="w-full mx-auto">
+    <div class="drawer lg:drawer-open">
+        <input id="main-drawer" type="checkbox" class="drawer-toggle" />
+        <div class="drawer-content w-full mx-auto p-2 lg:px-4 lg:py-2">
+            
+            <div wire:snapshot="{&quot;data&quot;:{&quot;cycle_id&quot;:2026,&quot;subject_id&quot;:null,&quot;mp_key&quot;:null,&quot;mp_token&quot;:null,&quot;showCareerWarning&quot;:false},&quot;memo&quot;:{&quot;id&quot;:&quot;V34bNEL5dOcVWUDvJjn9&quot;,&quot;name&quot;:&quot;dashboard&quot;,&quot;path&quot;:&quot;dashboard&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;lazyLoaded&quot;:false,&quot;lazyIsolated&quot;:true,&quot;errors&quot;:[],&quot;locale&quot;:&quot;es&quot;,&quot;islands&quot;:[]},&quot;checksum&quot;:&quot;861660a6bdf8b1f2e6165674bcff76870eb56e4b031e10fc98ea2eeaea880e48&quot;}" wire:effects="{&quot;url&quot;:{&quot;cycle_id&quot;:{&quot;as&quot;:null,&quot;use&quot;:&quot;replace&quot;,&quot;alwaysShow&quot;:false,&quot;except&quot;:null}}}" wire:id="V34bNEL5dOcVWUDvJjn9" wire:name="dashboard" x-intersect="$wire.__lazyLoad(&#039;eyJkYXRhIjp7ImZvck1vdW50IjpbW10seyJzIjoiYXJyIn1dfSwibWVtbyI6eyJpZCI6IlRDVEFYbXpGT1dmSkxxTGd3cjk0IiwibmFtZSI6Il9fbW91bnRQYXJhbXNDb250YWluZXIiLCJwYXRoIjoiZGFzaGJvYXJkIiwibWV0aG9kIjoiR0VUIiwicmVsZWFzZSI6ImEtYS1hIn0sImNoZWNrc3VtIjoiYzRlZDRhYmYwOGMyN2YwMmNjMTNjNTVlYzAzYWUzMjEwZGFmNGRkNDYyYWQxZDgwNzUyZjJhNzY1ZWE4NTExOSJ9&#039;)" class="flex justify-center items-center h-64">
+    <span class="loading loading-lg text-primary"></span></div>
+        </div>
+
+        
+                    <div
+                x-data="{
+                    collapsed: false,
+                    collapseText: 'Collapse',
+                    toggle() {
+                        this.collapsed = !this.collapsed;
+                        fetch('/mary/toogle-sidebar?collapsed=' + this.collapsed);
+                        this.$dispatch('sidebar-toggled', this.collapsed);
+                    }
+                }"
+
+                @menu-sub-clicked="if(collapsed) { toggle() }"
+                class="drawer-side z-20 lg:z-auto"
+            >
+                <label for="main-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+
+                
+                <div
+                    :class="collapsed
+                        ? '!w-[62px] [&>*_summary::after]:!hidden [&_.mary-hideable]:!hidden [&_.display-when-collapsed]:!block [&_.hidden-when-collapsed]:!hidden'
+                        : '!w-[270px] [&>*_summary::after]:!block [&_.mary-hideable]:!block [&_.hidden-when-collapsed]:!block [&_.display-when-collapsed]:!hidden'"
+
+                    class="flex flex-col !transition-all !duration-100 ease-out overflow-x-hidden overflow-y-auto h-screen w-[270px] [&amp;&gt;*_summary::after]:block [&amp;_.mary-hideable]:block [&amp;_.hidden-when-collapsed]:block [&amp;_.display-when-collapsed]:hidden bg-base-100 lg:bg-inherit" drawer="main-drawer" collapsible="collapsible"
+                >
+                    <div class="flex-1">
+                        <a href="/" wire:navigate>
+        <!-- Hidden when collapsed -->
+        <div class="hidden-when-collapsed p-4 pt-3">
+            <div class="flex items-center gap-2">
+                <svg class="inline w-6 -mb-1 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3"/>
+</svg>
+                    <span class="font-bold text-3xl me-3 bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent ">
+                    SAE4013
+                </span>
+            </div>
+        </div>
+
+        <!-- Display when collapsed -->
+        <div class="display-when-collapsed hidden mx-5 mt-4 lg:mb-6 h-[28px]">
+            <svg class="inline w-6 -mb-1 text-purple-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" data-slot="icon">
+  <path d="M11.644 1.59a.75.75 0 0 1 .712 0l9.75 5.25a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.712 0l-9.75-5.25a.75.75 0 0 1 0-1.32l9.75-5.25Z"/>
+  <path d="m3.265 10.602 7.668 4.129a2.25 2.25 0 0 0 2.134 0l7.668-4.13 1.37.739a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.71 0l-9.75-5.25a.75.75 0 0 1 0-1.32l1.37-.738Z"/>
+  <path d="m10.933 19.231-7.668-4.13-1.37.739a.75.75 0 0 0 0 1.32l9.75 5.25c.221.12.489.12.71 0l9.75-5.25a.75.75 0 0 0 0-1.32l-1.37-.738-7.668 4.13a2.25 2.25 0 0 1-2.134-.001Z"/>
+</svg>
+            </div>
+    </a>
+            
+            <ul class="menu w-full" >
+        
+        
+        <div wire:key="mary94daa3ad6662d2dc0b32f21bd4c66a4d">
+        <div
+            class="flex justify-start items-center gap-4 px-3 -mx-2 !-mt-2 rounded bg-black/20"
+        >
+
+            
+            <!-- AVATAR -->
+            
+            
+
+            
+            <!-- CONTENT -->
+            <div class="flex-1 overflow-hidden whitespace-nowrap text-ellipsis truncate w-0 mary-hideable">
+                
+                <div class="py-3">
+                    <div  class="font-semibold truncate" >
+                        45213546
+                    </div>
+
+                    <div  class="text-base-content/50 text-sm truncate" >
+                        benitezmartina10@gmail.com
+                    </div>
+                </div>
+
+                            </div>
+
+            <!-- ACTION -->
+                                                <div class="py-3 flex items-center gap-3 mary-hideable">
+                            <a href="/profile"
+    
+        wire:key="mary0177ad9a54fcf2836375084254e09225"
+        type="button"
+        class="btn !inline-flex lg:tooltip lg:tooltip-left btn-circle btn-ghost btn-xs hover:text-primary"
+
+        
+                    wire:navigate
+        
+                    data-tip="PERFIL"
+        
+            >
+
+        <!-- SPINNER LEFT -->
+        
+        <!-- ICON -->
+                    <span class="block" >
+                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/>
+</svg>
+                </span>
+        
+        <!-- LABEL / SLOT -->
+                    
+        
+        <!-- ICON RIGHT -->
+        
+        <!-- SPINNER RIGHT -->
+        
+            </a>
+                                <a href="/logout"
+    
+        wire:key="marycfe979ec5b52befed9611c6135ba97a0"
+        type="button"
+        class="btn !inline-flex lg:tooltip lg:tooltip-left btn-circle btn-ghost btn-xs hover:text-error"
+
+        
+        
+                    data-tip="SALIR"
+        
+            >
+
+        <!-- SPINNER LEFT -->
+        
+        <!-- ICON -->
+                    <span class="block" >
+                <svg class="inline w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9"/>
+</svg>
+                </span>
+        
+        <!-- LABEL / SLOT -->
+                    
+        
+        <!-- ICON RIGHT -->
+        
+        <!-- SPINNER RIGHT -->
+        
+            </a>
+                    </div>
+
+                                    </div>
+
+            </div>                    
+                    <div wire:key="lw-2067018863-1-mary94daa3ad6662d2dc0b32f21bd4c66a4d" wire:snapshot="{&quot;data&quot;:{&quot;shortName&quot;:null},&quot;memo&quot;:{&quot;id&quot;:&quot;Rv7AFQwoCHr9kpYpbjA3&quot;,&quot;name&quot;:&quot;bookmarks&quot;,&quot;path&quot;:&quot;dashboard&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;es&quot;,&quot;islands&quot;:[]},&quot;checksum&quot;:&quot;acd3b81f391a332e5b089535619892f74a87a9424c2cc736b39e8ed093f0401d&quot;}" wire:effects="{&quot;listeners&quot;:[&quot;context-batch-sync&quot;,&quot;bookmarked&quot;,&quot;refresh-bookmarks&quot;]}" wire:id="Rv7AFQwoCHr9kpYpbjA3" wire:name="bookmarks">
+    
+    <div class="mt-2 space-y-1">
+        <!--[if BLOCK]><![endif]-->            <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->        <!--[if ENDBLOCK]><![endif]-->    </div>
+</div>
+
+                    <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap mary-active-menu bg-base-300"
+
+                            href="/dashboard"
+
+                
+                                    wire:navigate
+                            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Dashboard
+
+                                                </span>
+                    </a>
+    </li>                    
+                    <!--[if BLOCK]><![endif]-->    
+    <!--[if BLOCK]><![endif]-->        <li>
+        <a wire:key="lw-2067018863-2-mary94daa3ad6662d2dc0b32f21bd4c66a4d-0" wire:snapshot="{&quot;data&quot;:{&quot;type&quot;:&quot;desktop&quot;},&quot;memo&quot;:{&quot;id&quot;:&quot;84FBSnrWhDsLsbQNRjvi&quot;,&quot;name&quot;:&quot;unread-messages-indicator&quot;,&quot;path&quot;:&quot;dashboard&quot;,&quot;method&quot;:&quot;GET&quot;,&quot;release&quot;:&quot;a-a-a&quot;,&quot;children&quot;:[],&quot;scripts&quot;:[],&quot;assets&quot;:[],&quot;errors&quot;:[],&quot;locale&quot;:&quot;es&quot;,&quot;islands&quot;:[]},&quot;checksum&quot;:&quot;359dff2f4da7846359a67f8c2b15c65f61aa2582669a22ae8f497f086b797cb6&quot;}" wire:effects="[]" wire:id="84FBSnrWhDsLsbQNRjvi" wire:name="unread-messages-indicator"
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap"
+
+                            href="/chat"
+
+                
+                            
+                    >
+            
+            <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->
+            <!--[if BLOCK]><![endif]-->                <span class="block py-0.5" >
+                    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->        <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/>
+</svg>
+    <!--[if BLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                </span>
+            <!--[if ENDBLOCK]><![endif]-->
+            <!--[if BLOCK]><![endif]-->            <span class="mary-hideable whitespace-nowrap truncate">
+                <!--[if BLOCK]><![endif]-->                    Comunicación
+
+                    <!--[if BLOCK]><![endif]-->                        <span class="badge badge-sm badge-error text-white font-bold">1</span>
+                    <!--[if ENDBLOCK]><![endif]-->                <!--[if ENDBLOCK]><![endif]-->            </span>
+            <!--[if ENDBLOCK]><![endif]-->        </a>
+    </li>    <!--[if ENDBLOCK]><![endif]--><!--[if ENDBLOCK]><![endif]-->                    
+                    
+                    
+                    
+                    
+                                            <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap"
+
+                            href="/calendar"
+
+                
+                                    wire:navigate
+                            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Calendario
+
+                                                </span>
+                    </a>
+    </li>                        <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap"
+
+                            href="/enrollments"
+
+                
+                                    wire:navigate
+                            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Matricularse
+
+                                                </span>
+                    </a>
+    </li>                        <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap"
+
+                            href="/inscriptions"
+
+                
+                                    wire:navigate
+                            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Inscripciones
+
+                                                </span>
+                    </a>
+    </li>                        <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap"
+
+                            href="http://localhost/my-payment-plan"
+
+                
+                                    wire:navigate
+                            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Mis Pagos
+
+                                                </span>
+                    </a>
+    </li>
+    </ul>
+                    </div>
+
+                     
+                                        <ul class="menu w-full hidden lg:block" >
+        
+        
+        <li>
+        <a
+            class="my-0.5 py-1.5 px-4 hover:text-inherit whitespace-nowrap" @click="toggle"
+
+            
+                    >
+            
+            
+                            <span class="block py-0.5" >
+                    <svg class="inline w-5 h-5 mb-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
+  <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/>
+</svg>
+                    </span>
+            
+                        <span class="mary-hideable whitespace-nowrap truncate">
+                                    Collapse
+
+                                                </span>
+                    </a>
+    </li>
+    </ul>                                    </div>
+            </div>
+                
+
+    </div>
+</main>
+
+ 
+ 
+    
+    <div>
+    <div x-persist="mary-toaster">
+    <div
+        x-cloak
+        x-data="{ show: false, timer: '', toast: ''}"
+        @mary-toast.window="
+                        clearTimeout(timer);
+                        toast = $event.detail.toast
+                        setTimeout(() => show = true, 100);
+                        timer = setTimeout(() => show = false, $event.detail.toast.timeout);
+                        "
+    >
+        <div
+            class="toast rounded-md fixed cursor-pointer z-[999]"
+            :class="toast.position || 'toast-top toast-end'"
+            x-show="show"
+            x-classes="alert alert-success alert-warning alert-error alert-info top-10 end-10 toast toast-top toast-bottom toast-center toast-end toast-middle toast-start"
+            @click="show = false"
+        >
+            <div class="alert gap-2" :class="toast.css">
+                <div x-html="toast.icon"></div>
+                <div class="grid">
+                    <div x-html="toast.title" class="font-bold"></div>
+                    <div x-html="toast.description" class="text-xs"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.toast = function(payload){
+            window.dispatchEvent(new CustomEvent('mary-toast', {detail: payload}))
+        }
+
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('request', ({fail}) => {
+                fail(({status, content, preventDefault}) => {
+                    try {
+                        let result = JSON.parse(content);
+
+                        if (result?.toast && typeof window.toast === "function") {
+                            window.toast(result);
+                        }
+
+                        if ((result?.prevent_default ?? false) === true) {
+                            preventDefault();
+                        }
+                    } catch (e) {
+                        console.log(e)
+                    }
+                })
+            })
+        })
+    </script>
+    </div>
+</div>    
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const keys = ['cycle_id', 'user_id', 'career_id', 'subject_id'];
+            const sessions = {
+                cycle_id: null,
+                user_id: null,
+                career_id: null,
+                subject_id: null            };
+
+            // Inicializar cycle_id si no existe
+            if (!localStorage.getItem('cycle_id')) {
+                localStorage.setItem('cycle_id', sessions.cycle_id || new Date().getFullYear());
+            }
+
+            // Sincronizar contexto en LOTE (Batch) para reducir roundtrips
+            const toSync = [];
+            keys.forEach(key => {
+                const val = localStorage.getItem(key);
+                if (val && val != sessions[key]) {
+                    toSync.push({ 
+                        type: key, 
+                        value: val, 
+                        name: localStorage.getItem(key + '_name') // Enviar nombre cacheado
+                    });
+                }
+            });
+
+            if (toSync.length > 0) {
+                window.Livewire.dispatch('context-batch-sync', { items: toSync });
+            }
+
+            // Actualizar visualmente el Dashboard en el menú
+            const updateDashboardUI = () => {
+                const dashboardTitle = document.querySelector('[title^="Dashboard"]');
+                if (dashboardTitle) {
+                    const cycle = localStorage.getItem('cycle_id');
+                    dashboardTitle.innerText = `Dashboard ${cycle}`;
+                }
+            };
+            
+            updateDashboardUI();
+
+            // Escuchar actualizaciones de contexto
+            window.addEventListener('context-updated', event => {
+                localStorage.setItem(event.detail.type, event.detail.value);
+                if (event.detail.name) {
+                    localStorage.setItem(event.detail.type + '_name', event.detail.name);
+                }
+                if (event.detail.type === 'cycle_id') updateDashboardUI();
+                
+                // Si se actualizó la materia, recargar para que aparezca "Contenidos" en el menú
+                if (event.detail.type === 'subject_id') {
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            });
+
+            window.addEventListener('context-cleared', event => {
+                localStorage.removeItem(event.detail.type);
+                localStorage.removeItem(event.detail.type + '_name');
+                if (event.detail.type === 'subject_id') window.location.reload();
+            });
+            
+            window.addEventListener('cycle-updated', event => {
+                localStorage.setItem('cycle_id', event.detail.cycle);
+                updateDashboardUI();
+            });
+        });
+    </script>
+<!-- Livewire Scripts -->
+<script src="http://localhost/livewire-eb2fabba/livewire.js?id=6b3709b1"   data-csrf="bWQrW2QQRMKVZ13UHDLeZWCfR3YoYuElbluugB1e" data-module-url="http://localhost/livewire-eb2fabba" data-update-uri="http://localhost/livewire-eb2fabba/update" data-navigate-once="true"></script>
+</body>
+
+</html>

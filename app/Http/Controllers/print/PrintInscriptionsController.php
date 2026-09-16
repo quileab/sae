@@ -4,8 +4,8 @@ namespace App\Http\Controllers\print;
 
 use App\Http\Controllers\Controller;
 use App\Models\Career;
-use App\Models\Configs;
-use App\Models\Inscriptions;
+use App\Models\Config;
+use App\Models\Inscription;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
@@ -19,14 +19,14 @@ class PrintInscriptionsController extends Controller
     { // Constructor, obtengo de la configuracion los datos del
         //  grupo MAIN en forma de array asociativo ID => VALOR en This->Config
         // obtengo datos del grupo MAIN
-        $this->config = Configs::where('group', 'main')->get()->pluck('value', 'id')->toArray();
+        $this->config = Config::where('group', 'main')->get()->pluck('value', 'id')->toArray();
         // agrego a config datos del grupo INSCRIPTIONS
-        $this->config += Configs::where('group', 'inscriptions')->get()->pluck('description', 'id')->toArray();
+        $this->config += Config::where('group', 'inscriptions')->get()->pluck('description', 'id')->toArray();
     }
 
     public function inscriptions($student, $insc_conf_id)
     {
-        return Inscriptions::where('user_id', $student->id)
+        return Inscription::where('user_id', $student->id)
             ->where('configs_id', $insc_conf_id)->orderBy('subject_id')->get();
     }
 

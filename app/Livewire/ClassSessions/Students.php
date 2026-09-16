@@ -2,11 +2,16 @@
 
 namespace App\Livewire\ClassSessions;
 
+use App\Enums\EnrollmentStatus;
 use App\Models\ClassSession;
 use App\Models\Enrollment;
 use App\Models\Grade;
+use App\Models\JustifiedAbsence;
+use App\Models\Subject;
 use App\Models\User;
+use App\Services\EnrollmentAcademicStatusService;
 use App\Traits\AuthorizesAccess;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -34,13 +39,37 @@ class Students extends Component
 
     public $data = [];
 
+    public $evaluationChoices = [];
+
     #[Url(as: 'subject_id')]
     public $subject_id = null;
 
     #[Computed]
     public function subject()
     {
-        return \App\Models\Subject::find($this->subject_id);
+        return Subject::find($this->subject_id);
+    }
+
+    #[Computed]
+    public function justifications(): array
+    {
+        if (! $this->class_session || ! $this->class_session->date) {
+            return [];
+        }
+
+        $date = Carbon::parse($this->class_session->date)->toDateString();
+        $studentIds = $this->items()->pluck('id')->toArray();
+
+        if (empty($studentIds)) {
+            return [];
+        }
+
+        return JustifiedAbsence::whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->whereIn('user_id', $studentIds)
+            ->get()
+            ->keyBy('user_id')
+            ->toArray();
     }
 
     public function mount($id = null)
@@ -56,7 +85,7 @@ class Students extends Component
         } else {
             // Si no hay subject_id por URL, intentar sesión o primera materia disponible
             if (! $this->subject_id) {
-                $this->subject_id = session('subject_id') ?? ($user->subjects->first()->id ?? null);
+                $this->subject_id = session('current_subject_id') ?? ($user->subjects->first()->id ?? null);
             }
 
             if (! $this->subject_id) {
@@ -75,6 +104,11 @@ class Students extends Component
             $this->class_session->content = '';
         }
 
+        // Persistir el contexto de la materia
+        if ($this->subject_id) {
+            session()->put('current_subject_id', $this->subject_id);
+        }
+
         $this->authorizeSubject($this->subject_id);
 
         if ($this->class_session->subject_id != $this->subject_id) {
@@ -82,17 +116,12 @@ class Students extends Component
         }
     }
 
-    public function delete($id): void
-    {
-        $this->warning("Will delete #$id", 'It is fake.', position: 'toast-bottom');
-    }
-
     public function headers(): array
     {
         return [
-            ['key' => 'row_id', 'label' => '#', 'class' => 'w-10'],
-            ['key' => 'lastname', 'label' => 'Apellido', 'class' => 'w-64'],
-            ['key' => 'firstname', 'label' => 'Nombre', 'class' => 'w-full'],
+            ['key' => 'row_id', 'label' => '#', 'class' => 'w-1'],
+            ['key' => 'fullname', 'label' => 'Estudiante'],
+            ['key' => 'academic_status', 'label' => '% Asist. Gral.', 'sortable' => false],
             ['key' => 'attendance', 'label' => 'Asistencia', 'sortable' => false],
         ];
     }
@@ -103,14 +132,14 @@ class Students extends Component
         $search = Str::of($this->search)->lower()->ascii();
 
         $query = User::query()
-            ->select('users.id', 'users.lastname', 'users.firstname', 'users.email', 'users.phone')
+            ->select('users.id', 'users.lastname', 'users.firstname', 'users.email', 'users.phone', 'enrollments.id as enrollment_id')
             ->leftJoin('enrollments', 'users.id', '=', 'enrollments.user_id')
             ->leftJoin('grades', function ($join) {
                 $join->on('users.id', '=', 'grades.user_id')
                     ->where('grades.class_session_id', '=', $this->class_session->id);
             })
             ->where('enrollments.subject_id', $this->subject_id)
-            ->where('enrollments.status', 'active')
+            ->where('enrollments.status', EnrollmentStatus::Active->value)
             ->where('users.role', $this->role_student)
             ->orderBy($this->sortBy['column'], $this->sortBy['direction'])
             ->addSelect('grades.grade as grade', 'grades.attendance as attendance');
@@ -125,6 +154,12 @@ class Students extends Component
         return $query->get();
     }
 
+    #[Computed]
+    public function enrollments(): Collection
+    {
+        return Enrollment::where('subject_id', $this->subject_id)->get()->keyBy('id');
+    }
+
     public function attendance($userId): void
     {
         if (isset($this->class_session->id) == false) {
@@ -134,9 +169,20 @@ class Students extends Component
         }
 
         $user = User::find($userId);
-        if (!$user) {
+        if (! $user) {
             $this->error('Usuario no encontrado.');
+
             return;
+        }
+
+        // IDOR Prevention: Ensure the user is actually enrolled in this subject and is a student
+        $isEnrolled = Enrollment::where('user_id', $userId)
+            ->where('subject_id', $this->subject_id)
+            ->where('status', EnrollmentStatus::Active->value)
+            ->exists();
+
+        if (! $isEnrolled || $user->role !== 'student') {
+            abort(403, 'El usuario no está matriculado en esta materia o no es un estudiante válido.');
         }
 
         $this->data = $user->toArray();
@@ -149,8 +195,10 @@ class Students extends Component
                 'class_session_id' => $this->class_session->id,
                 'attendance' => 0,
                 'grade' => 0,
+                'type' => 'regular',
                 'approved' => 0,
                 'comments' => '',
+                'recovered_grade_id' => null,
             ];
         } catch (\Throwable $th) {
             $this->grades = [
@@ -158,11 +206,34 @@ class Students extends Component
                 'class_session_id' => $this->class_session->id,
                 'attendance' => 0,
                 'grade' => 0,
+                'type' => 'regular',
                 'approved' => 0,
                 'comments' => '',
+                'recovered_grade_id' => null,
             ];
         }
+        $this->loadEvaluationChoices($userId);
         $this->drawer = true;
+    }
+
+    protected function loadEvaluationChoices(int $userId): void
+    {
+        $this->evaluationChoices = Grade::where('user_id', $userId)
+            ->where('type', Grade::TYPE_EVALUATION)
+            ->whereHas('classSession', function ($q) {
+                $q->where('subject_id', $this->subject_id);
+            })
+            ->with('classSession')
+            ->get()
+            ->map(function (Grade $grade) {
+                $date = $grade->classSession?->date ? Carbon::parse($grade->classSession->date)->format('d/m/Y') : 's/f';
+
+                return [
+                    'id' => $grade->id,
+                    'name' => "EV {$date} - Nota: {$grade->grade}",
+                ];
+            })
+            ->toArray();
     }
 
     public function attendanceSet($userId, $value): void
@@ -176,20 +247,24 @@ class Students extends Component
         if ($value !== null) {
             $this->grades['attendance'] = $value;
         }
-        
+
         $this->validate([
             'grades.attendance' => ['required', 'integer', 'min:0', 'max:100'],
             'grades.grade' => ['required', 'integer', 'min:0', 'max:10'],
+            'grades.type' => ['required', 'string', 'in:regular,evaluation,practical_work,recuperatory'],
+            'grades.recovered_grade_id' => ['nullable', 'integer', 'exists:grades,id'],
             'grades.comments' => ['nullable', 'string', 'max:255'],
         ]);
 
         $attendance = (int) $this->grades['attendance'];
         $gradeValue = (int) $this->grades['grade'];
+        $type = $this->grades['type'];
         $approved = (int) ($this->grades['approved'] ?? 0);
         $comments = trim($this->grades['comments'] ?? '');
+        $recoveredGradeId = $type === 'recuperatory' ? ($this->grades['recovered_grade_id'] ?? null) : null;
 
-        // Economy/Optimization: If all values are zero/empty, delete the record to save space
-        if ($attendance === 0 && $gradeValue === 0 && $approved === 0 && empty($comments)) {
+        // Economy/Optimization: If all values are zero/empty and the type is regular, delete the record to save space
+        if ($type === 'regular' && $attendance === 0 && $gradeValue === 0 && $approved === 0 && empty($comments)) {
             Grade::where('user_id', $this->data['id'])
                 ->where('class_session_id', $this->class_session->id)
                 ->delete();
@@ -201,31 +276,19 @@ class Students extends Component
                     'class_session_id' => $this->class_session->id,
                     'attendance' => $attendance,
                     'grade' => $gradeValue,
+                    'type' => $type,
                     'approved' => $approved,
                     'comments' => $comments,
+                    'recovered_grade_id' => $recoveredGradeId,
                 ]
             );
         }
-
         $this->drawer = false;
         $this->success('Registrado.');
-        
+
         // Refrescar la propiedad computada para reflejar el cambio (especialmente si se eliminó)
         unset($this->items);
-    }
-
-    public bool $profileModal = false;
-
-    public $studentProfile = null;
-
-    public function viewProfile($userId): void
-    {
-        $this->studentProfile = User::with('careers')->find($userId);
-        if ($this->studentProfile) {
-            $this->profileModal = true;
-        } else {
-            $this->error('Estudiante no encontrado.');
-        }
+        unset($this->justifications);
     }
 
     public function bookmark($id): void
@@ -241,6 +304,41 @@ class Students extends Component
             ->delete();
         $this->success('Estudiante desmatriculado.');
         $this->drawer = false;
+    }
+
+    public function calculateApprovals(): void
+    {
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
+            abort(403, 'No tienes permiso para realizar esta acción.');
+        }
+
+        $enrollments = Enrollment::where('subject_id', $this->subject_id)
+            ->where('status', EnrollmentStatus::Active->value)
+            ->get();
+
+        $service = app(EnrollmentAcademicStatusService::class);
+        $allStatusData = $service->calculate($enrollments);
+
+        $approvedCount = 0;
+
+        foreach ($enrollments as $enrollment) {
+            $statusData = $allStatusData[$enrollment->id] ?? null;
+
+            // Si el estado es "Promovido", marcamos como completada
+            if ($statusData && $statusData['status'] === 'Promovido') {
+                $enrollment->update(['status' => EnrollmentStatus::Completed->value]);
+                $approvedCount++;
+            }
+        }
+
+        if ($approvedCount > 0) {
+            $this->success("¡Proceso finalizado! Se han aprobado $approvedCount alumnos automáticamente.");
+        } else {
+            $this->warning('No se encontraron nuevos alumnos que cumplan con los requisitos de promoción (Asistencia >= 75%, Evaluaciones >= 8 y Trabajos Prácticos >= 6).');
+        }
+
+        unset($this->items);
+        unset($this->justifications);
     }
 
     public function render()

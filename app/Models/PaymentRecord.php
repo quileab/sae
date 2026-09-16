@@ -13,6 +13,7 @@ class PaymentRecord extends Model
         'paymentBox',
         'description',
         'paymentAmount',
+        'transaction_id',
     ];
 
     protected $table = 'paymentrecords';
@@ -24,8 +25,8 @@ class PaymentRecord extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function userpayments()
+    public function userPayment()
     {
-        return $this->belongsTo(UserPayments::class);
+        return $this->belongsTo(UserPayment::class, 'userpayments_id');
     }
 }

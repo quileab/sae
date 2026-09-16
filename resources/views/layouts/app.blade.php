@@ -3,23 +3,25 @@
 
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ isset($title) ? $title . ' - ' . config('app.name') : config('app.name') }}</title>
     @if(config('mercadopago.public_key'))
-        <script src="https://sdk.mercadopago.com/js/v2"></script>
+        <script src="https://sdk.mercadopago.com/js/v2" defer></script>
         <script>
-            const mp = new MercadoPago("{{ config('mercadopago.public_key') }}", {
-                locale: 'es-AR'
+            document.addEventListener('DOMContentLoaded', function() {
+                const mp = new MercadoPago("{{ config('mercadopago.public_key') }}", {
+                    locale: 'es-AR'
+                });
             });
         </script>
     @endif
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#570df8">
+    <meta name="robots" content="noindex, nofollow">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="{{ asset('js/tinymce/tinymce.min.js') }}" defer></script>
 </head>
 
 <body class="min-h-screen font-sans antialiased bg-base-200/50 dark:bg-base-200">
@@ -29,6 +31,9 @@
             <x-app-brand />
         </x-slot:brand>
         <x-slot:actions>
+            @auth
+                <livewire:unread-messages-indicator type="mobile" />
+            @endauth
             <label for="main-drawer" class="lg:hidden me-3">
                 <x-icon name="o-bars-3" class="cursor-pointer" />
             </label>
@@ -50,6 +55,7 @@
                     @php $user = auth()->user(); @endphp
                     {{-- SETEO User --}}
                     <x-list-item :item="$user" value="name" sub-value="email" no-separator no-hover
+                        avatar="{{ $user->avatar_url }}"
                         class="-mx-2 !-mt-2 rounded bg-black/20">
                         <x-slot:actions>
                             <x-button icon="o-user" class="btn-circle btn-ghost btn-xs hover:text-primary"
@@ -63,7 +69,7 @@
 
                     <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
                     
-                    <x-menu-item title="Comunicación" icon="o-chat-bubble-left-right" link="/chat" no-wire-navigate />
+                    <livewire:unread-messages-indicator type="desktop" />
                     
                     @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
                         <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
@@ -81,7 +87,9 @@
                     @if($user->hasAnyRole(['admin', 'principal', 'administrative', 'teacher']))
                         <x-menu-sub title="Clases" icon="o-document-duplicate">
                             <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
-                            <x-menu-item title="Estudiantes" icon="o-user-group" link="/class-sessions/students" />
+                            <x-menu-item title="Directorio Estudiantes" icon="o-user-group" link="/students-directory" />
+                            <x-menu-item title="Cierre de Actas" icon="o-document-check" link="/final-grades" />
+                            <x-menu-item title="Alumnos en Riesgo" icon="o-exclamation-triangle" link="/reports/risk" />
                             <x-menu-item title="Contenidos" icon="o-academic-cap" link="/subjects-content" />
                         </x-menu-sub>
                     @endif
@@ -89,6 +97,7 @@
                     @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                         <x-menu-sub title="Biblioteca" icon="o-book-open">
                             <x-menu-item title="Libros" icon="o-book-open" link="/books" />
+                            <x-menu-item title="Tejuelos" icon="o-qr-code" link="/books/spines" />
                             <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
                         </x-menu-sub>
 
@@ -107,7 +116,7 @@
                         
                         <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
                             <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
-                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/configs" />
+                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/config-manager" />
                             <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
                         </x-menu-sub>
                     @endif
@@ -146,10 +155,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             const keys = ['cycle_id', 'user_id', 'career_id', 'subject_id'];
             const sessions = {
-                cycle_id: {{ json_encode(session('cycle_id')) }},
-                user_id: {{ json_encode(session('user_id')) }},
-                career_id: {{ json_encode(session('career_id')) }},
-                subject_id: {{ json_encode(session('subject_id')) }}
+                cycle_id: @json(session('cycle_id')),
+                user_id: @json(session('user_id')),
+                career_id: @json(session('career_id')),
+                subject_id: @json(session('subject_id'))
             };
 
             // Inicializar cycle_id si no existe
@@ -195,14 +204,14 @@
                 
                 // Si se actualizó la materia, recargar para que aparezca "Contenidos" en el menú
                 if (event.detail.type === 'subject_id') {
-                    setTimeout(() => window.location.reload(), 500);
+                    window.Livewire.dispatch('subject-context-changed');
                 }
             });
 
             window.addEventListener('context-cleared', event => {
                 localStorage.removeItem(event.detail.type);
                 localStorage.removeItem(event.detail.type + '_name');
-                if (event.detail.type === 'subject_id') window.location.reload();
+                if (event.detail.type === 'subject_id') window.Livewire.dispatch('subject-context-changed');
             });
             
             window.addEventListener('cycle-updated', event => {

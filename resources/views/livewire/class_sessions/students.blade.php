@@ -4,6 +4,13 @@
         <x-slot:middle class="!justify-end">
             <x-input placeholder="buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
         </x-slot:middle>
+        @if(auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+        <x-slot:actions>
+            <x-button label="Calcular Aprobaciones" icon="o-calculator" class="btn-primary" 
+                wire:confirm="¿Estás seguro de que deseas calcular y cerrar la condición de los alumnos promovidos para esta materia? Los alumnos con promedio de evaluaciones >= 8, trabajos prácticos >= 6 y asistencia >= 75% serán marcados como 'Aprobados (Completada)'"
+                wire:click="calculateApprovals" spinner />
+        </x-slot:actions>
+        @endif
     </x-header>
 
     <!-- TABLE  -->
@@ -24,6 +31,21 @@
             {{ $loop->index + 1 }}
             @endscope
 
+            {{-- academic status --}}
+            @scope('cell_academic_status', $item)
+            @php
+                $enrollment = $this->enrollments->get($item->enrollment_id);
+                $status = $enrollment?->academic_status;
+            @endphp
+            @if($status)
+                @if(in_array($status['status'], ['Sin Fecha', 'Sin Datos']))
+                    <x-badge :value="$status['status']" :class="$status['color'] . ' badge-outline'" />
+                @else
+                    <x-badge value="{{ $status['attendance'] }}%" :class="$status['color'] . ' badge-outline'" />
+                @endif
+            @endif
+            @endscope
+
             {{-- attendance --}}
             @scope('cell_attendance', $item)
             <div class="flex items-center gap-2">
@@ -34,85 +56,41 @@
                         <x-badge value="Ausente" class="badge-ghost text-error opacity-50 italic" />
                     @endif
                 </div>
-                <div class="flex items-center gap-1 border-l border-white/10 pl-2">
-                    <x-button label="100" class="btn-xs {{ $item->attendance == 100 ? 'btn-success' : 'btn-outline btn-success' }}"
-                        wire:click="attendanceSet({{ $item->id }}, 100)" 
-                        wire:target="attendanceSet({{ $item->id }}, 100)" spinner tooltip="100%" />
-                    <x-button label="50" class="btn-xs {{ $item->attendance == 50 ? 'btn-warning' : 'btn-outline btn-warning' }}"
-                        wire:click="attendanceSet({{ $item->id }}, 50)" 
-                        wire:target="attendanceSet({{ $item->id }}, 50)" spinner tooltip="50%" />
-                    <x-button label="X" class="btn-xs {{ ($item->attendance == 0 && !is_null($item->attendance)) ? 'btn-error' : 'btn-outline btn-error' }}"
-                        wire:click="attendanceSet({{ $item->id }}, 0)" 
-                        wire:target="attendanceSet({{ $item->id }}, 0)" spinner tooltip="Ausente" />
+                @if(isset($this->justifications[$item->id]))
+                    <span class="tooltip" data-tip="Justificación: {{ $this->justifications[$item->id]['description'] }}">
+                        <span class="badge badge-info badge-sm gap-1 text-white py-0.5 px-2">
+                            <x-icon name="o-document-text" class="w-3.5 h-3.5" />
+                            Justificado
+                        </span>
+                    </span>
+                @endif
+            </div>
+            @endscope
+
+            {{-- actions --}}
+            @scope('actions', $item)
+            <div class="flex items-center gap-1 transition-opacity duration-200"
+                wire:loading.class="opacity-50 pointer-events-none"
+                wire:target="attendanceSet({{ $item->id }}, 100), attendanceSet({{ $item->id }}, 50), attendanceSet({{ $item->id }}, 0)">
+                <x-button label="100" class="btn-xs {{ $item->attendance == 100 ? 'btn-success' : 'btn-outline btn-success' }}"
+                    wire:click="attendanceSet({{ $item->id }}, 100)" 
+                    wire:target="attendanceSet({{ $item->id }}, 100)" tooltip="100%" />
+                <x-button label="50" class="btn-xs {{ $item->attendance == 50 ? 'btn-warning' : 'btn-outline btn-warning' }}"
+                    wire:click="attendanceSet({{ $item->id }}, 50)" 
+                    wire:target="attendanceSet({{ $item->id }}, 50)" tooltip="50%" />
+                <x-button label="X" class="btn-xs {{ ($item->attendance == 0 && !is_null($item->attendance)) ? 'btn-error' : 'btn-outline btn-error' }}"
+                    wire:click="attendanceSet({{ $item->id }}, 0)" 
+                    wire:target="attendanceSet({{ $item->id }}, 0)" tooltip="Ausente" />
+                
+                <div class="border-l border-base-300 ml-1 pl-1 flex gap-1">
                     <x-button icon="o-pencil-square" class="btn-xs btn-ghost text-primary"
                         wire:click="attendance({{ $item->id }})" tooltip="Editar detalle" />
-                    <x-button icon="o-eye" class="btn-xs btn-ghost text-info"
-                        wire:click="viewProfile({{ $item->id }})" tooltip="Ver Perfil" />
                 </div>
             </div>
             @endscope
         </x-table>
     </x-card>
 
-    <!-- PROFILE MODAL -->
-    <x-modal wire:model="profileModal" class="backdrop-blur" title="Perfil del Estudiante">
-        @if($studentProfile)
-            <div class="flex flex-col gap-4">
-                <div class="flex items-center gap-4 border-b border-base-300 pb-4">
-                    <x-avatar :placeholder="strtoupper(substr($studentProfile->firstname, 0, 1))" class="!w-16 !rounded-lg bg-primary text-white text-2xl" />
-                    <div>
-                        <h2 class="text-2xl font-bold">{{ $studentProfile->lastname }}, {{ $studentProfile->firstname }}</h2>
-                        <p class="text-sm opacity-70">DNI: {{ $studentProfile->id }}</p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-list-item :item="$studentProfile" no-hover no-separator>
-                        <x-slot:avatar>
-                            <x-icon name="o-envelope" class="text-primary" />
-                        </x-slot:avatar>
-                        <x-slot:value>Email</x-slot:value>
-                        <x-slot:sub-value>{{ $studentProfile->email }}</x-slot:sub-value>
-                        <x-slot:actions>
-                            <x-button icon="o-clipboard" class="btn-ghost btn-xs" @click="navigator.clipboard.writeText('{{ $studentProfile->email }}'); $wire.success('Email copiado')" />
-                        </x-slot:actions>
-                    </x-list-item>
-
-                    <x-list-item :item="$studentProfile" no-hover no-separator>
-                        <x-slot:avatar>
-                            <x-icon name="o-phone" class="text-success" />
-                        </x-slot:avatar>
-                        <x-slot:value>Teléfono</x-slot:value>
-                        <x-slot:sub-value>{{ $studentProfile->phone ?: 'No registrado' }}</x-slot:sub-value>
-                        <x-slot:actions>
-                            @if($studentProfile->phone)
-                                <x-button icon="o-clipboard" class="btn-ghost btn-xs" @click="navigator.clipboard.writeText('{{ $studentProfile->phone }}'); $wire.success('Teléfono copiado')" />
-                            @endif
-                        </x-slot:actions>
-                    </x-list-item>
-                </div>
-
-                <div class="bg-base-200 rounded-lg p-4">
-                    <h3 class="font-bold mb-2 flex items-center gap-2">
-                        <x-icon name="o-academic-cap" class="w-4 h-4" />
-                        Carreras Inscriptas
-                    </h3>
-                    <div class="flex flex-wrap gap-2">
-                        @forelse($studentProfile->careers as $career)
-                            <x-badge :value="$career->name" class="badge-outline" />
-                        @empty
-                            <p class="text-sm opacity-50 italic">Sin carreras asignadas</p>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
-        @endif
-        <x-slot:actions>
-            <x-button label="Marcar" icon="o-bookmark" wire:click="bookmark({{ $studentProfile?->id }})" class="btn-outline btn-sm" />
-            <x-button label="Ir al Chat" icon="o-chat-bubble-left" link="/chat?user_id={{ $studentProfile?->id }}" class="btn-primary btn-sm" />
-            <x-button label="Cerrar" @click="$wire.profileModal = false" class="btn-sm" />
-        </x-slot:actions>
-    </x-modal>
 
     <!-- FILTER DRAWER -->
     <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
@@ -139,8 +117,25 @@
                 inline />
             <x-checkbox label="Aprueba" wire:model="grades.approved" hint="Notas no numéricas" />
         </div>
+
+        <div class="mt-4">
+            <x-select label="Tipo de Nota" wire:model="grades.type" :options="[
+                ['id' => 'regular', 'name' => 'Clase Normal (Asistencia)'],
+                ['id' => 'evaluation', 'name' => 'Evaluación / Examen'],
+                ['id' => 'practical_work', 'name' => 'Trabajo Práctico'],
+                ['id' => 'recuperatory', 'name' => 'Evaluación / Recuperatorio'],
+            ]" option-value="id" option-label="name" />
+        </div>
+
+        @if(($grades['type'] ?? null) === 'recuperatory')
+            <div class="mt-4">
+                <x-select label="Recupera a" wire:model="grades.recovered_grade_id" :options="$evaluationChoices"
+                    option-value="id" option-label="name" placeholder="Seleccione la evaluación a recuperar" />
+            </div>
+        @endif
+
         <div class="grid items-center gap-4 mt-4">
-            <x-input label="Observaciones" wire:model="grades.comments" type="text" placeholder="Observaciones" hint="Comience con Ev: o TP: para indicar el TIPO (Evaluación o Trabajo Practico), de esta manera el sistema podrá calcular el promedio de notas" class="w-full" />
+            <x-input label="Observaciones" wire:model="grades.comments" type="text" placeholder="Observaciones" hint="Ya no es necesario anteponer EV o TP, use el selector superior" class="w-full" />
         </div>
         <x-slot:actions>
             <x-dropdown>

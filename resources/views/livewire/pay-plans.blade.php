@@ -7,7 +7,7 @@
 
     {{-- Plans Selection Bar --}}
     <div class="flex flex-wrap gap-2 p-3 bg-base-200 rounded-xl shadow-sm border border-base-300">
-        @forelse ($this->allPlansMasters as $plan)
+        @forelse ($this->allPaymentPlans as $plan)
             <div class="join shadow-sm">
                 <button wire:click="payPlanChanged('{{ $plan->id }}')" 
                     @class([
@@ -41,8 +41,8 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            @forelse ($this->currentPlansDetails as $detail)
-                <div class="group relative bg-base-100 rounded-xl shadow-sm border border-base-300 overflow-hidden hover:shadow-md transition-all duration-200">
+            @forelse ($this->currentPaymentPlanDetails as $detail)
+                <div wire:key="detail-{{ $detail->id }}" class="group relative bg-base-100 rounded-xl shadow-sm border border-base-300 overflow-hidden hover:shadow-md transition-all duration-200">
                     <div class="bg-primary/10 px-3 py-2 border-b border-base-300 flex justify-between items-center">
                         <span class="text-xs font-bold truncate pr-4">{{ $detail->title }}</span>
                         <x-button icon="o-pencil" wire:click="populateDetailData({{ $detail->id }})" class="btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 transition-opacity" />

@@ -12,16 +12,33 @@
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
 
             @foreach($this->subjects as $subject)
-                <div class="border border-white/10 rounded-lg overflow-hidden text-black dark:text-white">
+                @php
+                    $enrollment = $this->enrolledSubjects->get($subject->id);
+                    $isEnrolled = $enrollment !== null;
+                    $hasFinalGrade = $isEnrolled && $enrollment->final_grade !== null;
+                    $headerColor = $hasFinalGrade ? 'bg-success/80 text-success-content' : ($isEnrolled ? 'bg-blue-500/50' : 'bg-gray-500/30');
+                @endphp
+                <div class="border border-white/10 rounded-lg overflow-hidden text-black dark:text-white flex flex-col justify-between">
 
-                    <p class="p-2 border-b border-white/50 bg-blue-500/50 h-16 overflow-hidden">
-                        <small>{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong>
-                    </p>
+                    <div class="p-3 border-b border-white/30 {{ $headerColor }} h-16 overflow-hidden flex justify-between items-start">
+                        <span><small class="opacity-75">{{ $subject->id }}</small> <strong>{{ $subject->name }}</strong></span>
+                    </div>
 
-                    <div class="justify-end flex p-2 bg-gray-500/40">
-                        <x-button label="{{ in_array($subject->id, $this->enrolledSubjectIds) ? 'Desmatricularse' : 'Matricularse' }}"
-                            wire:click="toggleEnrollment({{ $subject->id }})"
-                            class="btn-sm {{ in_array($subject->id, $this->enrolledSubjectIds) ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}" />
+                    <div class="justify-between items-center flex p-2.5 bg-gray-500/40 min-h-[48px]">
+                        @if($hasFinalGrade)
+                            <span class="text-xs font-bold text-success flex items-center gap-1">
+                                <x-icon name="o-check-circle" class="w-4 h-4 text-success" /> Aprobada
+                            </span>
+                            <div class="badge badge-success text-white font-bold px-3 py-1 text-sm shadow-sm">
+                                Nota: {{ number_format((float)$enrollment->final_grade, 2) }}
+                            </div>
+                        @else
+                            <div class="w-full flex justify-end">
+                                <x-button label="{{ $isEnrolled ? 'Desmatricularse' : 'Matricularse' }}"
+                                    wire:click="toggleEnrollment({{ $subject->id }})"
+                                    class="btn-sm {{ $isEnrolled ? 'bg-red-500/50 text-white' : 'bg-lime-500/50 text-white' }}" />
+                            </div>
+                        @endif
                     </div>
 
                 </div>

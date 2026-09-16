@@ -3,21 +3,20 @@
 namespace App\Http\Controllers\print;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\UserPayments;
 use App\Models\PaymentRecord;
-use Illuminate\Http\Request;
+use App\Models\User;
+use App\Models\UserPayment;
 
 class PrintPaymentsController extends Controller
 {
     public function summary(User $user)
     {
         // Authorization check - only admins or the student themselves
-        if (!auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']) && auth()->id() !== $user->id) {
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative']) && auth()->id() !== $user->id) {
             abort(403);
         }
 
-        $payments = UserPayments::where('user_id', $user->id)
+        $payments = UserPayment::where('user_id', $user->id)
             ->orderBy('date', 'asc')
             ->get();
 

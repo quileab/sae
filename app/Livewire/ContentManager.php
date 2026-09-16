@@ -62,6 +62,8 @@ class ContentManager extends Component
 
     public $upload;
 
+    public bool $isStudent = false;
+
     public Subject $subject;
 
     public $subject_id;
@@ -77,11 +79,12 @@ class ContentManager extends Component
         $user = auth()->user();
 
         // Si recibimos 0 o null (desde el menú lateral), intentamos resolver la materia
-        if (!$subject || (is_numeric($subject) && $subject == 0) || (is_object($subject) && !$subject->exists)) {
-            $sid = session('subject_id') ?? ($user->subjects->first()->id ?? null);
+        if (! $subject || (is_numeric($subject) && $subject == 0) || (is_object($subject) && ! $subject->exists)) {
+            $sid = session('current_subject_id') ?? ($user->subjects->first()->id ?? null);
 
-            if (!$sid) {
+            if (! $sid) {
                 $this->error('Debe seleccionar una materia primero.');
+
                 return $this->redirect('/class-sessions', navigate: true);
             }
 
@@ -91,19 +94,24 @@ class ContentManager extends Component
             $this->subject = $subject;
         }
 
+        $this->isStudent = auth()->user()->hasRole('student');
         $this->subject_id = $this->subject->id;
-        $this->authorizeSubject($this->subject->id);
+        session()->put('current_subject_id', $this->subject_id);
+        $this->authorizeSubject($this->subject_id);
     }
 
     public function updatedSubjectId($value)
     {
         if ($value) {
-            return $this->redirect('/subjects-content/' . $value, navigate: true);
+            session()->put('current_subject_id', $value);
+
+            return $this->redirect('/subjects-content/'.$value, navigate: true);
         }
     }
 
     public function addUnit()
     {
+        $this->authorizeStaff();
         $this->reset('unitForm');
         $this->editingUnit = false;
         $this->showUnitModal = true;
@@ -111,6 +119,7 @@ class ContentManager extends Component
 
     public function editUnit($unitId)
     {
+        $this->authorizeStaff();
         $unit = $this->subject->units()->findOrFail($unitId);
         $this->unitForm = $unit->toArray();
         $this->editingUnit = true;
@@ -119,6 +128,7 @@ class ContentManager extends Component
 
     public function saveUnit()
     {
+        $this->authorizeStaff();
         $validated = $this->validate([
             'unitForm.name' => 'required|string|max:255',
             'unitForm.description' => 'nullable|string',
@@ -127,7 +137,6 @@ class ContentManager extends Component
         ]);
 
         $data = $validated['unitForm'];
-        $data['is_visible'] = filter_var($data['is_visible'], FILTER_VALIDATE_BOOLEAN);
 
         if ($this->editingUnit) {
             $unit = $this->subject->units()->findOrFail($this->unitForm['id']);
@@ -144,6 +153,7 @@ class ContentManager extends Component
 
     public function deleteUnit($unitId)
     {
+        $this->authorizeStaff();
         $this->subject->units()->findOrFail($unitId)->delete();
         $this->success('Unidad eliminada correctamente.');
         $this->subject->refresh();
@@ -156,6 +166,7 @@ class ContentManager extends Component
 
     public function addTopic($unitId)
     {
+        $this->authorizeStaff();
         $this->reset('topicForm');
         $this->topicForm['unit_id'] = $unitId;
         $this->editingTopic = false;
@@ -164,6 +175,7 @@ class ContentManager extends Component
 
     public function editTopic($topicId)
     {
+        $this->authorizeStaff();
         $topic = Topic::findOrFail($topicId);
         $this->topicForm = $topic->toArray();
         $this->editingTopic = true;
@@ -172,6 +184,7 @@ class ContentManager extends Component
 
     public function saveTopic()
     {
+        $this->authorizeStaff();
         $validated = $this->validate([
             'topicForm.unit_id' => 'required|exists:units,id',
             'topicForm.name' => 'required|string|max:255',
@@ -181,7 +194,6 @@ class ContentManager extends Component
         ]);
 
         $data = $validated['topicForm'];
-        $data['is_visible'] = filter_var($data['is_visible'], FILTER_VALIDATE_BOOLEAN);
 
         if ($this->editingTopic) {
             $topic = Topic::findOrFail($this->topicForm['id']);
@@ -198,6 +210,7 @@ class ContentManager extends Component
 
     public function deleteTopic($topicId)
     {
+        $this->authorizeStaff();
         Topic::findOrFail($topicId)->delete();
         $this->success('Tema eliminado correctamente.');
         $this->subject->refresh();
@@ -210,6 +223,7 @@ class ContentManager extends Component
 
     public function addResource($topicId)
     {
+        $this->authorizeStaff();
         $this->reset('resourceForm');
         $this->resourceForm['topic_id'] = $topicId;
         $this->editingResource = false;
@@ -218,6 +232,7 @@ class ContentManager extends Component
 
     public function editResource($resourceId)
     {
+        $this->authorizeStaff();
         $resource = Resource::findOrFail($resourceId);
         $this->resourceForm = $resource->toArray();
         $this->editingResource = true;
@@ -226,6 +241,7 @@ class ContentManager extends Component
 
     public function saveResource()
     {
+        $this->authorizeStaff();
         $validated = $this->validate([
             'resourceForm.topic_id' => 'required|exists:topics,id',
             'resourceForm.title' => 'required|string|max:255',
@@ -234,7 +250,6 @@ class ContentManager extends Component
         ]);
 
         $data = $validated['resourceForm'];
-        $data['is_visible'] = filter_var($data['is_visible'], FILTER_VALIDATE_BOOLEAN);
 
         if ($this->editingResource) {
             $resource = Resource::findOrFail($this->resourceForm['id']);
@@ -251,46 +266,32 @@ class ContentManager extends Component
 
     public function deleteResource($resourceId)
     {
+        $this->authorizeStaff();
         Resource::findOrFail($resourceId)->delete();
         $this->success('Recurso eliminado correctamente.');
         $this->subject->refresh();
     }
 
-    public function toggleUnitVisibility($unitId)
+    public function toggleVisibility(string $type, int $id): void
     {
-        $unit = Unit::find($unitId);
-        if ($unit) {
-            $unit->is_visible = ! $unit->is_visible;
-            $unit->save();
-            $this->subject->refresh();
-            $this->success('Visibilidad de la unidad actualizada.');
-        }
-    }
+        $this->authorizeStaff();
 
-    public function toggleTopicVisibility($topicId)
-    {
-        $topic = Topic::find($topicId);
-        if ($topic) {
-            $topic->is_visible = ! $topic->is_visible;
-            $topic->save();
-            $this->subject->refresh();
-            $this->success('Visibilidad del tema actualizada.');
-        }
-    }
+        $model = match ($type) {
+            'unit' => Unit::find($id),
+            'topic' => Topic::find($id),
+            'resource' => Resource::find($id),
+        };
 
-    public function toggleResourceVisibility($resourceId)
-    {
-        $resource = Resource::find($resourceId);
-        if ($resource) {
-            $resource->is_visible = ! $resource->is_visible;
-            $resource->save();
+        if ($model) {
+            $model->update(['is_visible' => ! $model->is_visible]);
             $this->subject->refresh();
-            $this->success('Visibilidad del recurso actualizada.');
+            $this->success('Visibilidad actualizada.');
         }
     }
 
     public function exportContent()
     {
+        $this->authorizeStaff();
         $units = $this->subject->units()->with(['topics.resources'])->get();
 
         $fileName = 'content-'.$this->subject->id.'-'.now()->format('Y-m-d').'.json';
@@ -302,6 +303,7 @@ class ContentManager extends Component
 
     public function importContent()
     {
+        $this->authorizeStaff();
         $this->validate([
             'upload' => 'required|file|mimes:json|max:10240', // 10MB Max
         ]);
@@ -364,6 +366,16 @@ class ContentManager extends Component
 
     public function render()
     {
-        return view('livewire.content-manager');
+        $colors = [
+            'border-l-violet-500', 'border-l-blue-500', 'border-l-emerald-500',
+            'border-l-amber-500', 'border-l-orange-500', 'border-l-red-500',
+        ];
+
+        $bgColors = [
+            'bg-violet-500', 'bg-blue-500', 'bg-emerald-500',
+            'bg-amber-500', 'bg-orange-500', 'bg-red-500',
+        ];
+
+        return view('livewire.content-manager', compact('colors', 'bgColors'));
     }
 }

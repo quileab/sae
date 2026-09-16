@@ -268,7 +268,7 @@ $copy = 'SINGLE';
     <div style="height: 49%;">
       <div style="padding-top:1cm;">
         <div class="inline-block text-center">
-          <img style="height:3cm; width:auto;" src="{{ public_path('imgs/logo.png') }}"><br><br>
+          <img style="height:3cm; width:auto;" src="{{ public_path('imgs/logo.png') }}" alt="Logo institucional"><br><br>
           RECIBO Nº: {{ str_pad($data['payment']->id, 6, '0', STR_PAD_LEFT) }}
         </div>
         <div class="inline-block text-center">
@@ -304,7 +304,7 @@ $copy = 'SINGLE';
       </div>
 
       <div style="width:90%" class="text-right font-sm">Firma Autorizada</div>
-      <div style="width:100ñ%" class="text-center font-sm">{{ $copy }}</div>
+      <div style="width:100%" class="text-center font-sm">{{ $copy }}</div>
     </div>
     {!! $copy == $copies[0] ? '<hr>' : '' !!}
   @endforeach

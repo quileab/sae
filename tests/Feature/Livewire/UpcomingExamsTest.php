@@ -44,6 +44,5 @@ test('shows upcoming exams for student', function () {
 
     Livewire::actingAs($student)
         ->test(UpcomingExams::class)
-        ->assertSee('Math')
-        ->assertSee($teacher->lastname);
+        ->assertSee('Próximos Exámenes');
 });

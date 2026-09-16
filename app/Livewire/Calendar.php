@@ -57,16 +57,24 @@ class Calendar extends Component
         $user = auth()->user();
 
         return Cache::remember('user_careers_'.$user->id, 3600, function () use ($user) {
+            $query = Career::where('allow_enrollments', true)
+                ->where('allow_evaluations', true);
+
             if ($user->hasAnyRole(['admin', 'director', 'administrative'])) {
-                return Career::all();
+                return $query->get();
             } elseif ($user->hasRole('teacher')) {
-                $subjects = $user->subjects()->with('career')->get();
+                $subjects = $user->subjects()->with(['career' => function ($q) {
+                    $q->where('allow_enrollments', true)->where('allow_evaluations', true);
+                }])->get();
 
                 return $subjects->map(function ($subject) {
                     return $subject->career;
                 })->filter()->unique('id')->values();
             } else { // student
-                return $user->careers ?? collect();
+                return $user->careers()
+                    ->where('allow_enrollments', true)
+                    ->where('allow_evaluations', true)
+                    ->get() ?? collect();
             }
         });
     }

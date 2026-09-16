@@ -2,7 +2,7 @@
 
 use Livewire\Volt\Component;
 use App\Models\User;
-use App\Models\UserPayments;
+use App\Models\UserPayment;
 use Illuminate\Support\Collection;
 use Mary\Traits\Toast;
 use Livewire\Attributes\Computed;
@@ -124,9 +124,9 @@ new class extends Component {
         <x-table :headers="$headers" :rows="$students" :sort-by="$sortBy" @row-click="showDetail($event.detail.id)">
             @scope('cell_fullname', $student)
                 <div class="flex items-center gap-3">
-                    <x-avatar :placeholder="substr($student->firstname, 0, 1) . substr($student->lastname, 0, 1)" class="!w-9 !h-9" />
+                    <x-avatar :image="$student->avatar_url" class="!w-9 !h-9" />
                     <div>
-                        <div class="font-bold">{{ $student->lastname }}, {{ $student->firstname }}</div>
+                        <div class="font-bold">{{ $student->fullname }}</div>
                         <div class="text-xs text-gray-500">{{ $student->email }}</div>
                     </div>
                 </div>

@@ -4,6 +4,11 @@
     <div class="grid gap-8 lg:grid-cols-2">
         <x-card title="Información Personal" subtitle="Actualiza tus datos de contacto" separator shadow>
             <x-form wire:submit="save">
+                <div class="flex justify-center mb-6">
+                    <x-file wire:model="photo" accept="image/png, image/jpeg, image/webp">
+                        <img src="{{ $photo ? $photo->temporaryUrl() : auth()->user()->avatar_url }}" class="h-40 w-40 rounded-full object-cover border-4 border-base-200" />
+                    </x-file>
+                </div>
                 <div class="grid gap-4">
                     <x-input label="Nombre de Usuario" wire:model="name" icon="o-user" required />
                     <x-input label="Nombre" wire:model="firstname" icon="o-user" />

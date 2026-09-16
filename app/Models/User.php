@@ -3,12 +3,15 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\RoleGroups;
+use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -22,14 +25,10 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'id',
-        'role',
         'name',
         'lastname',
         'firstname',
         'email',
-        'password',
-        'enabled',
         'phone',
     ];
     // protected $guarded = [];
@@ -58,23 +57,14 @@ class User extends Authenticatable
         ];
     }
 
-    public static $roles = [
-        ['id' => 1, 'name' => 'admin', 'alias' => 'ADMIN'],
-        ['id' => 2, 'name' => 'student', 'alias' => 'Estudiante'],
-        ['id' => 3, 'name' => 'teacher', 'alias' => 'Profesor'],
-        ['id' => 4, 'name' => 'director', 'alias' => 'Director'],
-        ['id' => 5, 'name' => 'administrative', 'alias' => 'Administrativo'],
-        ['id' => 6, 'name' => 'treasurer', 'alias' => 'Tesorero'],
-        ['id' => 7, 'name' => 'user', 'alias' => 'Usuario'],
-        ['id' => 8, 'name' => 'preceptor', 'alias' => 'Preceptor'],
-    ];
-
-    // public static function that reurns role name from id
     public static function getRoleName(string $name): string
     {
-        $role = collect(self::$roles)->firstWhere('name', $name);
+        return UserRole::tryFrom($name)?->label() ?? 'error';
+    }
 
-        return $role['alias'] ?? 'error';
+    public static function roleOptions(): array
+    {
+        return UserRole::options();
     }
 
     // users may have multiple careers
@@ -83,14 +73,14 @@ class User extends Authenticatable
         return $this->belongsToMany(Career::class);
     }
 
-    public function book(): HasMany
+    public function books(): HasMany
     {
-        return $this->hasMany('App\Models\Books');
+        return $this->hasMany(Book::class);
     }
 
-    public function subjects()
+    public function subjects(): BelongsToMany
     {
-        return $this->belongsToMany('App\Models\Subject', 'enrollments', 'user_id', 'subject_id')
+        return $this->belongsToMany(Subject::class, 'enrollments', 'user_id', 'subject_id')
             ->orderBy('id', 'asc');
     }
 
@@ -114,7 +104,7 @@ class User extends Authenticatable
 
     public function userPayments(): HasMany
     {
-        return $this->hasMany(UserPayments::class);
+        return $this->hasMany(UserPayment::class);
     }
 
     public function payments(): HasMany
@@ -138,13 +128,26 @@ class User extends Authenticatable
 
     public function isStaff(): bool
     {
-        return $this->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor', 'treasurer']);
+        return $this->hasAnyRole(RoleGroups::values(RoleGroups::STAFF));
     }
 
     // full name attribute
     public function getFullNameAttribute(): string
     {
         return $this->lastname.', '.$this->firstname;
+    }
+
+    public function getAvatarUrlAttribute(): string
+    {
+        $path = 'avatars/'.$this->id.'.webp';
+
+        if (Storage::disk('public')->exists($path)) {
+            $timestamp = Storage::disk('public')->lastModified($path);
+
+            return asset('storage/'.$path).'?v='.$timestamp;
+        }
+
+        return 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=7F9CF5&background=EBF4FF';
     }
 
     public function classSessions()
@@ -162,5 +165,10 @@ class User extends Authenticatable
         return $this->belongsToMany(Message::class, 'message_user', 'user_id', 'message_id')
             ->withPivot('read_at')
             ->withTimestamps();
+    }
+
+    public function justifiedAbsences(): HasMany
+    {
+        return $this->hasMany(JustifiedAbsence::class);
     }
 }

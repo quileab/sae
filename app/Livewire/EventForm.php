@@ -2,31 +2,43 @@
 
 namespace App\Livewire;
 
-use App\Models\Subject;
+use App\Models\Career;
 use App\Models\Event;
 use App\Models\User;
-use App\Models\Career;
-use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class EventForm extends Component
 {
     public $title;
+
     public $start;
+
     public $end;
+
     public $color = '#0C4767';
+
     public $target = 'all';
+
     public $subject_id;
+
     public $description;
+
     public $presidente_id;
+
     public $vocal1_id;
+
     public $vocal2_id;
+
     public $teachers;
 
     public $careers;
+
     public $subjects;
+
     public $eventId = null;
+
     public $isReadOnly = false;
 
     #[On('openEventModal')]
@@ -35,14 +47,21 @@ class EventForm extends Component
         $this->reset();
         $user = Auth::user();
         if ($user->hasAnyRole(['admin', 'director', 'administrative', 'principal'])) {
-            $this->careers = Career::all();
+            $this->careers = Career::where('allow_enrollments', true)
+                ->where('allow_evaluations', true)
+                ->get();
         } elseif ($user->hasRole('teacher')) {
-            $subjects = $user->subjects()->with('career')->get();
+            $subjects = $user->subjects()->with(['career' => function ($q) {
+                $q->where('allow_enrollments', true)->where('allow_evaluations', true);
+            }])->get();
             $this->careers = $subjects->map(function ($subject) {
                 return $subject->career;
             })->filter()->unique('id')->values();
         } else { // student
-            $this->careers = $user->careers ?? collect();
+            $this->careers = $user->careers()
+                ->where('allow_enrollments', true)
+                ->where('allow_evaluations', true)
+                ->get() ?? collect();
         }
         $this->subjects = collect();
         $this->teachers = User::where('role', 'teacher')
@@ -52,7 +71,7 @@ class EventForm extends Component
             ->map(function ($user) {
                 return [
                     'id' => $user->id,
-                    'name' => $user->lastname . ', ' . $user->firstname,
+                    'name' => $user->lastname.', '.$user->firstname,
                 ];
             });
 
@@ -65,7 +84,7 @@ class EventForm extends Component
             $this->eventId = $eventId;
             $event = Event::find($eventId);
             if ($event) {
-                if ($event->user_id !== Auth::id() && !Auth::user()->hasRole('admin')) {
+                if ($event->user_id !== Auth::id() && ! Auth::user()->hasRole('admin')) {
                     $this->isReadOnly = true;
                 }
 
@@ -85,19 +104,20 @@ class EventForm extends Component
                     $this->subjects = Auth::user()->subjects()->with('career')->where('career_id', $this->career_id)->get()->map(function ($subject) {
                         return [
                             'id' => $subject->id,
-                            'name' => $subject->id . ' - ' . $subject->name,
+                            'name' => $subject->id.' - '.$subject->name,
                         ];
                     }) ?? collect();
                 }
             }
         } elseif ($date) {
-            $this->start = $date . 'T08:00';
-            $this->end = $date . 'T09:00';
+            $this->start = $date.'T08:00';
+            $this->end = $date.'T09:00';
         }
         $this->showModal = true;
     }
 
     public $career_id;
+
     public $showModal = false;
 
     protected $rules = [
@@ -125,7 +145,7 @@ class EventForm extends Component
         $this->subjects = Auth::user()->subjects()->with('career')->where('career_id', $value)->get()->map(function ($subject) {
             return [
                 'id' => $subject->id,
-                'name' => $subject->id . ' - ' . $subject->name,
+                'name' => $subject->id.' - '.$subject->name,
             ];
         }) ?? collect();
     }
@@ -140,6 +160,17 @@ class EventForm extends Component
     public function save()
     {
         $this->validate();
+
+        $user = Auth::user();
+
+        if (! $user->isStaff()) {
+            $this->target = 'students';
+
+            if ($this->subject_id) {
+                $allowedSubjectIds = $user->subjects()->pluck('subjects.id')->all();
+                abort_if(! in_array($this->subject_id, $allowedSubjectIds, true), 403, 'No tienes permiso para vincular este evento a esa materia.');
+            }
+        }
 
         if ($this->eventId) {
             $event = Event::find($this->eventId);
@@ -192,7 +223,7 @@ class EventForm extends Component
     public function duplicate()
     {
         $this->eventId = null;
-        $this->title = $this->title . ' (Copia)';
+        $this->title = $this->title.' (Copia)';
     }
 
     public function render()

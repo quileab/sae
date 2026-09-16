@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use App\Models\PlansDetail;
-use App\Models\PlansMaster;
+use App\Models\PaymentPlan;
+use App\Models\PaymentPlanDetail;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -57,23 +57,23 @@ class PayPlans extends Component
 
     // Computed property for all master plans
     #[Computed]
-    public function allPlansMasters()
+    public function allPaymentPlans()
     {
-        return PlansMaster::all();
+        return PaymentPlan::all();
     }
 
     // Computed property for details of the selected plan
     #[Computed]
-    public function currentPlansDetails()
+    public function currentPaymentPlanDetails()
     {
-        return PlansDetail::where('plans_master_id', '=', $this->payPlan)->orderBy('date')->get();
+        return PaymentPlanDetail::where('plans_master_id', '=', $this->payPlan)->orderBy('date')->get();
     }
 
     public function mount()
     {
         // Set initial payPlan if there are any masters
-        if ($this->allPlansMasters->isNotEmpty()) {
-            $this->payPlan = $this->allPlansMasters->first()->id;
+        if ($this->allPaymentPlans->isNotEmpty()) {
+            $this->payPlan = $this->allPaymentPlans->first()->id;
         }
     }
 
@@ -87,7 +87,7 @@ class PayPlans extends Component
         $this->payPlan = $id;
     }
 
-    // --- CRUD Operations for PlansMaster ---
+    // --- CRUD Operations for PaymentPlan ---
     public function openCreateMasterForm()
     {
         $this->masterId = 0;
@@ -141,12 +141,12 @@ class PayPlans extends Component
     {
         $this->validate();
 
-        $master = new PlansMaster;
+        $master = new PaymentPlan;
         $master->title = $this->masterTitle;
         $master->save();
 
         foreach ($this->planDetails as $detail) {
-            PlansDetail::create([
+            PaymentPlanDetail::create([
                 'plans_master_id' => $master->id,
                 'title' => $detail['title'],
                 'amount' => $detail['amount'],
@@ -156,13 +156,13 @@ class PayPlans extends Component
 
         $this->updatePayPlanForm = false;
         // Invalidate computed property to refresh data
-        unset($this->allPlansMasters);
+        unset($this->allPaymentPlans);
         $this->payPlan = $master->id; // Select the newly created master
     }
 
     public function populateMasterData($id)
     {
-        $master = PlansMaster::find($id);
+        $master = PaymentPlan::find($id);
         $this->masterId = $master->id;
         $this->masterTitle = $master->title;
         $this->updatePayPlanForm = true;
@@ -170,30 +170,30 @@ class PayPlans extends Component
 
     public function updateMasterData($id)
     {
-        $master = PlansMaster::find($id);
+        $master = PaymentPlan::find($id);
         $master->title = $this->masterTitle;
         $master->save();
         $this->updatePayPlanForm = false;
         // Invalidate computed property to refresh data
-        unset($this->allPlansMasters);
+        unset($this->allPaymentPlans);
     }
 
     public function deleteMasterData($id)
     {
-        $master = PlansMaster::find($id);
+        $master = PaymentPlan::find($id);
         $master->delete();
         $this->updatePayPlanForm = false;
         // Invalidate computed property to refresh data
-        unset($this->allPlansMasters);
+        unset($this->allPaymentPlans);
         // Reset payPlan if the deleted master was the selected one
-        if ($this->allPlansMasters->isNotEmpty()) {
-            $this->payPlan = $this->allPlansMasters->first()->id;
+        if ($this->allPaymentPlans->isNotEmpty()) {
+            $this->payPlan = $this->allPaymentPlans->first()->id;
         } else {
             $this->payPlan = 1; // Default if no masters left
         }
     }
 
-    // --- CRUD Operations for PlansDetail ---
+    // --- CRUD Operations for PaymentPlanDetail ---
     public function openCreateDetailForm()
     {
         $this->detailId = 0;
@@ -205,7 +205,7 @@ class PayPlans extends Component
 
     public function createDetailData()
     {
-        $detail = new PlansDetail;
+        $detail = new PaymentPlanDetail;
         $detail->date = $this->detailDate;
         $detail->title = $this->detailTitle;
         $detail->amount = $this->detailAmount;
@@ -213,12 +213,12 @@ class PayPlans extends Component
         $detail->save();
         $this->updatePaymentForm = false;
         // Invalidate computed property to refresh data
-        unset($this->currentPlansDetails);
+        unset($this->currentPaymentPlanDetails);
     }
 
     public function populateDetailData($id)
     {
-        $detail = PlansDetail::find($id);
+        $detail = PaymentPlanDetail::find($id);
         $this->detailId = $detail->id;
         $this->detailDate = $detail->date->format('Y-m-d');
         $this->detailTitle = $detail->title;
@@ -228,22 +228,22 @@ class PayPlans extends Component
 
     public function updateDetailData($id)
     {
-        $detail = PlansDetail::find($id);
+        $detail = PaymentPlanDetail::find($id);
         $detail->date = $this->detailDate;
         $detail->title = $this->detailTitle;
         $detail->amount = $this->detailAmount;
         $detail->save();
         $this->updatePaymentForm = false;
         // Invalidate computed property to refresh data
-        unset($this->currentPlansDetails);
+        unset($this->currentPaymentPlanDetails);
     }
 
     public function deleteDetailData($id)
     {
-        $detail = PlansDetail::find($id);
+        $detail = PaymentPlanDetail::find($id);
         $detail->delete();
         $this->updatePaymentForm = false;
         // Invalidate computed property to refresh data
-        unset($this->currentPlansDetails);
+        unset($this->currentPaymentPlanDetails);
     }
 }

@@ -2,14 +2,16 @@
 
 namespace App\Livewire;
 
+use App\Models\PaymentPlan;
 use App\Models\PaymentRecord;
-use App\Models\PlansMaster;
 use App\Models\User;
-use App\Models\UserPayments;
+use App\Models\UserPayment;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
@@ -17,6 +19,7 @@ class UserPaymentComponent extends Component
 {
     use Toast;
 
+    #[Locked]
     public $userId;
 
     public $user;
@@ -37,11 +40,45 @@ class UserPaymentComponent extends Component
 
     public $modifyPaymentModal = false;
 
+    #[Locked]
     public $paymentId;
 
+    #[Locked]
     public $totalDebt;
 
     public $plansError = false;
+
+    /**
+     * Ensure a student can only operate on their own payments; staff may operate on any user.
+     */
+    protected function assertOwnsTargetUser(): void
+    {
+        $auth = Auth::user();
+
+        if ($auth->hasRole('student') && (int) $this->userId !== $auth->id) {
+            abort(403, 'No tienes permiso para gestionar los pagos de otro usuario.');
+        }
+    }
+
+    /**
+     * Ensure the given UserPayment belongs to the authenticated student (when applicable).
+     */
+    protected function assertOwnsPayment(UserPayment $payment): void
+    {
+        $auth = Auth::user();
+
+        if ($auth->hasRole('student') && $payment->user_id !== $auth->id) {
+            abort(403, 'No tienes permiso para gestionar este pago.');
+        }
+    }
+
+    /**
+     * Staff-only financial operations (adjusting owed amounts).
+     */
+    protected function assertStaffOnly(): void
+    {
+        abort_if(! Auth::user()->isStaff(), 403, 'Se requieren permisos de personal para realizar esta acción.');
+    }
 
     public function mount($user = null)
     {
@@ -65,7 +102,7 @@ class UserPaymentComponent extends Component
             return null;
         }
 
-        return UserPayments::where('user_id', $this->userId)
+        return UserPayment::where('user_id', $this->userId)
             ->whereRaw('paid < amount')
             ->orderBy('date')
             ->first();
@@ -78,7 +115,7 @@ class UserPaymentComponent extends Component
             return collect();
         }
 
-        return UserPayments::where('user_id', $this->userId)
+        return UserPayment::where('user_id', $this->userId)
             ->orderBy('date')
             ->get();
     }
@@ -87,8 +124,8 @@ class UserPaymentComponent extends Component
     public function payPlans()
     {
         try {
-            return PlansMaster::all();
-        } catch (\Illuminate\Database\QueryException $e) {
+            return PaymentPlan::orderBy('title')->get(['id', 'title']);
+        } catch (QueryException $e) {
             $this->plansError = true;
 
             return collect();
@@ -106,13 +143,15 @@ class UserPaymentComponent extends Component
 
     public function assignPayPlan()
     {
+        $this->assertOwnsTargetUser();
+
         if (empty($this->selectedPlan)) {
             $this->error('Debe seleccionar un plan.');
 
             return;
         }
 
-        $planMaster = PlansMaster::with('details')->find($this->selectedPlan);
+        $planMaster = PaymentPlan::with('details')->find($this->selectedPlan);
 
         if (! $planMaster) {
             $this->error('El plan seleccionado no es válido.');
@@ -125,7 +164,7 @@ class UserPaymentComponent extends Component
                 $installment = null;
 
                 if ($this->combinePlans) {
-                    $installment = UserPayments::where('user_id', $this->userId)
+                    $installment = UserPayment::where('user_id', $this->userId)
                         ->whereDate('date', $detail->date)
                         ->first();
                 }
@@ -133,14 +172,14 @@ class UserPaymentComponent extends Component
                 if ($installment) {
                     $updateData = ['title' => $detail->title];
 
-                    // Protect fully paid installments from amount changes
+                    // Protect fully paid Installment from amount changes
                     if ($installment->paid < $installment->amount) {
                         $updateData['amount'] = $detail->amount;
                     }
 
                     $installment->update($updateData);
                 } else {
-                    UserPayments::create([
+                    UserPayment::create([
                         'user_id' => $this->userId,
                         'amount' => $detail->amount,
                         'paid' => 0,
@@ -176,17 +215,19 @@ class UserPaymentComponent extends Component
         $this->paymentAmountPaid = $userPayment->amount - $userPayment->paid;
 
         // Balance until today, starting from the selected installment
-        $balance = UserPayments::where('user_id', $this->userId)
+        $balance = UserPayment::where('user_id', $this->userId)
             ->where('date', '>=', $userPayment->date)
             ->where('date', '<=', now())
-            ->get()
-            ->sum(fn ($p) => max(0, $p->amount - $p->paid));
+            ->selectRaw('COALESCE(SUM(GREATEST(0, amount - paid)), 0) as balance')
+            ->value('balance') ?? 0;
 
         $this->paymentAmountInput = $balance > 0 ? $balance : $this->paymentAmountPaid;
     }
 
     public function registerUserPayment()
     {
+        $this->assertOwnsTargetUser();
+
         if (empty($this->paymentAmountInput) || $this->paymentAmountInput <= 0) {
             $this->error('Debe ingresar un importe válido mayor a 0.');
 
@@ -197,14 +238,17 @@ class UserPaymentComponent extends Component
 
         DB::transaction(function () use (&$paymentRecord) {
             $amountToDistribute = $this->paymentAmountInput;
-            $currentInstallment = UserPayments::find($this->paymentId);
+            $currentInstallment = UserPayment::find($this->paymentId);
 
             if (! $currentInstallment) {
                 return;
             }
 
-            // Get all pending installments for the user, starting from the current one
-            $installments = UserPayments::where('user_id', $this->userId)
+            $this->assertOwnsPayment($currentInstallment);
+            $this->userId = $currentInstallment->user_id;
+
+            // Get all pending Installment for the user, starting from the current one
+            $Installment = UserPayment::where('user_id', $this->userId)
                 ->where('date', '>=', $currentInstallment->date)
                 ->whereRaw('paid < amount')
                 ->orderBy('date', 'asc')
@@ -213,7 +257,7 @@ class UserPaymentComponent extends Component
             Carbon::setLocale(config('app.locale'));
             $description = '';
 
-            foreach ($installments as $installment) {
+            foreach ($Installment as $installment) {
                 if ($amountToDistribute <= 0) {
                     break;
                 }
@@ -260,7 +304,8 @@ class UserPaymentComponent extends Component
 
     public function handleInstallmentClick($userPaymentId)
     {
-        $userPayment = UserPayments::findOrFail($userPaymentId);
+        $userPayment = UserPayment::findOrFail($userPaymentId);
+        $this->assertOwnsPayment($userPayment);
 
         if ($userPayment->paid < $userPayment->amount) {
             // Open payment modal
@@ -274,7 +319,9 @@ class UserPaymentComponent extends Component
 
     public function openModifyModal($userPaymentId)
     {
-        $userPayment = UserPayments::findOrFail($userPaymentId);
+        $this->assertStaffOnly();
+
+        $userPayment = UserPayment::findOrFail($userPaymentId);
         $this->paymentId = $userPayment->id;
         $this->paymentDescription = $userPayment->title;
         $this->paymentAmountPaid = $userPayment->amount;
@@ -284,7 +331,9 @@ class UserPaymentComponent extends Component
 
     public function modifyAmount($paymentId)
     {
-        $payment = UserPayments::find($paymentId);
+        $this->assertStaffOnly();
+
+        $payment = UserPayment::find($paymentId);
         if ($payment) {
             $payment->amount = $this->totalDebt;
             $payment->save();

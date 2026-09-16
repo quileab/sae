@@ -15,6 +15,7 @@
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
+        "intervention/image": "*",
         "laravel/framework": "12.*",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",

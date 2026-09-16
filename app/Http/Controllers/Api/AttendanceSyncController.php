@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Career;
-use App\Models\Configs;
+use App\Models\Config;
 use App\Models\DailyAttendance;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AttendanceSyncController extends Controller
 {
@@ -18,27 +20,30 @@ class AttendanceSyncController extends Controller
     public function students(Request $request): JsonResponse
     {
         $user = $request->user();
-        $totalLimit = 300;
-        $count = 0;
+        abort_if(! $user->isStaff(), 403, 'No tienes permiso para acceder a esta información.');
 
-        $careers = $user->hasAnyRole(['admin', 'director', 'administrative'])
-            ? Career::orderBy('name')->get()
-            : $user->careers()->orderBy('name')->get();
+        $totalLimit = 500; // Increased limit for better usability
 
-        $data = $careers->map(function (Career $career) use (&$count, $totalLimit) {
-            if ($count >= $totalLimit) {
-                return null;
-            }
+        $careerIds = $user->hasAnyRole(['admin', 'director', 'administrative'])
+            ? Career::where('allow_enrollments', true)->where('allow_evaluations', true)->pluck('id')
+            : $user->careers()->where('allow_enrollments', true)->where('allow_evaluations', true)->pluck('careers.id');
 
-            $remaining = $totalLimit - $count;
-            $students = User::query()
-                ->where('role', 'student')
-                ->where('enabled', true)
-                ->whereHas('careers', fn ($q) => $q->where('careers.id', $career->id))
-                ->orderBy('lastname')
-                ->orderBy('firstname')
-                ->take($remaining)
-                ->get(['id', 'firstname', 'lastname'])
+        $students = User::query()
+            ->where('role', 'student')
+            ->where('enabled', true)
+            ->whereHas('careers', fn ($q) => $q->whereIn('careers.id', $careerIds))
+            ->with(['careers' => fn ($q) => $q->whereIn('careers.id', $careerIds)])
+            ->orderBy('lastname')
+            ->orderBy('firstname')
+            ->take($totalLimit)
+            ->get(['id', 'firstname', 'lastname']);
+
+        // Group students by career for the expected JSON structure
+        $data = [];
+        $careers = Career::whereIn('id', $careerIds)->get(['id', 'name']);
+
+        foreach ($careers as $career) {
+            $careerStudents = $students->filter(fn ($s) => $s->careers->contains('id', $career->id))
                 ->map(fn ($s) => [
                     'id' => $s->id,
                     'firstname' => $s->firstname,
@@ -46,16 +51,16 @@ class AttendanceSyncController extends Controller
                     'name' => $s->lastname.', '.$s->firstname,
                 ]);
 
-            $count += $students->count();
+            if ($careerStudents->isNotEmpty()) {
+                $data[] = [
+                    'career_id' => $career->id,
+                    'career_name' => $career->name,
+                    'students' => $careerStudents->values(),
+                ];
+            }
+        }
 
-            return [
-                'career_id' => $career->id,
-                'career_name' => $career->name,
-                'students' => $students,
-            ];
-        })->filter();
-
-        return response()->json($data->values());
+        return response()->json($data);
     }
 
     /**
@@ -74,10 +79,39 @@ class AttendanceSyncController extends Controller
             'records.*.note' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $shiftType = Configs::find('shift_type')?->value ?? 'simple';
-        $recordedBy = $request->user()->id;
+        $user = $request->user();
+        abort_if(! $user->isStaff(), 403, 'No tienes permiso para registrar asistencia.');
 
+        $shiftType = Config::find('shift_type')?->value ?? 'simple';
+        $recordedBy = $user->id;
+
+        // Security check for each record
+        $accessibleCareerIds = $user->hasAnyRole(['admin', 'director', 'administrative'])
+            ? Career::pluck('id')
+            : $user->careers()->pluck('careers.id');
+
+        $syncedCount = 0;
         foreach ($request->records as $record) {
+            // IDOR Prevention: Check career access
+            if (! $accessibleCareerIds->contains($record['career_id'])) {
+                continue;
+            }
+
+            // Security check: Ensure student (user_id) belongs to the career
+            $isStudentInCareer = DB::table('career_user')
+                ->where('career_id', $record['career_id'])
+                ->where('user_id', $record['user_id'])
+                ->exists();
+
+            if (! $isStudentInCareer) {
+                Log::warning('AttendanceSync: Student not in career', [
+                    'career_id' => $record['career_id'],
+                    'user_id' => $record['user_id'],
+                ]);
+
+                continue;
+            }
+
             DailyAttendance::updateOrCreate(
                 [
                     'career_id' => $record['career_id'],
@@ -91,8 +125,10 @@ class AttendanceSyncController extends Controller
                     'note' => $record['note'] ?? null,
                 ]
             );
+
+            $syncedCount++;
         }
 
-        return response()->json(['synced' => count($request->records)]);
+        return response()->json(['synced' => $syncedCount]);
     }
 }

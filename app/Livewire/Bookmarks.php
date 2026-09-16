@@ -14,13 +14,53 @@ class Bookmarks extends Component
 {
     public $shortName;
 
+    private function authorizeBookmark(string $type, $value): bool
+    {
+        if (empty($value)) {
+            return false;
+        }
+
+        $user = Auth::user();
+        if (! $user) {
+            return false;
+        }
+
+        $isAdmin = $user->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor']);
+        $isTeacher = $user->hasRole('teacher');
+
+        if (! $isAdmin) {
+            // Students can only bookmark themselves
+            if ($type === 'user_id') {
+                if ($value != $user->id && ! $isTeacher) {
+                    return false;
+                }
+            }
+
+            // For subjects and careers, verify enrollment/ownership
+            if (in_array($type, ['subject_id', 'career_id'])) {
+                if ($type === 'subject_id' && ! $user->hasSubject($value)) {
+                    return false;
+                }
+                if ($type === 'career_id' && ! $user->careers()->where('career_id', $value)->exists()) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     #[On('context-batch-sync')]
     public function syncBatch($items): void
     {
         foreach ($items as $item) {
             if (isset($item['type'], $item['value'])) {
+                if (! $this->authorizeBookmark($item['type'], $item['value'])) {
+                    continue;
+                }
+
                 // Si el cliente ya tiene el nombre (caché), lo usamos directamente para ahorrar consultas DB
-                if (isset($item['name']) && !empty($item['name'])) {
+                if (isset($item['name']) && ! empty($item['name'])) {
                     session()->put($item['type'], $item['value']);
                     session()->put($item['type'].'_name', $item['name']);
                 } else {
@@ -32,34 +72,22 @@ class Bookmarks extends Component
     }
 
     #[On('bookmarked')]
-    public function updateBookmark($data): void
+    public function updateBookmark($type = null, $value = null, $data = null): void
     {
+        if (is_array($type)) {
+            $data = $type;
+        } elseif (is_array($data)) {
+            // Already set
+        } else {
+            $data = ['type' => $type, 'value' => $value];
+        }
+
         if (empty($data['value'])) {
             return;
         }
 
-        // Security check: Role-based permissions for bookmarking
-        $user = Auth::user();
-        $isAdmin = $user->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'preceptor']);
-        $isTeacher = $user->hasRole('teacher');
-
-        if (! $isAdmin) {
-            // Students can only bookmark themselves
-            if ($data['type'] === 'user_id') {
-                if ($data['value'] != $user->id && ! $isTeacher) {
-                    return;
-                }
-            }
-
-            // For subjects and careers, verify enrollment/ownership
-            if (in_array($data['type'], ['subject_id', 'career_id'])) {
-                if ($data['type'] === 'subject_id' && ! $user->hasSubject($data['value'])) {
-                    return;
-                }
-                if ($data['type'] === 'career_id' && ! $user->careers()->where('career_id', $data['value'])->exists()) {
-                    return;
-                }
-            }
+        if (! $this->authorizeBookmark($data['type'], $data['value'])) {
+            return;
         }
 
         switch ($data['type']) {
@@ -95,7 +123,7 @@ class Bookmarks extends Component
         if ($this->shortName) {
             session()->put($data['type'], $data['value']);
             session()->put($data['type'].'_name', $this->shortName);
-            
+
             // Emitir evento para sincronizar con localStorage incluyendo el nombre
             $this->dispatch('context-updated', type: $data['type'], value: $data['value'], name: $this->shortName);
         }

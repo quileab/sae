@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Enums\EnrollmentStatus;
 use App\Models\Subject;
 use App\Traits\AuthorizesAccess;
 use Livewire\Attributes\Computed;
@@ -76,25 +77,32 @@ class Enrollment extends Component
     }
 
     #[Computed]
-    public function enrolledSubjectIds()
+    public function enrolledSubjects()
     {
         if (! $this->targetUser || ! $this->careerId) {
-            return [];
+            return collect();
         }
 
         return \App\Models\Enrollment::where('user_id', $this->targetUser->id)
             ->whereHas('subject', function ($query) {
                 $query->where('career_id', $this->careerId);
             })
-            ->pluck('subject_id')
-            ->toArray();
+            ->get()
+            ->keyBy('subject_id');
     }
 
     public function toggleEnrollment($subjectId)
     {
         $targetId = $this->targetUser->id;
+        $enrollment = $this->enrolledSubjects->get($subjectId);
 
-        if (in_array($subjectId, $this->enrolledSubjectIds)) {
+        if ($enrollment) {
+            if ($enrollment->final_grade !== null) {
+                $this->error('No se puede desmatricular de una materia con nota final asignada.');
+
+                return;
+            }
+
             \App\Models\Enrollment::where('user_id', $targetId)
                 ->where('subject_id', $subjectId)
                 ->delete();
@@ -103,13 +111,13 @@ class Enrollment extends Component
             \App\Models\Enrollment::create([
                 'user_id' => $targetId,
                 'subject_id' => $subjectId,
-                'status' => 'active',
+                'status' => EnrollmentStatus::Active,
             ]);
             $this->success('Matriculado correctamente.');
         }
 
         // Clear computed property cache to reflect changes in UI
-        unset($this->enrolledSubjectIds);
+        unset($this->enrolledSubjects);
     }
 
     public function render()

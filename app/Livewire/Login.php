@@ -38,7 +38,7 @@ class Login extends Component
             return redirect()->intended('/');
         }
 
-        $this->addError('email', 'The provided credentials do not match our records.');
+        $this->addError('email', 'Las credenciales ingresadas no coinciden con nuestros registros.');
     }
 
     public function render()

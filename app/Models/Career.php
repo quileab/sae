@@ -17,4 +17,9 @@ class Career extends Model
         'allow_enrollments' => 'boolean',
         'allow_evaluations' => 'boolean',
     ];
+
+    public function subjects()
+    {
+        return $this->hasMany(Subject::class);
+    }
 }

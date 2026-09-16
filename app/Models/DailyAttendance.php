@@ -7,7 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DailyAttendance extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'career_id',
+        'user_id',
+        'recorded_by',
+        'date',
+        'status',
+        'absence_value',
+        'note',
+    ];
 
     protected function casts(): array
     {

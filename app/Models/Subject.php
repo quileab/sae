@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Subject extends Model
 {
     protected $guarded = [];
+
     public function career()
     {
         return $this->belongsTo(Career::class);
@@ -17,14 +18,21 @@ class Subject extends Model
         return $this->hasMany(Enrollment::class);
     }
 
-    public function subjectUsers($subjectId = null){
+    public function subjectUsers($subjectId = null)
+    {
         return $this->enrollments()->with('user')->where('subject_id', $subjectId);
     }
 
     // add attribute full_name
     public function getFullNameAttribute()
     {
-        return $this->career->name . '» ' . $this->name;
+        return $this->career->name.'» '.$this->name;
+    }
+
+    // add attribute label_with_id
+    public function getLabelWithIdAttribute()
+    {
+        return $this->id.' - '.$this->name;
     }
 
     public function users()
@@ -36,6 +44,7 @@ class Subject extends Model
     {
         // Find the first class session for this subject and return its teacher
         $classSession = $this->hasMany(ClassSession::class)->first();
+
         return $classSession ? $classSession->teacher : null;
     }
 

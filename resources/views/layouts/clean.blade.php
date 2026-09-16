@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -12,7 +12,7 @@
   <img id="background" class="fixed left-0 top-0 w-full h-auto" src="../background.jpg" />
   <x-main full-width="true">
     <x-slot:content>
-      <div class="mx-auto bg-slate-800 bg-opacity-30 backdrop-blur-sm rounded-lg shadow-sm shadow-black p-4">
+      <div class="mx-auto bg-slate-800/30 backdrop-blur-sm rounded-lg shadow-sm shadow-black p-4">
         <div class="my-4 text-center grid grid-cols-2 gap-2 md:grid-cols-4">
           {{-- logo --}}
           <img src="../logo.webp" class="w-20 h-auto mx-auto col-start-1 col-span-1">

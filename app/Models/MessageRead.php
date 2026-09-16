@@ -10,6 +10,8 @@ class MessageRead extends Model
 {
     use HasFactory;
 
+    protected $table = 'message_user';
+
     protected $fillable = [
         'message_id',
         'user_id',

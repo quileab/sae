@@ -45,5 +45,5 @@ test('admin does not see course filter when recipient type is subject', function
         ->set('activeTab', 'new')
         ->set('recipient_type', 'subject')
         ->assertDontSee('wire:model.live="selectedSubjectId"', false) // Filter should be gone
-        ->assertSee('wire:model.defer="recipient_id"', false); // Recipient picker should be there
+        ->assertSee('wire:model.live="recipient_id"', false); // Recipient picker should be there
 });

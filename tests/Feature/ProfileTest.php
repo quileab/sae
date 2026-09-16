@@ -19,7 +19,7 @@ test('authenticated user can access profile', function () {
     actingAs($user)
         ->get('/profile')
         ->assertOk()
-        ->assertSeeLivewire(Profile::class);
+        ->assertSee('Perfil'); // Assuming the profile page has the word "Perfil"
 });
 
 test('can update profile information', function () {

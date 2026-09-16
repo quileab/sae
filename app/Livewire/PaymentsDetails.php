@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use App\Models\PaymentRecord;
 use App\Models\User;
-use App\Models\UserPayments;
+use App\Models\UserPayment;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -42,18 +42,23 @@ class PaymentsDetails extends Component
 
     public function cancelPayment($paymentId)
     {
+        // IDOR Prevention: Only authorized staff can cancel payments
+        if (! auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'treasurer'])) {
+            abort(403, 'No tienes permiso para cancelar pagos.');
+        }
+
         DB::transaction(function () use ($paymentId) {
             $payment = PaymentRecord::find($paymentId);
 
             if ($payment && $payment->description != 'CANCELADO') {
                 $amountToRevert = $payment->paymentAmount;
 
-                $userpayments = UserPayments::where('user_id', $payment->userpayments->user_id)
+                $UserPayment = UserPayment::where('user_id', $payment->UserPayment->user_id)
                     ->where('paid', '>', 0)
                     ->orderBy('date', 'desc')
                     ->get();
 
-                foreach ($userpayments as $userpayment) {
+                foreach ($UserPayment as $userpayment) {
                     if ($amountToRevert <= 0) {
                         break;
                     }
@@ -81,7 +86,7 @@ class PaymentsDetails extends Component
     #[Computed]
     public function payments()
     {
-        return PaymentRecord::whereHas('userpayments', function ($query) {
+        return PaymentRecord::whereHas('UserPayment', function ($query) {
             $query->where('user_id', $this->user->id);
         })
             ->paginate($this->perPage);

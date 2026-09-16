@@ -126,19 +126,18 @@ class Import extends Component
 
             try {
                 DB::transaction(function () use ($data) {
-                    $user = User::updateOrCreate(
-                        ['id' => $data['id']],
-                        [
-                            'name' => $data['id'],
-                            'lastname' => $data['lastname'],
-                            'firstname' => $data['firstname'],
-                            'phone' => $data['phone'] ?? null,
-                            'enabled' => true,
-                            'email' => $data['email'],
-                            'password' => Hash::make($data['id']),
-                            'role' => 'student',
-                        ]
-                    );
+                    $user = User::find($data['id']) ?? new User;
+                    $user->forceFill([
+                        'id' => $data['id'],
+                        'name' => $data['id'],
+                        'lastname' => $data['lastname'],
+                        'firstname' => $data['firstname'],
+                        'phone' => $data['phone'] ?? null,
+                        'enabled' => true,
+                        'email' => $data['email'],
+                        'password' => Hash::make($data['id']),
+                        'role' => 'student',
+                    ])->save();
                     $user->careers()->syncWithoutDetaching([$data['career_id']]);
                 });
                 $this->stats['success']++;

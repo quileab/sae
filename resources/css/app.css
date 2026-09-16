@@ -3,6 +3,10 @@
 /* DaisyUI */
 @plugin "daisyui";
 
+:root {
+    --color-info: #4285F4;
+}
+
 /* maryUI */
 @source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
 

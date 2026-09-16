@@ -2,10 +2,10 @@
 
 namespace App\Livewire;
 
-use App\Traits\AuthorizesAccess;
-use App\Models\Configs;
+use App\Models\Config as ConfigModel;
 use App\Models\User;
-use App\Models\UserPayments;
+use App\Models\UserPayment;
+use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
@@ -37,21 +37,30 @@ class Dashboard extends Component
 
         $user = Auth::user();
 
-        // Cycle ID initialization (URL > Default)
+        // Cycle ID initialization (URL > Session > Default)
         if (! $this->cycle_id) {
-            $this->cycle_id = $this->getCycleId();
+            $this->cycle_id = session('cycle_id') ?? $this->getCycleId();
         }
 
         // Check if user has no career (only for students)
         if ($user->hasRole('student')) {
-            if ($user->careers()->count() == 0) {
+            if (! $user->careers()->exists()) {
                 $this->showCareerWarning = true;
             }
         }
 
-        if ($this->subjects->isNotEmpty()) {
+        // Subject context persistence
+        $this->subject_id = session('current_subject_id');
+
+        if (! $this->subject_id && $this->subjects->isNotEmpty()) {
             $this->subject_id = $this->subjects->first()->id;
         }
+    }
+
+    public function updatedSubjectId($value): void
+    {
+        session()->put('current_subject_id', $value);
+        $this->success('Materia seleccionada: '.$this->subjects->find($value)->name, position: 'toast-bottom toast-end');
     }
 
     #[Computed]
@@ -76,11 +85,11 @@ class Dashboard extends Component
     public function inscriptionsStatus()
     {
         return Cache::remember('configs_inscriptions', 3600, function () {
-            return Configs::where('group', 'inscriptions')->get();
+            return ConfigModel::where('group', 'inscriptions')->get();
         });
     }
 
-    #[Computed]
+    #[Computed(persist: true)]
     public function subjects()
     {
         return Auth::user()->subjects()->with('career')->get();
@@ -93,7 +102,7 @@ class Dashboard extends Component
             return null;
         }
 
-        return UserPayments::where('user_id', Auth::id())
+        return UserPayment::where('user_id', Auth::id())
             ->whereRaw('paid < amount')
             ->orderBy('date', 'asc')
             ->first();

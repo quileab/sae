@@ -147,6 +147,18 @@ new class extends Component {
                 </div>
             @endscope
 
+            @scope('cell_gender', $book)
+                @if($book->gender)
+                    <div class="flex flex-wrap gap-1">
+                        @foreach(explode(',', $book->gender) as $genre)
+                            <x-badge :value="trim($genre)" class="badge-ghost badge-sm text-[11px]" />
+                        @endforeach
+                    </div>
+                @else
+                    <span class="text-xs text-base-content/40 italic">S/G</span>
+                @endif
+            @endscope
+
             @scope('actions', $book)
                 <div class="flex gap-2">
                     @if($book->is_loaned)

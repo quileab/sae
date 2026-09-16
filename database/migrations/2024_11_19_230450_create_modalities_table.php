@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('modalities', function (Blueprint $table) {
             $table->id();
-            $table->string('name',20)->unique();
-            $table->string('description',100)->nullable();
+            $table->string('name', 20)->unique();
+            $table->string('description', 100)->nullable();
             $table->integer('percentage')->default(75);
             $table->timestamps();
         });

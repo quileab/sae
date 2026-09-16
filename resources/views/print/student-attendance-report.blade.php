@@ -189,7 +189,7 @@
               $total_clases = $total_classes_q1 + $total_classes_q2;
               $percent = $total_clases > 0 ? round(($total_asist / $total_clases) * 100) : 0;
             @endphp
-            <div style="font-weight: 700; color: {{ $percent < 75 ? '#dc2626' : '#059669' }};">{{ $percent }}%</div>
+            <div style="font-weight: 700; color: {{ $percent <= 75 ? '#dc2626' : '#059669' }};">{{ $percent }}%</div>
             <div style="font-size: 0.7rem; color: #6b7280;">{{ $total_asist }} / {{ $total_clases }}</div>
           </td>
         </tr>

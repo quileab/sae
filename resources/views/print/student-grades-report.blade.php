@@ -214,12 +214,17 @@
               @php $grade = $data['grades_q1']->get($session->id); @endphp
               @if ($grade)
                 <div style="font-size: 8px;">{{ $grade->attendance }}%</div>
-                @if (str_starts_with(strtolower($grade->comments), 'ev') || str_starts_with(strtolower($grade->comments), 'tp'))
+                @php
+                  $isEv = $grade->type === 'evaluation' || str_starts_with(strtolower($grade->comments ?? ''), 'ev');
+                  $isTp = $grade->type === 'practical_work' || str_starts_with(strtolower($grade->comments ?? ''), 'tp');
+                  $isRec = $grade->type === 'recuperatory';
+                @endphp
+                @if ($isEv || $isTp || $isRec)
                   @php
-                    $type = strtoupper(substr($grade->comments, 0, 2));
+                    $typeLabel = $isRec ? 'REC' : ($isEv ? 'EV' : 'TP');
                     $val = ($grade->grade == 0 && $grade->approved == 1) ? 'A' : $grade->grade;
                   @endphp
-                  <div style="font-weight: 700; color: #570df8;">{{ $type }}:{{ $val }}</div>
+                  <div style="font-weight: 700; color: #570df8;">{{ $typeLabel }}:{{ $val }}</div>
                 @endif
               @else - @endif
             </td>
@@ -235,12 +240,17 @@
               @php $grade = $data['grades_q2']->get($session->id); @endphp
               @if ($grade)
                 <div style="font-size: 8px;">{{ $grade->attendance }}%</div>
-                @if (str_starts_with(strtolower($grade->comments), 'ev') || str_starts_with(strtolower($grade->comments), 'tp'))
+                @php
+                  $isEv = $grade->type === 'evaluation' || str_starts_with(strtolower($grade->comments ?? ''), 'ev');
+                  $isTp = $grade->type === 'practical_work' || str_starts_with(strtolower($grade->comments ?? ''), 'tp');
+                  $isRec = $grade->type === 'recuperatory';
+                @endphp
+                @if ($isEv || $isTp || $isRec)
                   @php
-                    $type = strtoupper(substr($grade->comments, 0, 2));
+                    $typeLabel = $isRec ? 'REC' : ($isEv ? 'EV' : 'TP');
                     $val = ($grade->grade == 0 && $grade->approved == 1) ? 'A' : $grade->grade;
                   @endphp
-                  <div style="font-weight: 700; color: #570df8;">{{ $type }}:{{ $val }}</div>
+                  <div style="font-weight: 700; color: #570df8;">{{ $typeLabel }}:{{ $val }}</div>
                 @endif
               @else - @endif
             </td>

@@ -142,38 +142,38 @@
 
                 @php
                     $isClickable = $isAdmin;
-                    $cardClasses = "relative overflow-hidden text-sm uppercase bg-gray-700 rounded-lg shadow hover:shadow-md transition-all duration-200 border-t-4 " . $userPayment->borderColor;
+                    $cardClasses = "relative overflow-hidden text-sm uppercase bg-base-100 dark:bg-base-200 border border-base-300/50 dark:border-none rounded-lg shadow hover:shadow-md transition-all duration-200 border-t-4 " . $userPayment->borderColor;
                 @endphp
 
                 @if ($isClickable)
                     <div wire:key="payment-{{ $userPayment->id }}" class="{{ $cardClasses }} group flex flex-col">
                         <div wire:click="handleInstallmentClick({{ $userPayment->id }})"
-                            class="cursor-pointer p-2 border-b border-gray-600/50 bg-gray-800/30 flex justify-between items-start">
+                            class="cursor-pointer p-2 border-b border-base-300 dark:border-base-100 bg-base-200/50 dark:bg-base-300/30 flex justify-between items-start">
                             <div class="flex-1 truncate">
-                                <div class="font-bold truncate text-gray-200">{{ $userPayment->title }}</div>
-                                <div class="text-[10px] text-gray-400 font-medium">{{ $userPayment->date->format('d/m/Y') }}</div>
+                                <div class="font-bold truncate text-base-content/90">{{ $userPayment->title }}</div>
+                                <div class="text-[10px] text-base-content/60 font-medium">{{ $userPayment->date->format('d/m/Y') }}</div>
                             </div>
                         </div>
                         <div wire:click="handleInstallmentClick({{ $userPayment->id }})"
                             class="cursor-pointer p-2 text-right flex-1">
-                            <div class="text-base font-mono text-white">$ {{ number_format($userPayment->paid, 2) }}</div>
+                            <div class="text-base font-mono text-base-content font-bold">$ {{ number_format($userPayment->paid, 2) }}</div>
                             <div class="{{ $userPayment->textColor }} text-[10px] font-bold"
                                 title="{{ __('Importe total') }}">$ {{ number_format($userPayment->amount, 2) }}</div>
                             <div class="mt-1">
                                 <x-button icon="o-pencil" wire:click.stop="openModifyModal({{ $userPayment->id }})"
-                                    class="btn-ghost btn-xs text-gray-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    class="btn-ghost btn-xs text-base-content/50 hover:text-base-content opacity-0 group-hover:opacity-100 transition-opacity"
                                     tooltip="{{ __('Modificar') }}" />
                             </div>
                         </div>
                     </div>
                 @else
                     <div wire:key="payment-{{ $userPayment->id }}" class="{{ $cardClasses }}">
-                        <div class="p-2 border-b border-gray-600/50 bg-gray-800/30">
-                            <div class="font-bold truncate text-gray-200">{{ $userPayment->title }}</div>
-                            <div class="text-[10px] text-gray-400 font-medium">{{ $userPayment->date->format('d/m/Y') }}</div>
+                        <div class="p-2 border-b border-base-300 dark:border-base-100 bg-base-200/50 dark:bg-base-300/30">
+                            <div class="font-bold truncate text-base-content/90">{{ $userPayment->title }}</div>
+                            <div class="text-[10px] text-base-content/60 font-medium">{{ $userPayment->date->format('d/m/Y') }}</div>
                         </div>
                         <div class="p-2 text-right">
-                            <div class="text-base font-mono text-white">$ {{ number_format($userPayment->paid, 2) }}</div>
+                            <div class="text-base font-mono text-base-content font-bold">$ {{ number_format($userPayment->paid, 2) }}</div>
                             <div class="{{$userPayment->textColor}} text-[10px] font-bold">$
                                 {{ number_format($userPayment->amount, 2) }}
                             </div>

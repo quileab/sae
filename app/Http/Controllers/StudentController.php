@@ -7,6 +7,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -34,24 +35,25 @@ class StudentController extends Controller
             $row = array_combine($header, $row); // convierte en array asociativo con los datos de $header
 
             try { // user Student Creation
-                $user = User::create([
+                $user = new User;
+                $user->forceFill([
+                    'id' => $row['pid'], // Assuming pid is used as ID here as well
                     'name' => $row['name'],
-                    'pid' => $row['pid'],
                     'lastname' => $row['lastname'],
                     'firstname' => $row['firstname'],
                     'phone' => $row['phone'],
                     'enabled' => $row['enabled'],
                     'email' => $row['email'],
                     'password' => Hash::make($row['pid']),
-                ]);
-            } catch (\Illuminate\Database\QueryException $exception) {
+                    'role' => $request->role,
+                ])->save();
+            } catch (QueryException $exception) {
                 // Just Continue
                 // $this->errorInfo = $this->errorInfo.$exception->errorInfo;
                 $user = null;
             }
-            // Assign Role & Career to User
+            // Assign Career to User
             if ($user) {
-                $user->assignRole($request->role);
                 $user->careers()->attach($row['career']);
             }
         }

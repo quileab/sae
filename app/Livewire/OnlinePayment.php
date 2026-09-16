@@ -2,14 +2,16 @@
 
 namespace App\Livewire;
 
-use App\Models\UserPayments;
+use App\Models\UserPayment;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
+use MercadoPago\Client\Common\RequestOptions;
 use MercadoPago\Client\Preference\PreferenceClient;
 use MercadoPago\MercadoPagoConfig;
 
 class OnlinePayment extends Component
 {
-    public UserPayments $userPayment;
+    public UserPayment $userPayment;
 
     public $preferenceId = null;
 
@@ -17,7 +19,13 @@ class OnlinePayment extends Component
 
     public function mount($userPaymentId)
     {
-        $this->userPayment = UserPayments::find($userPaymentId);
+        $userPayment = UserPayment::find($userPaymentId);
+        abort_if(! $userPayment, 404, 'Pago no encontrado.');
+
+        $user = Auth::user();
+        abort_if(! $user->isStaff() && $userPayment->user_id !== $user->id, 403, 'No tienes permiso para acceder a este pago.');
+
+        $this->userPayment = $userPayment;
         $this->createAndDispatchPreference();
     }
 
@@ -33,7 +41,7 @@ class OnlinePayment extends Component
         try {
             MercadoPagoConfig::setAccessToken($accessToken);
             $client = new PreferenceClient;
-            $request_options = new \MercadoPago\Client\Common\RequestOptions;
+            $request_options = new RequestOptions;
             $idempotencyKey = uniqid();
             $request_options->setCustomHeaders(['X-Idempotency-Key: '.$idempotencyKey]);
 
@@ -41,16 +49,24 @@ class OnlinePayment extends Component
                 'items' => [
                     [
                         'title' => $this->userPayment->title,
+                        'description' => 'Pago de '.$this->userPayment->title,
                         'quantity' => 1,
                         'unit_price' => (float) ($this->userPayment->amount - $this->userPayment->paid),
                         'currency_id' => 'ARS',
                     ],
+                ],
+                'payer' => [
+                    'email' => $this->userPayment->user->email,
+                    'name' => $this->userPayment->user->firstname,
+                    'surname' => $this->userPayment->user->lastname,
                 ],
                 'back_urls' => [
                     'success' => route('mercadopago.success'),
                     'failure' => route('mercadopago.failure'),
                     'pending' => route('mercadopago.pending'),
                 ],
+                'auto_return' => 'approved',
+                'statement_descriptor' => config('app.name', 'SAE'),
                 'external_reference' => $this->userPayment->id,
                 'notification_url' => route('mercadopago.webhook'),
             ], $request_options);

@@ -1,5 +1,5 @@
 <div>
-    <x-card title="Próximas Mesas de Examen" shadow-md class="bg-info/5 border-t-4 border-t-info">
+    <x-card title="Próximas Mesas de Examen" shadow-md class="bg-lime-600/5 border-t-4 border-t-lime-600">
         @if (auth()->user()->hasRole('student') || auth()->user()->hasAnyRole(['admin', 'director', 'administrative']))
             <div class="mb-4">
                 <x-select wire:model.live="selectedProfessorId" :options="$this->professors" option-value="id"
@@ -15,7 +15,7 @@
                     <div wire:key="{{ $exam->id }}" class="p-4 rounded-lg bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
                             <div class="col-span-1 border-b md:border-b-0 md:border-r border-base-300 pb-2 md:pb-0">
-                                <div class="text-xs font-bold text-info uppercase tracking-wider">Fecha y Hora</div>
+                                <div class="text-xs font-bold text-lime-600 uppercase tracking-wider">Fecha y Hora</div>
                                 <p class="font-bold text-lg">
                                     {{ \Carbon\Carbon::parse($exam->start)->translatedFormat('d/m/Y H:i') }} hs</p>
                                 @if (auth()->user()->hasRole('teacher'))

@@ -8,10 +8,9 @@ test('it excludes .env by default but includes .env.example', function () {
         '--no-optimize' => true,
     ])->assertExitCode(0);
 
-    $allZips = File::glob(base_path('deploy_*.zip'));
-    $latestZip = end($allZips);
+    $latestZip = base_path('deploy.zip');
 
-    $zip = new \ZipArchive;
+    $zip = new ZipArchive;
     $zip->open($latestZip);
 
     $filesInZip = [];
@@ -35,10 +34,9 @@ test('it includes .env when --include-env flag is used', function () {
         '--include-env' => true,
     ])->assertExitCode(0);
 
-    $allZips = File::glob(base_path('deploy_*.zip'));
-    $latestZip = end($allZips);
+    $latestZip = base_path('deploy.zip');
 
-    $zip = new \ZipArchive;
+    $zip = new ZipArchive;
     $zip->open($latestZip);
 
     $filesInZip = [];
@@ -61,10 +59,9 @@ test('it excludes unnecessary files from the zip', function () {
         '--no-optimize' => true,
     ])->assertExitCode(0);
 
-    $allZips = File::glob(base_path('deploy_*.zip'));
-    $latestZip = end($allZips);
+    $latestZip = base_path('deploy.zip');
 
-    $zip = new \ZipArchive;
+    $zip = new ZipArchive;
     $zip->open($latestZip);
 
     $filesInZip = [];

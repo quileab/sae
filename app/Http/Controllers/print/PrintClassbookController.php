@@ -4,7 +4,7 @@ namespace App\Http\Controllers\print;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
-use App\Models\Configs;
+use App\Models\Config;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -32,10 +32,13 @@ class PrintClassbookController extends Controller
             $subject = null;
         }
 
-        $config = Configs::where('group', 'main')->get()->pluck('value', 'id')->toArray();
+        $config = [
+            'longname' => Config::get('longname', 'Nombre de la Institución'),
+            'shortname' => Config::get('shortname', 'SAE'),
+        ];
 
-        // Prioritize: 1. URL Parameter, 2. Session, 3. DB default
-        $cycle = request()->query('cycle') ?? session('cycle_id') ?? (Configs::getValue('cycle')[0]->value ?? date('Y'));
+        // Prioritize: 1. URL Parameter, 2. Session, 3. Current Year
+        $cycle = request()->query('cycle') ?? session('cycle_id') ?? date('Y');
 
         $dateFrom = $cycle.'-01-01';
         $dateTo = $cycle.'-12-31';
@@ -50,9 +53,9 @@ class PrintClassbookController extends Controller
             ->join('users', 'users.id', '=', 'class_sessions.teacher_id')
             ->where('subject_id', $subject)
             ->whereBetween('date', [$dateFrom, $dateTo])
+            ->orderBy('class_sessions.date')
             ->get();
 
-        // dd($classbooks, $subject, $user, $dateFrom, $dateTo);
         // Si no hay sesiones de clase, devolver 404
         if ($classbooks->isEmpty()) {
             return back()->with('error', 'No encontrado');
@@ -80,8 +83,6 @@ class PrintClassbookController extends Controller
         // }
         $data['attendance'] = number_format(100 * $attendance / $totalAttendance, 2).'%';
 
-        // dd($data, $classbooks, $config);
-
-        return view('printClassbook', compact(['classbooks', 'data', 'config']));
+        return view('print.classbook', compact(['classbooks', 'data', 'config']));
     }
 }

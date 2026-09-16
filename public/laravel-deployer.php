@@ -1,4 +1,9 @@
 <?php
+
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Facade;
+
 // 1. FORZAR DIAGNÓSTICO
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -40,8 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         switch ($action) {
             case 'env':
                 if (file_exists($rootDir.'/.env.example') && ! file_exists($rootDir.'/.env')) {
-                    copy($rootDir.'/.env.example', $rootDir.'/.env');
-                    $output = "Archivo .env creado desde .env.example\n";
+                    if (! is_writable($rootDir)) {
+                        throw new Exception("El directorio raíz ($rootDir) NO es escribible. No puedo crear el archivo .env. Cambia los permisos a 755 o 775.");
+                    }
+                    if (copy($rootDir.'/.env.example', $rootDir.'/.env')) {
+                        $output = "Archivo .env creado desde .env.example\n";
+                    } else {
+                        $error = error_get_last();
+                        throw new Exception('Fallo al copiar .env.example a .env: '.$error['message']);
+                    }
                 } else {
                     $output = "El archivo .env ya existe o no hay .env.example\n";
                 }
@@ -61,13 +73,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             case 'htaccess':
                 $htaccessPath = $rootDir.'/.htaccess';
+                if (file_exists($htaccessPath) && ! is_writable($htaccessPath)) {
+                    throw new Exception('El archivo .htaccess ya existe pero no es escribible.');
+                }
+                if (! file_exists($htaccessPath) && ! is_writable($rootDir)) {
+                    throw new Exception('El directorio raíz no es escribible para crear .htaccess.');
+                }
                 $rules = "\n<IfModule mod_rewrite.c>\n    RewriteEngine On\n    RewriteCond %{REQUEST_URI} !^/public/\n    RewriteRule ^(.*)$ public/$1 [L]\n</IfModule>";
-                file_put_contents($htaccessPath, $rules, FILE_APPEND);
-                $output = "Reglas de redirección añadidas al .htaccess de la raíz.\n";
+                if (file_put_contents($htaccessPath, $rules, FILE_APPEND)) {
+                    $output = "Reglas de redirección añadidas al .htaccess de la raíz.\n";
+                } else {
+                    throw new Exception('No se pudo escribir en el archivo .htaccess.');
+                }
                 break;
 
             case 'save_env':
                 $envPath = $rootDir.'/.env';
+                if (file_exists($envPath) && ! is_writable($envPath)) {
+                    throw new Exception('El archivo .env ya existe pero no es escribible. Verifica sus permisos.');
+                }
+                if (! file_exists($envPath) && ! is_writable($rootDir)) {
+                    throw new Exception('El archivo .env no existe y el directorio raíz no es escribible.');
+                }
                 if (isset($_POST['env_content'])) {
                     $content = $_POST['env_content'];
                     // Normalizar a LF (Linux) retirando cualquier rastro de CR (\r)
@@ -107,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 require_once $autoload;
                 $app = require_once $bootstrap;
-                \Illuminate\Support\Facades\Facade::setFacadeApplication($app);
+                Facade::setFacadeApplication($app);
 
                 // Asegurar directorios antes de cualquier comando de Artisan
                 $requiredDirs = [
@@ -116,43 +143,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $rootDir.'/storage/framework/cache/data',
                     $rootDir.'/storage/framework/sessions',
                     $rootDir.'/storage/framework/views',
+                    $rootDir.'/bootstrap/cache',
                 ];
                 foreach ($requiredDirs as $dir) {
                     if (! file_exists($dir)) {
-                        mkdir($dir, 0755, true);
+                        mkdir($dir, 0775, true);
                         $output .= 'Sistema: Directorio creado: '.basename($dir)."\n";
+                    } elseif (! is_writable($dir)) {
+                        @chmod($dir, 0775);
+                        $output .= 'Sistema: Permisos actualizados para: '.basename($dir)."\n";
                     }
                 }
 
-                $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+                $kernel = $app->make(Kernel::class);
 
                 if ($action === 'migrate') {
                     $exitCode = $kernel->call('migrate', ['--force' => true]);
-                    $cmdOutput = \Illuminate\Support\Facades\Artisan::output();
+                    $cmdOutput = Artisan::output();
                     $output .= "MIGRACIONES (Código: $exitCode):\n".($cmdOutput ?: 'Ejecutado correctamente (sin cambios pendientes o salida vacía).');
                 }
 
                 if ($action === 'optimize') {
                     $output .= "Solicitando optimización de caches...\n";
                     $exitCode = $kernel->call('optimize');
-                    $cmdOutput = \Illuminate\Support\Facades\Artisan::output();
+                    $cmdOutput = Artisan::output();
                     $output .= "OPTIMIZACIÓN (Código: $exitCode):\n".($cmdOutput ?: '¡Éxito! La configuración y rutas han sido cacheadas (Laravel no devolvió texto extra, pero el proceso terminó bien).');
                 }
 
                 if ($action === 'link') {
                     $target = $rootDir.'/storage/app/public';
                     $link = __DIR__.'/storage';
+
+                    if (! is_writable(__DIR__)) {
+                        throw new Exception('El directorio public/ NO es escribible. No puedo crear el enlace simbólico. Cambia sus permisos a 755 o 775.');
+                    }
+
                     if (is_link($link)) {
-                        unlink($link);
+                        if (! unlink($link)) {
+                            throw new Exception("No se pudo eliminar el enlace simbólico existente en $link.");
+                        }
                     }
+
                     if (is_dir($link)) {
-                        rename($link, $link.'_bak_'.time());
+                        if (! rename($link, $link.'_bak_'.time())) {
+                            throw new Exception("No se pudo renombrar el directorio existente $link para liberar espacio para el enlace.");
+                        }
                     }
+
                     if (! file_exists($target)) {
                         mkdir($target, 0755, true);
                     }
-                    symlink($target, $link);
-                    $output = "Enlace de storage creado manualmente de $target a $link.\n";
+
+                    if (! function_exists('symlink')) {
+                        throw new Exception('La función symlink() de PHP está deshabilitada en este hosting. Deberás crear el enlace manualmente o usar un enlace relativo.');
+                    }
+
+                    if (symlink($target, $link)) {
+                        $output = "Enlace de storage creado con éxito de $target a $link.\n";
+                    } else {
+                        $error = error_get_last();
+                        throw new Exception('Error al crear symlink: '.$error['message']);
+                    }
                 }
 
                 if ($action === 'up') {
@@ -165,16 +216,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 if ($action === 'check') {
                     $dirs = [
+                        $rootDir,
+                        __DIR__,
                         $rootDir.'/storage',
                         $rootDir.'/storage/logs',
                         $rootDir.'/storage/framework',
                         $rootDir.'/bootstrap/cache',
                     ];
+                    $phpUser = function_exists('posix_getpwuid') ? posix_getpwuid(posix_geteuid())['name'] : 'Desconocido';
+                    $output .= "Usuario PHP: $phpUser\n\n";
+
                     foreach ($dirs as $dir) {
                         if (file_exists($dir)) {
-                            $output .= basename($dir).': '.(is_writable($dir) ? '✅ Escribible' : '❌ NO ESCRIBIBLE').' ('.substr(sprintf('%o', fileperms($dir)), -4).")\n";
+                            $isRoot = ($dir === $rootDir);
+                            $isPublic = ($dir === __DIR__);
+                            $label = $isRoot ? 'RAÍZ ('.basename($dir).')' : ($isPublic ? 'PUBLIC ('.basename($dir).')' : basename($dir));
+                            $perms = substr(sprintf('%o', fileperms($dir)), -4);
+                            $ownerId = fileowner($dir);
+                            $owner = function_exists('posix_getpwuid') ? posix_getpwuid($ownerId)['name'] : $ownerId;
+
+                            $writable = is_writable($dir);
+                            $testFile = $dir.'/.write_test_'.time();
+                            $realWritable = false;
+                            if (@file_put_contents($testFile, 'test')) {
+                                $realWritable = true;
+                                @unlink($testFile);
+                            }
+
+                            $status = ($writable || $realWritable) ? '✅ Escribible' : '❌ NO ESCRIBIBLE';
+                            $output .= "$label: $status ($perms) [Dueño: $owner]\n";
+
+                            if (! $realWritable && $label === 'cache') {
+                                $output .= "   ⚠️ Intenta ejecutar: chmod -R 777 bootstrap/cache\n";
+                            }
                         } else {
-                            $output .= basename($dir).": ❌ NO EXISTE (Intentando crear...)\n";
+                            $output .= basename($dir).": ❌ NO EXISTE\n";
                         }
                     }
                 }
@@ -190,13 +266,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 if ($action === 'clear_cache') {
-                    $cacheFiles = glob($rootDir.'/bootstrap/cache/*.php');
-                    foreach ($cacheFiles as $file) {
+                    $cacheDir = $rootDir.'/bootstrap/cache';
+                    $files = glob($cacheDir.'/*.php');
+                    foreach ($files as $file) {
                         if (basename($file) !== 'packages.php' && basename($file) !== 'services.php') {
-                            unlink($file);
+                            @chmod($file, 0666);
+                            @unlink($file);
                         }
                     }
-                    $output = "Cache de bootstrap limpiado manualmente (config.php, routes-v7.php, etc).\n";
+                    $output = "Intento de limpieza de cache en $cacheDir finalizado.\n";
                 }
                 break;
         }
