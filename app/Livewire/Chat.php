@@ -124,13 +124,13 @@ class Chat extends Component
             $this->users = [];
 
             // Personal / Staff para el docente.
-            $this->staffUsers = User::all()
-                ->filter(fn ($u) => $u->isStaff())
+            $this->staffUsers = User::whereIn('role', ['admin', 'director', 'administrative', 'treasurer', 'preceptor'])
+                ->orderBy('lastname')
+                ->get(['id', 'firstname', 'lastname', 'role'])
                 ->map(fn ($u) => [
                     'id' => $u->id,
                     'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
                 ])
-                ->sortBy('name')
                 ->values()
                 ->all();
         } elseif ($user->hasRole('student')) {
@@ -146,15 +146,14 @@ class Chat extends Component
             $this->subjects = $this->allSubjects;
 
             // Solo docentes de sus materias.
-            $teacherIds = collect();
-            foreach ($subjects as $subject) {
-                $teacherIds = $teacherIds->merge(
-                    $subject->users()->where('role', 'teacher')->pluck('users.id')
-                );
-            }
+            $teacherIds = Enrollment::whereIn('subject_id', $subjects->pluck('id'))
+                ->join('users', 'enrollments.user_id', '=', 'users.id')
+                ->where('users.role', 'teacher')
+                ->pluck('enrollments.user_id')
+                ->unique();
 
-            $this->users = User::whereIn('id', $teacherIds->unique())
-                ->get()
+            $this->users = User::whereIn('id', $teacherIds)
+                ->get(['id', 'firstname', 'lastname', 'role'])
                 ->map(fn ($u) => [
                     'id' => $u->id,
                     'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
@@ -164,13 +163,13 @@ class Chat extends Component
                 ->all();
 
             // Personal / Staff para el estudiante.
-            $this->staffUsers = User::all()
-                ->filter(fn ($u) => $u->isStaff())
+            $this->staffUsers = User::whereIn('role', ['admin', 'director', 'administrative', 'treasurer', 'preceptor'])
+                ->orderBy('lastname')
+                ->get(['id', 'firstname', 'lastname', 'role'])
                 ->map(fn ($u) => [
                     'id' => $u->id,
                     'name' => $this->getRoleEmoji($u->role).' '.$u->fullname,
                 ])
-                ->sortBy('name')
                 ->values()
                 ->all();
         }
@@ -299,16 +298,19 @@ class Chat extends Component
 
         if (in_array($type, ['user', 'subject'])) {
             // Marcar mensajes como leídos.
-            Auth::user()->receivedMessages()
+            DB::table('message_user')
+                ->join('messages', 'message_user.message_id', '=', 'messages.id')
+                ->where('message_user.user_id', Auth::id())
+                ->whereNull('message_user.read_at')
                 ->where(function ($query) use ($type, $id) {
                     if ($type === 'user') {
-                        $query->where('sender_id', $id)->whereNull('subject_id');
+                        $query->where('messages.sender_id', $id)
+                            ->whereNull('messages.subject_id');
                     } else {
-                        $query->where('subject_id', $id);
+                        $query->where('messages.subject_id', $id);
                     }
                 })
-                ->whereNull('read_at')
-                ->update(['read_at' => now()]);
+                ->update(['message_user.read_at' => now()]);
         }
 
         $this->dispatch('scroll-to-bottom');
@@ -318,68 +320,90 @@ class Chat extends Component
     {
         $userId = Auth::id();
 
-        $subquery = Message::selectRaw('MAX(id) as id')
-            ->where('sender_id', $userId)
-            ->orWhereHas('recipients', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->groupBy(DB::raw('COALESCE(subject_id, IF(sender_id = '.$userId.', (SELECT user_id FROM message_user WHERE message_id = messages.id LIMIT 1), sender_id))'));
-
-        $recentMessages = Message::whereIn('id', $subquery)
-            ->with(['sender', 'recipients', 'subject.career'])
+        // Obtener los últimos mensajes en los que participó el usuario
+        $recentMessagesQuery = Message::where(function ($q) use ($userId) {
+            $q->where('sender_id', $userId)
+                ->orWhereHas('recipients', function ($r) use ($userId) {
+                    $r->where('message_user.user_id', $userId);
+                });
+        })
+            ->with([
+            'sender:id,firstname,lastname,role,name',
+            'recipients:id,firstname,lastname,role,name',
+            'subject:id,name,career_id',
+            'subject.career:id,name',
+        ])
             ->latest()
+            ->take(200)
             ->get();
 
-        $conversations = [];
         $processedKeys = [];
 
-        foreach ($recentMessages as $message) {
-            $key = '';
-            $label = '';
-            $subLabel = '';
-            $id = 0;
-            $type = '';
-
+        foreach ($recentMessagesQuery as $message) {
             if ($message->subject_id) {
-                $type = 'subject';
-                $id = $message->subject_id;
-                $key = 'subject_'.$id;
-                $label = $message->subject->name ?? 'Curso';
-                $subLabel = $message->subject->career->name ?? '';
-            } else {
-                $type = 'user';
-                if ($message->sender_id == $userId) {
-                    $recipient = $message->recipients->where('id', '!=', $userId)->first();
-                    $id = $recipient->id ?? 0;
-                    $label = $recipient->fullname ?? 'Usuario';
-                } else {
-                    $id = $message->sender_id;
-                    $label = $message->sender->fullname ?? 'Usuario';
+                $key = 'subject_'.$message->subject_id;
+                if (! isset($processedKeys[$key])) {
+                    $processedKeys[$key] = [
+                        'key' => $key,
+                        'type' => 'subject',
+                        'id' => $message->subject_id,
+                        'label' => $message->subject->name ?? 'Curso',
+                        'subLabel' => $message->subject->career->name ?? '',
+                        'last_date' => $message->created_at,
+                        'unread' => false,
+                    ];
                 }
-                $key = 'user_'.$id;
-            }
 
-            if (! in_array($key, $processedKeys)) {
-                $unreadCount = 0;
                 if ($message->sender_id !== $userId) {
                     $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
                     if ($myPivot && is_null($myPivot->read_at)) {
-                        $unreadCount = 1;
+                        $processedKeys[$key]['unread'] = true;
                     }
                 }
-
-                $conversations[] = [
-                    'key' => $key,
-                    'type' => $type,
-                    'id' => $id,
-                    'label' => $label,
-                    'subLabel' => $subLabel,
-                    'last_date' => $message->created_at,
-                    'unread' => $unreadCount > 0,
-                ];
-                $processedKeys[] = $key;
+            } else {
+                if ($message->sender_id === $userId) {
+                    foreach ($message->recipients as $recipient) {
+                        if ($recipient->id === $userId) {
+                            continue;
+                        }
+                        $key = 'user_'.$recipient->id;
+                        if (! isset($processedKeys[$key])) {
+                            $processedKeys[$key] = [
+                                'key' => $key,
+                                'type' => 'user',
+                                'id' => $recipient->id,
+                                'label' => $recipient->fullname ?? 'Usuario',
+                                'subLabel' => '',
+                                'last_date' => $message->created_at,
+                                'unread' => false,
+                            ];
+                        }
+                    }
+                } else {
+                    $key = 'user_'.$message->sender_id;
+                    if (! isset($processedKeys[$key])) {
+                        $processedKeys[$key] = [
+                            'key' => $key,
+                            'type' => 'user',
+                            'id' => $message->sender_id,
+                            'label' => $message->sender->fullname ?? 'Usuario',
+                            'subLabel' => '',
+                            'last_date' => $message->created_at,
+                            'unread' => false,
+                        ];
+                    }
+                    $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
+                    if ($myPivot && is_null($myPivot->read_at)) {
+                        $processedKeys[$key]['unread'] = true;
+                    }
+                }
             }
         }
+
+        $conversations = collect(array_values($processedKeys))
+            ->sortByDesc('last_date')
+            ->values()
+            ->all();
 
         $filteredMessages = collect();
         if ($this->selectedConversation) {
@@ -395,12 +419,12 @@ class Chat extends Component
                             $subQ->where(function ($q2) use ($id, $userId) {
                                 $q2->where('sender_id', $userId)
                                     ->whereHas('recipients', function ($r) use ($id) {
-                                        $r->where('user_id', $id);
+                                        $r->where('message_user.user_id', $id);
                                     });
                             })->orWhere(function ($q2) use ($id, $userId) {
                                 $q2->where('sender_id', $id)
                                     ->whereHas('recipients', function ($r) use ($userId) {
-                                        $r->where('user_id', $userId);
+                                        $r->where('message_user.user_id', $userId);
                                     });
                             });
                         });
@@ -410,7 +434,12 @@ class Chat extends Component
             }
 
             $filteredMessages = $query->latest()
-                ->with(['subject.career', 'sender'])
+                ->with([
+                    'sender:id,firstname,lastname,role,name',
+                    'recipients:id,firstname,lastname,role,name',
+                    'subject:id,name,career_id',
+                    'subject.career:id,name',
+                ])
                 ->take($this->amount)
                 ->get();
         }

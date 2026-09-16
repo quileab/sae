@@ -1,6 +1,6 @@
 <div class="h-full flex flex-col lg:flex-row gap-2 p-2" x-data="{ showList: true }" @messages-loaded.window="showList = false">
     <!-- Sidebar (Conversaciones) -->
-    <div class="w-full lg:w-1/4 h-full flex flex-col gap-2" x-show="showList || window.innerWidth >= 1024" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0">
+    <div class="w-full lg:w-1/4 h-full min-h-0 flex flex-col gap-2 lg:flex hidden" x-show="showList" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-full">
         <div class="shrink-0 bg-base-100 rounded-lg border border-base-300 p-2 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <x-button icon="o-arrow-left" @click="window.history.back()" class="btn-sm btn-ghost" />
@@ -31,7 +31,7 @@
                     <div class="absolute inset-0 overflow-y-auto p-2 space-y-2">
                         @forelse ($conversationList as $conv)
                             <div wire:click="selectConversation('{{ $conv['type'] }}', {{ $conv['id'] }})"
-                                @click="showList = false"
+                                @click="if (window.innerWidth < 1024) showList = false"
                                 class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $conv['id'] && $selectedConversation['type'] == $conv['type'] ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
                                 <div class="flex justify-between items-start">
                                     <div class="font-bold truncate max-w-[75%]">
@@ -219,7 +219,7 @@
                                 label="Abrir conversación"
                                 icon="o-chat-bubble-left-right"
                                 wire:click="selectConversation('{{ $convType }}', {{ $targetId }})"
-                                @click="$wire.activeTab = 'messages'; showList = false"
+                                @click="$wire.activeTab = 'messages'; if (window.innerWidth < 1024) showList = false"
                                 class="btn-primary w-full"
                                 spinner
                             />
@@ -231,7 +231,7 @@
     </div>
 
     <!-- Área principal de chat -->
-    <div class="w-full lg:w-3/4 h-full flex flex-col" x-show="!showList || window.innerWidth >= 1024" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0">
+    <div class="w-full lg:w-3/4 h-full min-h-0 flex flex-col lg:flex hidden" x-show="!showList || window.innerWidth >= 1024" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 translate-x-full">
         @if ($selectedConversation)
             <div class="shrink-0 bg-base-100 rounded-lg border border-base-300 p-2 mb-2 flex items-center gap-2">
                 <x-button icon="o-chevron-left" @click="showList = true" class="btn-sm btn-ghost lg:hidden" label="Volver" />
@@ -265,15 +265,8 @@
 
             <div
                 class="flex-1 overflow-y-auto p-4 bg-base-200 rounded-lg mb-2 min-h-0 border border-base-300"
-                x-data="{
-                    init() {
-                        this.scrollToBottom();
-                    },
-                    scrollToBottom() {
-                        this.$el.scrollTop = this.$el.scrollHeight;
-                    }
-                }"
-                x-on:scroll-to-bottom.window="$nextTick(() => scrollToBottom())"
+                x-init="scrollToBottom()"
+                @scroll-to-bottom.window="$nextTick(() => scrollToBottom())"
             >
                 <div class="space-y-4">
                     @if ($receivedMessages->count() >= $amount)
@@ -293,7 +286,12 @@
                     @endif
 
                     @forelse ($receivedMessages->sortBy('created_at') as $message)
-                        <div class="flex {{ $message->sender_id == auth()->id() ? 'justify-end' : 'justify-start' }}">
+                        <div wire:key="msg-{{ $message->id }}" class="flex {{ $message->sender_id == auth()->id() ? 'justify-end' : 'justify-start' }} gap-2">
+                            @if ($message->sender_id != auth()->id())
+                                <div class="shrink-0 mt-auto">
+                                    <img src="{{ $message->sender->avatar_url }}" class="w-8 h-8 rounded-full object-cover" />
+                                </div>
+                            @endif
                             <div class="max-w-[85%] lg:max-w-[70%] {{ $message->sender_id == auth()->id() ? 'bg-primary text-primary-content' : 'bg-base-100' }} rounded-lg p-3 shadow-sm">
                                 @if ($message->subject)
                                     <div class="text-xs font-bold opacity-70 mb-1">
@@ -307,7 +305,7 @@
                                     $content = e($message->content);
                                     $content = preg_replace(
                                         '/(https?:\/\/[^\s]+)/',
-                                        '<a href="$0" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 break-all">$0</a>',
+                                        '<a href="$0" target="_blank" rel="noopener noreferrer" class="link link-primary break-all">$0</a>',
                                         $content
                                     );
                                 @endphp
@@ -344,20 +342,27 @@
                 </form>
             </div>
         @else
-            <div class="flex-1 flex items-center justify-center bg-base-200 rounded-lg mb-2 border border-base-300 lg:flex hidden">
+            <div class="flex-1 flex items-center justify-center bg-base-200 rounded-lg mb-2 border border-base-300">
                 <div class="text-center text-base-content/50">
                     <x-icon name="o-chat-bubble-oval-left-ellipsis" class="w-16 h-16 mx-auto mb-4 opacity-20" />
                     <h3 class="text-lg font-bold">Selecciona una conversación</h3>
                     <p>o inicia una nueva desde la pestaña "Nuevo"</p>
                 </div>
             </div>
-
-            <div class="flex-1 flex items-center justify-center bg-base-200 rounded-lg mb-2 border border-base-300 lg:hidden" x-show="!showList" @click="showList = true">
-                <div class="text-center text-base-content/50">
-                    <x-icon name="o-arrow-left" class="w-12 h-12 mx-auto mb-2 opacity-20" />
-                    <p>Toca para ver conversaciones</p>
-                </div>
-            </div>
         @endif
     </div>
 </div>
+
+<script>
+    // Alpine data for scroll behavior - avoids nested x-data
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('chatScroll', () => ({
+            init() {
+                this.scrollToBottom();
+            },
+            scrollToBottom() {
+                this.$el.scrollTop = this.$el.scrollHeight;
+            }
+        }));
+    });
+</script>
