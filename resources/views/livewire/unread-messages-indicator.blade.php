@@ -22,7 +22,7 @@ new class extends Component {
 }; ?>
 
 @if($type === 'mobile')
-    <div wire:poll.30s class="inline-flex items-center">
+    <div class="inline-flex items-center" x-on:message-read.window="$wire.$refresh()">
         @if($count > 0)
             <x-button icon="o-chat-bubble-left-right" link="/chat" no-wire-navigate class="btn-ghost btn-sm text-primary relative me-2">
                 <span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-[9px] font-bold text-white">

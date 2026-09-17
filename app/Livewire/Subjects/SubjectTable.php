@@ -117,7 +117,8 @@ class SubjectTable extends Component
 
         $newId = $maxInCareer ? $maxInCareer + 1 : $logicalStart + 1;
 
-        while (Subject::where('id', $newId)->exists()) {
+        $existingIds = Subject::where('id', '>=', $newId)->pluck('id')->toArray();
+        while (in_array($newId, $existingIds)) {
             $newId++;
         }
 

@@ -13,10 +13,12 @@ use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
 
+#[Lazy]
 class RiskReport extends Component
 {
     use AuthorizesAccess, Toast;
@@ -275,6 +277,29 @@ class RiskReport extends Component
         });
 
         return $report->sortByDesc(fn ($item) => $item['risk_level'] === 'Crítico' ? 2 : 1)->values();
+    }
+
+    public function placeholder()
+    {
+        return <<<'HTML'
+        <div class="p-6 space-y-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold">Reporte de Alumnos en Riesgo Académico</h1>
+                    <p class="text-sm text-base-content/60">Cargando métricas e inasistencias...</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="skeleton h-24 w-full rounded-xl bg-base-200"></div>
+                <div class="skeleton h-24 w-full rounded-xl bg-base-200"></div>
+                <div class="skeleton h-24 w-full rounded-xl bg-base-200"></div>
+            </div>
+            <div class="card bg-base-100 border border-base-200 p-12 flex flex-col items-center justify-center gap-3">
+                <span class="loading loading-spinner loading-lg text-primary"></span>
+                <p class="text-sm font-medium text-base-content/70">Analizando asistencias y promedios de estudiantes...</p>
+            </div>
+        </div>
+        HTML;
     }
 
     public function render()

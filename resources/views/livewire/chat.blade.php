@@ -1,6 +1,6 @@
-<div class="h-full flex flex-col lg:flex-row gap-2 p-2" x-data="{ showList: true }" @messages-loaded.window="showList = false">
+<div class="h-full flex flex-col lg:flex-row gap-2 p-2" x-data="{ showList: true, isDesktop: window.innerWidth >= 1024 }" @resize.window="isDesktop = window.innerWidth >= 1024" @messages-loaded.window="showList = false">
     <!-- Sidebar (Conversaciones) -->
-    <div class="w-full lg:w-1/4 h-full min-h-0 flex flex-col gap-2 lg:flex hidden" x-show="showList" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-full">
+    <div class="w-full lg:w-1/4 h-full min-h-0 flex flex-col gap-2" x-show="showList || isDesktop" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 -translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 -translate-x-full">
         <div class="shrink-0 bg-base-100 rounded-lg border border-base-300 p-2 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <x-button icon="o-arrow-left" @click="window.history.back()" class="btn-sm btn-ghost" />
@@ -31,7 +31,7 @@
                     <div class="absolute inset-0 overflow-y-auto p-2 space-y-2">
                         @forelse ($conversationList as $conv)
                             <div wire:click="selectConversation('{{ $conv['type'] }}', {{ $conv['id'] }})"
-                                @click="if (window.innerWidth < 1024) showList = false"
+                                @click="if (!isDesktop) showList = false"
                                 class="p-3 rounded-lg cursor-pointer transition-colors duration-200 {{ $selectedConversation && $selectedConversation['id'] == $conv['id'] && $selectedConversation['type'] == $conv['type'] ? 'bg-primary text-primary-content' : 'hover:bg-base-200 bg-base-100' }}">
                                 <div class="flex justify-between items-start">
                                     <div class="font-bold truncate max-w-[75%]">
@@ -219,7 +219,7 @@
                                 label="Abrir conversación"
                                 icon="o-chat-bubble-left-right"
                                 wire:click="selectConversation('{{ $convType }}', {{ $targetId }})"
-                                @click="$wire.activeTab = 'messages'; if (window.innerWidth < 1024) showList = false"
+                                @click="$wire.activeTab = 'messages'; if (!isDesktop) showList = false"
                                 class="btn-primary w-full"
                                 spinner
                             />
@@ -231,7 +231,7 @@
     </div>
 
     <!-- Área principal de chat -->
-    <div class="w-full lg:w-3/4 h-full min-h-0 flex flex-col lg:flex hidden" x-show="!showList || window.innerWidth >= 1024" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 translate-x-full">
+    <div class="w-full lg:w-3/4 h-full min-h-0 flex flex-col" x-show="!showList || isDesktop" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-full" x-transition:enter-end="opacity-100 translate-x-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 translate-x-0" x-transition:leave-end="opacity-0 translate-x-full">
         @if ($selectedConversation)
             <div class="shrink-0 bg-base-100 rounded-lg border border-base-300 p-2 mb-2 flex items-center gap-2">
                 <x-button icon="o-chevron-left" @click="showList = true" class="btn-sm btn-ghost lg:hidden" label="Volver" />

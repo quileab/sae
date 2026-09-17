@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -140,9 +139,10 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute(): string
     {
         $path = 'avatars/'.$this->id.'.webp';
+        $fullPublicPath = public_path('storage/'.$path);
 
-        if (Storage::disk('public')->exists($path)) {
-            $timestamp = Storage::disk('public')->lastModified($path);
+        if (file_exists($fullPublicPath)) {
+            $timestamp = filemtime($fullPublicPath);
 
             return asset('storage/'.$path).'?v='.$timestamp;
         }

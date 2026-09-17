@@ -210,7 +210,7 @@
                         @endforeach
                     </select>
                     {{-- Selector de Fecha --}}
-                    <input type="date" wire:model.live="date" class="input input-bordered input-sm w-36" />
+                    <input type="date" wire:model.blur="date" class="input input-bordered input-sm w-36" />
                 </div>
 
                 <x-button

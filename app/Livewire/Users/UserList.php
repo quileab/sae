@@ -4,6 +4,7 @@ namespace App\Livewire\Users;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -12,8 +13,10 @@ class UserList extends Component
 {
     use Toast, WithPagination;
 
+    #[Url(except: '')]
     public string $search = '';
 
+    #[Url(except: '')]
     public string $filterRole = '';
 
     public array $sortBy = ['column' => 'name', 'direction' => 'asc'];

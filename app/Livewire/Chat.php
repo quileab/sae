@@ -349,12 +349,14 @@ class Chat extends Component
                     }
                 })
                 ->update(['message_user.read_at' => now()]);
+            $this->dispatch('message-read');
         }
 
         $this->dispatch('scroll-to-bottom');
     }
 
-    public function render()
+    #[Computed]
+    public function conversationList()
     {
         $userId = Auth::id();
 
@@ -399,51 +401,46 @@ class Chat extends Component
                     }
                 }
             } else {
-                if ($message->sender_id === $userId) {
-                    foreach ($message->recipients as $recipient) {
-                        if ($recipient->id === $userId) {
-                            continue;
-                        }
-                        $key = 'user_'.$recipient->id;
-                        if (! isset($processedKeys[$key])) {
-                            $processedKeys[$key] = [
-                                'key' => $key,
-                                'type' => 'user',
-                                'id' => $recipient->id,
-                                'label' => $recipient->fullname ?? 'Usuario',
-                                'subLabel' => '',
-                                'last_date' => $message->created_at,
-                                'unread' => false,
-                            ];
-                        }
-                    }
-                } else {
-                    $key = 'user_'.$message->sender_id;
+                $otherUser = $message->sender_id === $userId
+                    ? $message->recipients->first()
+                    : $message->sender;
+
+                if ($otherUser) {
+                    $key = 'user_'.$otherUser->id;
                     if (! isset($processedKeys[$key])) {
                         $processedKeys[$key] = [
                             'key' => $key,
                             'type' => 'user',
-                            'id' => $message->sender_id,
-                            'label' => $message->sender->fullname ?? 'Usuario',
-                            'subLabel' => '',
+                            'id' => $otherUser->id,
+                            'label' => $otherUser->fullname ?? 'Usuario',
+                            'subLabel' => $otherUser->role === 'student' ? 'Estudiante' : 'Staff/Docente',
                             'last_date' => $message->created_at,
                             'unread' => false,
                         ];
                     }
-                    $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
-                    if ($myPivot && is_null($myPivot->read_at)) {
-                        $processedKeys[$key]['unread'] = true;
+
+                    if ($message->sender_id !== $userId) {
+                        $myPivot = $message->recipients->where('id', $userId)->first()?->pivot;
+                        if ($myPivot && is_null($myPivot->read_at)) {
+                            $processedKeys[$key]['unread'] = true;
+                        }
                     }
                 }
             }
         }
 
-        $conversations = collect(array_values($processedKeys))
+        return collect(array_values($processedKeys))
             ->sortByDesc('last_date')
             ->values()
             ->all();
+    }
 
+    #[Computed]
+    public function receivedMessages()
+    {
+        $userId = Auth::id();
         $filteredMessages = collect();
+
         if ($this->selectedConversation) {
             $type = $this->selectedConversation['type'];
             $id = $this->selectedConversation['id'];
@@ -475,16 +472,19 @@ class Chat extends Component
                 ->with([
                     'sender:id,firstname,lastname,role,name',
                     'recipients:id,firstname,lastname,role,name',
-                    'subject:id,name,career_id',
-                    'subject.career:id,name',
                 ])
                 ->take($this->amount)
                 ->get();
         }
 
+        return $filteredMessages;
+    }
+
+    public function render()
+    {
         return view('livewire.chat', [
-            'conversationList' => $conversations,
-            'receivedMessages' => $filteredMessages,
+            'conversationList' => $this->conversationList(),
+            'receivedMessages' => $this->receivedMessages(),
         ])->layout('layouts.chat');
     }
 

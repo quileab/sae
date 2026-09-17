@@ -9,6 +9,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -57,6 +58,12 @@ class InscriptionManager extends Component
 
     public function mount()
     {
+        $adminId = Cache::remember('admin_user_id', 86400, function () {
+            return User::where('name', 'admin')->value('id');
+        });
+        if ($adminId) {
+            $this->admin_id = $adminId;
+        }
         $user = $this->targetUser;
 
         if ($user->enabled == false) {
@@ -129,18 +136,12 @@ class InscriptionManager extends Component
         $this->checkPdf();
     }
 
-    public function boot()
-    {
-        $admin = User::where('name', 'admin')->first();
-        if ($admin) {
-            $this->admin_id = $admin->id;
-        }
-    }
-
     // Table headers
     public function headers(): array
     {
-        $labelSubject = Config::where('id', 'label_subject')->value('value') ?? 'Materia';
+        $labelSubject = Cache::remember('label_subject_config', 86400, function () {
+            return Config::where('id', 'label_subject')->value('value') ?? 'Materia';
+        });
 
         return [
             ['key' => 'id', 'label' => '#', 'class' => 'w-10'],

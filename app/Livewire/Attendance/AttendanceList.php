@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\View;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -42,16 +43,19 @@ class AttendanceList extends Component
 
         $this->date = Carbon::today()->toDateString();
 
-        $careers = $this->getAccessibleCareers();
-
-        if ($careers->isNotEmpty()) {
+        $careers = $this->accessibleCareers;
+        if (! $this->careerId && $careers->isNotEmpty()) {
             $this->careerId = $careers->first()->id;
+        }
+
+        if ($this->careerId) {
             $this->loadStudents();
             $this->loadAttendances();
         }
     }
 
-    protected function getAccessibleCareers(): Collection
+    #[Computed]
+    public function accessibleCareers(): Collection
     {
         $user = auth()->user();
         $query = Career::where('allow_enrollments', true)
@@ -150,7 +154,7 @@ class AttendanceList extends Component
     public function save(): void
     {
         // IDOR Prevention: Ensure user has access to this career
-        if (! $this->getAccessibleCareers()->contains('id', $this->careerId)) {
+        if (! $this->accessibleCareers->contains('id', $this->careerId)) {
             abort(403, 'No tienes permiso para registrar asistencia en esta carrera.');
         }
 
@@ -177,6 +181,7 @@ class AttendanceList extends Component
     }
 
     /** @return array<int, float> */
+    #[Computed]
     public function absenceTotals(): array
     {
         if (empty($this->students)) {
@@ -199,8 +204,8 @@ class AttendanceList extends Component
     public function render(): View
     {
         return view('livewire.attendance.attendance-list', [
-            'careers' => $this->getAccessibleCareers(),
-            'totals' => $this->absenceTotals(),
+            'careers' => $this->accessibleCareers,
+            'totals' => $this->absenceTotals,
         ]);
     }
 }

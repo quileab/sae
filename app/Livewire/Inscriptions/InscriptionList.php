@@ -108,6 +108,7 @@ class InscriptionList extends Component
         ];
     }
 
+    #[Computed]
     public function items(): Collection
     {
         $search = Str::of($this->search)->lower()->ascii();
