@@ -26,6 +26,8 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('/subjects-table', 'subjects.subject-table')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/subject/{id?}', 'subjects.subject-form')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,director,administrative');
+    Route::livewire('/pre-enrollments', 'pre-enrollments.index')->middleware('roles:admin,principal,director,administrative');
+    Route::livewire('/pre-enrollments/materials', 'pre-enrollments.materials')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/config-manager', 'config-manager')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/inscriptions', 'inscriptions.inscription-manager')->middleware('roles:admin,student,principal,director,administrative');
     Route::livewire('/inscriptions/list', 'inscriptions.inscription-list')->middleware('roles:admin,teacher,principal,director,administrative');

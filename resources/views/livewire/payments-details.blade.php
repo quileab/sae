@@ -13,13 +13,16 @@
 
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <x-table :headers="[['key' => 'created_at', 'label' => __('Fecha')], ['key' => 'id', 'label' => __('ID')], ['key' => 'description', 'label' => __('Descripción')], ['key' => 'paymentAmount', 'label' => __('Monto'), 'class' => 'text-right'], ['key' => 'actions', 'label' => '']]" :rows="$this->payments" striped>
+    <x-table :headers="[['key' => 'created_at', 'label' => __('Fecha')], ['key' => 'id', 'label' => __('ID')], ['key' => 'description', 'label' => __('Descripción')], ['key' => 'paymentAmount', 'label' => __('Monto'), 'class' => 'text-right'], ['key' => 'actions', 'label' => '']]" :rows="$this->payments" striped selectable wire:model="selected">
       <x-slot:actions>
         <h1 class="flex item">
           <strong>{{ $user->lastname }}</strong>, {{ $user->firstname }}
           » {{ $user->id }}
         </h1>
-        <div class="flex item center">
+        <div class="flex item center gap-2">
+          @if(auth()->user()->hasAnyRole(['admin', 'principal', 'director', 'administrative', 'treasurer']))
+          <x-button label="{{ __('Facturar AFIP') }}" icon="o-document-currency-dollar" wire:click="generateAfipInvoice" class="btn-success btn-sm" spinner="generateAfipInvoice" />
+          @endif
           <span class="mt-3">{{ __('Mostrar') }}&nbsp;</span>
           <x-select wire:model.live="perPage"
             class="mr-4 w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm">
@@ -33,6 +36,14 @@
               @scope('cell_created_at', $payment)
                   {{ $payment->created_at->format('d/m/Y') }}
               @endscope
+              @scope('cell_description', $payment)
+                  <div class="flex items-center gap-2">
+                      {{ $payment->description }}
+                      @if($payment->payment_invoice_id)
+                          <x-badge value="Facturado" class="badge-info badge-sm" />
+                      @endif
+                  </div>
+              @endscope
               @scope('cell_paymentAmount', $payment)
                   ${{ number_format($payment->paymentAmount, 2) }}
               @endscope
@@ -41,8 +52,12 @@
         <div class="flex items-center">
         @if($payment->paymentAmount > 0)
             <a href="{{ route('payments.receipt', $payment->id) }}" target="_blank">
-                <x-button icon="o-document-text" class="btn-ghost btn-sm" />
+                <x-button icon="o-document-text" class="btn-ghost btn-sm" tooltip="Recibo Interno" />
             </a>
+            @if($payment->payment_invoice_id)
+                {{-- ToDo: Link to real AFIP PDF --}}
+                <x-button icon="o-document-check" class="btn-ghost btn-sm text-success" tooltip="Ver AFIP" />
+            @endif
         @endif
 
         @if(in_array(auth()->user()->role, ['admin', 'director', 'administrative']) && $payment->paymentAmount > 0)

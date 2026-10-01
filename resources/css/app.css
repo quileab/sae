@@ -3,19 +3,76 @@
 /* DaisyUI */
 @plugin "daisyui";
 
+/* Alpine.js - ocultar elementos antes de la inicialización */
+[x-cloak] { display: none !important; }
+
 :root {
     --color-info: #4285F4;
 }
 
 /* maryUI */
-@source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
+@source "../../vendor/robsontenorio/mary/src/View/Components";
 
 /* Dark theme variant support */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Laravel 12 defaults */
-@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
-@source "../../storage/framework/views/*.php";
-@source "../**/*.blade.php";
-@source "../**/*.js";
-@source "../**/*.vue";
+@source "../../storage/framework/views";
+@source "../../resources/views/components";
+@source "../../resources/views/layouts";
+@source "../../resources/views/livewire";
+@source "../../resources/views/vendor";
+
+/* Performance: CSS containment for independent regions */
+.menu-item, .list-item, .table-row {
+    contain: layout style paint;
+}
+
+/* Performance: content-visibility for long lists */
+.content-list, .card-grid, .table-container {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 500px;
+}
+
+/* Performance: GPU-accelerated scrolling */
+.sidebar, .scroll-area {
+    will-change: scroll-position;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Performance: reduce layout shifts */
+img, video, svg {
+    aspect-ratio: attr(width) / attr(height);
+}
+
+/* Performance: prevent font flash */
+.font-sans {
+    font-display: swap;
+}
+
+/* === Pagination — SAE Design System === */
+nav[aria-label="Pagination Navigation"] {
+    font-family: Inter, system-ui, sans-serif;
+}
+
+nav[aria-label="Pagination Navigation"] .relative.z-0 {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+nav[aria-label="Pagination Navigation"] span[aria-current="page"] .bg-primary {
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+nav[aria-label="Pagination Navigation"] button:hover {
+    transform: translateY(-1px);
+}
+
+nav[aria-label="Pagination Navigation"] button:active {
+    transform: translateY(0);
+}
+
+/* Ensure DaisyUI doesn't override pagination */
+nav[aria-label="Pagination Navigation"] .pagination {
+    display: inline-flex;
+}

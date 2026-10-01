@@ -64,6 +64,8 @@ class ContentManager extends Component
 
     public bool $isStudent = false;
 
+    public bool $viewAsStudent = false;
+
     public Subject $subject;
 
     public $subject_id;
@@ -98,6 +100,22 @@ class ContentManager extends Component
         $this->subject_id = $this->subject->id;
         session()->put('current_subject_id', $this->subject_id);
         $this->authorizeSubject($this->subject_id);
+
+        // Preseleccionar la primera unidad visible y el último tema de esa unidad
+        $firstUnit = $this->subject
+            ->units()
+            ->orderBy('order')
+            ->when($this->isStudent, fn ($q) => $q->where('is_visible', true))
+            ->with(['topics' => fn ($q) => $q->orderBy('order')])
+            ->first();
+
+        if ($firstUnit) {
+            $this->selectedUnitId = $firstUnit->id;
+            $topics = $this->isStudent
+                ? $firstUnit->topics->where('is_visible', true)
+                : $firstUnit->topics;
+            $this->selectedTopicId = $topics->last()?->id;
+        }
     }
 
     public function updatedSubjectId($value)
@@ -106,6 +124,38 @@ class ContentManager extends Component
             session()->put('current_subject_id', $value);
 
             return $this->redirect('/subjects-content/'.$value, navigate: true);
+        }
+    }
+
+    public function updatedViewAsStudent(): void
+    {
+        $effectiveStudent = $this->isStudent || $this->viewAsStudent;
+
+        $unit = $this->subject
+            ->units()
+            ->when($effectiveStudent, fn ($q) => $q->where('is_visible', true))
+            ->find($this->selectedUnitId);
+
+        if (! $unit) {
+            $firstUnit = $this->subject
+                ->units()
+                ->orderBy('order')
+                ->when($effectiveStudent, fn ($q) => $q->where('is_visible', true))
+                ->first();
+
+            $this->selectedUnitId = $firstUnit?->id;
+            $unit = $firstUnit;
+        }
+
+        if ($unit) {
+            $topics = $unit->topics()
+                ->orderBy('order')
+                ->when($effectiveStudent, fn ($q) => $q->where('is_visible', true))
+                ->get();
+
+            $this->selectedTopicId = $topics->last()?->id;
+        } else {
+            $this->selectedTopicId = null;
         }
     }
 
@@ -161,7 +211,24 @@ class ContentManager extends Component
 
     public function toggleTopics($unitId)
     {
-        $this->selectedUnitId = ($this->selectedUnitId == $unitId) ? null : $unitId;
+        if ($this->selectedUnitId == $unitId) {
+            return;
+        }
+
+        $this->selectedUnitId = $unitId;
+
+        $unit = $this->subject
+            ->units()
+            ->with(['topics' => fn ($q) => $q->orderBy('order')])
+            ->find($unitId);
+
+        if ($unit) {
+            $effectiveStudent = $this->isStudent || $this->viewAsStudent;
+            $topics = $effectiveStudent
+                ? $unit->topics->where('is_visible', true)
+                : $unit->topics;
+            $this->selectedTopicId = $topics->last()?->id;
+        }
     }
 
     public function addTopic($unitId)
@@ -376,6 +443,20 @@ class ContentManager extends Component
             'bg-amber-500', 'bg-orange-500', 'bg-red-500',
         ];
 
-        return view('livewire.content-manager', compact('colors', 'bgColors'));
+        $resourceBgColors = [
+            'bg-violet-500/15', 'bg-blue-500/15', 'bg-emerald-500/15',
+            'bg-amber-500/15', 'bg-orange-500/15', 'bg-red-500/15',
+        ];
+
+        $resourceTextColors = [
+            'text-violet-600 dark:text-violet-400',
+            'text-blue-600 dark:text-blue-400',
+            'text-emerald-600 dark:text-emerald-400',
+            'text-amber-600 dark:text-amber-400',
+            'text-orange-600 dark:text-orange-400',
+            'text-red-600 dark:text-red-400',
+        ];
+
+        return view('livewire.content-manager', compact('colors', 'bgColors', 'resourceBgColors', 'resourceTextColors'));
     }
 }

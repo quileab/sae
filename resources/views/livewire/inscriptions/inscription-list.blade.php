@@ -56,7 +56,7 @@
     </x-card>
 
     <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
+    <x-qb-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
 
         <div class="flex flex-col gap-4">
             <div class="p-4 border rounded-lg border-error/20 bg-error/5">
@@ -73,6 +73,6 @@
             </div>
         </div>
 
-    </x-drawer>
+    </x-qb-drawer>
 
 </div>

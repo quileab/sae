@@ -5,7 +5,9 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\RoleGroups;
 use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +31,7 @@ class User extends Authenticatable
         'firstname',
         'email',
         'phone',
+        'status',
     ];
     // protected $guarded = [];
 
@@ -53,6 +56,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'enabled' => 'boolean',
+            'status' => UserStatus::class,
         ];
     }
 
@@ -64,6 +68,31 @@ class User extends Authenticatable
     public static function roleOptions(): array
     {
         return UserRole::options();
+    }
+
+    public static function statusOptions(): array
+    {
+        return UserStatus::options();
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->status instanceof UserStatus ? $this->status->label() : ($this->status ?? 'Activo');
+    }
+
+    public function getStatusBadgeAttribute(): string
+    {
+        return $this->status instanceof UserStatus ? $this->status->badgeClass() : 'badge-neutral';
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === UserStatus::Active;
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', UserStatus::Active->value);
     }
 
     // users may have multiple careers

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Users;
 
+use App\Enums\UserStatus;
 use App\Models\Career;
 use App\Models\JustifiedAbsence;
 use App\Models\User;
@@ -29,6 +30,7 @@ class UserForm extends Component
         'phone' => '',
         'role' => 'student',
         'enabled' => true,
+        'status' => 'active',
         'careers' => [],
     ];
 
@@ -53,6 +55,7 @@ class UserForm extends Component
         if ($id !== null) {
             $user = User::findOrFail($id);
             $this->data = $user->toArray();
+            $this->data['status'] = $user->status instanceof UserStatus ? $user->status->value : ($user->status ?? 'active');
             $this->data['careers'] = $user->careers;
             $this->loadJustifiedAbsences();
         }
@@ -66,6 +69,12 @@ class UserForm extends Component
     public function roles()
     {
         return User::roleOptions();
+    }
+
+    #[Computed]
+    public function statuses()
+    {
+        return User::statusOptions();
     }
 
     #[Computed]
@@ -99,6 +108,7 @@ class UserForm extends Component
             'data.phone' => 'nullable|string|max:255',
             'data.role' => 'required|string|in:admin,principal,director,administrative,preceptor,treasurer,teacher,student,basic_user',
             'data.enabled' => 'required|boolean',
+            'data.status' => 'required|string|in:active,graduated,withdrawn,on_leave,passive',
         ], [
             'data.id.required' => 'El ID es obligatorio.',
             'data.id.integer' => 'El ID debe ser un número entero.',
@@ -111,6 +121,8 @@ class UserForm extends Component
             'data.lastname.required' => 'El apellido es obligatorio.',
             'data.role.required' => 'El rol es obligatorio.',
             'data.role.in' => 'El rol seleccionado no es válido.',
+            'data.status.required' => 'El estado es obligatorio.',
+            'data.status.in' => 'El estado seleccionado no es válido.',
         ]);
 
         // If we are editing and the ID has changed, update it directly via query builder
@@ -139,6 +151,7 @@ class UserForm extends Component
             'phone' => $this->data['phone'],
             'role' => $this->data['role'],
             'enabled' => $this->data['enabled'],
+            'status' => $this->data['status'] ?? 'active',
         ]);
 
         if (! $user->exists) {

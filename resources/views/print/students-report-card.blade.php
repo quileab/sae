@@ -2,7 +2,7 @@
 
 @section('orientation', 'landscape')
 @section('title', 'Boletín - '.config('app.name'))
-@section('print-button-label', 'Imprimir Boletín')
+@section('print-button-label', '🖨️ Imprimir')
 
 @section('content')
   <h2>{{ $data['shortname'] }} - {{ $data['longname'] }}</h2>

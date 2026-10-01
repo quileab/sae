@@ -33,10 +33,10 @@
     </x-card>
 
     <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
+    <x-qb-drawer wire:model="drawer" title="Opciones" right with-close-button class="lg:w-1/3">
         <x-dropdown label="Eliminar" class="btn-error" right>
             <x-menu-item title="Confirmar" wire:click="deleteSelected" spinner="deleteSelected" icon="o-trash" />
         </x-dropdown>
-    </x-drawer>
+    </x-qb-drawer>
 
 </div>

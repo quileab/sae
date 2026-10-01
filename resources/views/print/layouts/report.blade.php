@@ -58,10 +58,10 @@
       justify-content: center;
       gap: 1rem;
       padding: 0.75rem 1.5rem;
-      background-color: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(0, 0, 0, 0.1);
+      background-color: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 9999px;
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
@@ -143,10 +143,10 @@
 <body>
   <div class="dontPrint">
     <button type="button" class="btn btn-print" onclick="window.print();return false;">
-      @yield('print-button-label', 'Imprimir Reporte')
+      @yield('print-button-label', '🖨️ Imprimir')
     </button>
     <button type="button" class="btn btn-close" onclick="window.close();">
-      Cerrar
+      ✕
     </button>
   </div>
 

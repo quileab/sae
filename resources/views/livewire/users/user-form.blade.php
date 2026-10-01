@@ -23,10 +23,12 @@
                 <x-input label="Apellido" type="text" wire:model="data.lastname" />
                 <x-input label="Nombres" type="text" wire:model="data.firstname" />
             </div>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-4">
                 <x-input label="E-mail" type="email" wire:model="data.email" />
                 <x-input label="Teléfono" type="tel" wire:model="data.phone" />
                 <x-select label="Rol" icon="o-user" :options="$this->roles" wire:model="data.role" option-value="name"
+                    option-label="alias" />
+                <x-select label="Estado" icon="o-flag" :options="$this->statuses" wire:model="data.status" option-value="name"
                     option-label="alias" />
             </div>
 
@@ -110,7 +112,7 @@
     @endif
 
     <!-- DRAWER -->
-    <x-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
+    <x-qb-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
         class="lg:w-1/3">
         <x-input inline label="Password" wire:model="data.password" type="text" icon="o-key" error-field="data.password">
             <x-slot:append>
@@ -136,5 +138,5 @@
                 </x-dropdown>
             </div>
         </x-slot:actions>
-    </x-drawer>
+    </x-qb-drawer>
 </div>

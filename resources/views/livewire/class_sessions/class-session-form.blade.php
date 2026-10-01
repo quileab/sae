@@ -35,7 +35,7 @@
     </x-card>
 
     <!-- DRAWER -->
-    <x-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
+    <x-qb-drawer wire:model="drawer" title="Acciones" right with-close-button separator with-close-button close-on-escape
         class="lg:w-1/3">
 
         <x-slot:actions>
@@ -44,5 +44,5 @@
                     class="bg-error text-white" />
             </x-dropdown>
         </x-slot:actions>
-    </x-drawer>
+    </x-qb-drawer>
 </div>

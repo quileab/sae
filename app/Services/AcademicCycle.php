@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Config;
 use Illuminate\Support\Carbon;
 
 class AcademicCycle
@@ -17,6 +18,11 @@ class AcademicCycle
     public const Q2_END_MONTH = 11;
 
     public const Q2_END_DAY = 30;
+
+    public static function enrollmentCycle(): int
+    {
+        return (int) (Config::get('enrollment_cycle')?->value ?? date('Y') + 1);
+    }
 
     public static function startDate(int $cycle): Carbon
     {

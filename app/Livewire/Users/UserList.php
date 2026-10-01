@@ -2,8 +2,9 @@
 
 namespace App\Livewire\Users;
 
+use App\Enums\UserStatus;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -19,6 +20,9 @@ class UserList extends Component
     #[Url(except: '')]
     public string $filterRole = '';
 
+    #[Url(except: '')]
+    public string $filterStatus = '';
+
     public array $sortBy = ['column' => 'name', 'direction' => 'asc'];
 
     public $row_decoration;
@@ -29,38 +33,6 @@ class UserList extends Component
         $this->success('Filters cleared.', position: 'toast-bottom');
     }
 
-    public function delete(User $user): void
-    {
-        // Solo administradores pueden eliminar usuarios
-        if (! auth()->user()->hasRole('admin')) {
-            $this->error('No tienes permisos para realizar esta acción.');
-
-            return;
-        }
-
-        // No permitirse auto-eliminarse
-        if ($user->id === auth()->id()) {
-            $this->error('No puedes eliminar tu propia cuenta.');
-
-            return;
-        }
-
-        DB::transaction(function () use ($user) {
-            // Eliminar relaciones críticas de pagos y académico
-            $user->payments()->delete();
-            $user->userPayments()->delete();
-            $user->grades()->delete();
-            $user->enrollments()->delete();
-            $user->careers()->detach();
-            $user->receivedMessages()->detach();
-            $user->messages()->delete();
-
-            $user->delete();
-        });
-
-        $this->success('Usuario y toda su información relacionada eliminados permanentemente.', position: 'toast-bottom');
-    }
-
     public function headers(): array
     {
         return [
@@ -69,12 +41,29 @@ class UserList extends Component
             ['key' => 'phone', 'label' => 'Tel.', 'sortable' => false],
             ['key' => 'email', 'label' => 'E-mail', 'sortable' => false],
             ['key' => 'role', 'label' => 'Rol', 'sortable' => false],
+            ['key' => 'status', 'label' => 'Estado', 'sortable' => false],
         ];
     }
 
     public function updatedSearch(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedFilterRole(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    #[Computed]
+    public function statuses(): array
+    {
+        return UserStatus::options();
     }
 
     public function users()
@@ -91,6 +80,12 @@ class UserList extends Component
                         ->orWhere('email', 'like', "%{$this->search}%")
                         ->orWhere('id', 'like', "%{$this->search}%");
                 });
+            })
+            ->when($this->filterRole, function ($query) {
+                $query->where('role', $this->filterRole);
+            })
+            ->when($this->filterStatus, function ($query) {
+                $query->where('status', $this->filterStatus);
             });
 
         if ($column === 'fullname') {

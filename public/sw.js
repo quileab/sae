@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sae-attendance-v6';
+const CACHE_NAME = 'sae-attendance-v8';
 const CACHED_URLS = [
     '/favicon.ico',
     '/images/icon-192x192.png',
@@ -8,7 +8,15 @@ const CACHED_URLS = [
 // Instalación: cachear recursos esenciales
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHED_URLS))
+        caches.open(CACHE_NAME).then(async (cache) => {
+            for (const url of CACHED_URLS) {
+                try {
+                    await cache.add(url);
+                } catch (e) {
+                    console.warn('Failed to cache:', url, e);
+                }
+            }
+        })
     );
     self.skipWaiting();
 });

@@ -1,9 +1,13 @@
-<div>
+<div class="relative w-full">
     <x-input 
         wire:model.live.debounce.300ms="search" 
         icon="o-magnifying-glass" 
         placeholder="{{ __('Buscar por nombre, apellido o ID...') }}" 
         clearable 
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
     />
 
     @if($search)

@@ -8,8 +8,8 @@ use App\Models\UserPayment;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -76,7 +76,60 @@ class Dashboard extends Component
         }
 
         return Cache::remember('users_without_career_count', 300, function () {
-            return User::where('role', 'student')->doesntHave('careers')->count();
+            return User::where('role', 'student')->where('status', 'active')->doesntHave('careers')->count();
+        });
+    }
+
+    #[Computed]
+    public function studentStats(): array
+    {
+        if (! Auth::user()?->isStaff()) {
+            return [
+                'total' => 0,
+                'without_career' => 0,
+                'with_attendance' => 0,
+                'enabled' => 0,
+                'disabled' => 0,
+            ];
+        }
+
+        return Cache::remember('student_stats_'.now()->format('Y_m_d_H'), 300, function () {
+            $startOfMonth = now()->startOfMonth()->toDateString();
+            $endOfMonth = now()->endOfMonth()->toDateString();
+
+            $baseStudentQuery = User::where('role', 'student')->where('status', 'active');
+
+            $totalStudents = (clone $baseStudentQuery)->count();
+            $withoutCareer = (clone $baseStudentQuery)->doesntHave('careers')->count();
+            $enabled = (clone $baseStudentQuery)->where('enabled', true)->count();
+            $disabled = (clone $baseStudentQuery)->where('enabled', false)->count();
+
+            $attendanceQuery = (clone $baseStudentQuery)
+                ->whereHas('careers')
+                ->where(function ($query) use ($startOfMonth, $endOfMonth) {
+                    $query->whereHas('grades', function ($gradeQ) use ($startOfMonth, $endOfMonth) {
+                        $gradeQ->where('attendance', '>', 0)
+                            ->whereHas('classSession', function ($sessionQ) use ($startOfMonth, $endOfMonth) {
+                                $sessionQ->whereBetween('date', [$startOfMonth, $endOfMonth]);
+                            });
+                    })->orWhereExists(function ($attQ) use ($startOfMonth, $endOfMonth) {
+                        $attQ->select(DB::raw(1))
+                            ->from('daily_attendances')
+                            ->whereColumn('daily_attendances.user_id', 'users.id')
+                            ->whereBetween('daily_attendances.date', [$startOfMonth, $endOfMonth])
+                            ->whereIn('daily_attendances.status', ['present', 'late', 'half_absent']);
+                    });
+                });
+
+            $activeWithAttendance = (clone $attendanceQuery)->count();
+
+            return [
+                'total' => $totalStudents,
+                'without_career' => $withoutCareer,
+                'with_attendance' => $activeWithAttendance,
+                'enabled' => $enabled,
+                'disabled' => $disabled,
+            ];
         });
     }
 

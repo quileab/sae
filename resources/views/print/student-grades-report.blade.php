@@ -1,22 +1,9 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Reporte de Calificaciones - {{ config('app.name') }}</title>
-  <style>
-    * {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      padding: 0;
-      margin: 0;
-      box-sizing: border-box;
-    }
+@extends('print.layouts.report')
 
-    body {
-      margin: 1.5rem;
-      color: #1f2937;
-      background-color: #fff;
-    }
+@section('orientation', 'landscape')
+@section('title', 'Planilla de Calificaciones - '.config('app.name'))
 
+@section('styles')
     .header {
       display: flex;
       justify-content: space-between;
@@ -70,58 +57,6 @@
       text-align: center;
     }
 
-    .dontPrint {
-      position: fixed;
-      top: 1.5rem;
-      right: 2rem;
-      z-index: 1000;
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      padding: 0.75rem 1.5rem;
-      background-color: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      border-radius: 9999px;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-weight: 600;
-      font-size: 0.875rem;
-      border-radius: 9999px;
-      padding: 0.625rem 1.5rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: 1px solid transparent;
-      text-decoration: none;
-    }
-
-    .btn-print {
-      color: #ffffff;
-      background-color: #570df8;
-    }
-
-    .btn-print:hover {
-      background-color: #4506cb;
-      transform: translateY(-2px);
-    }
-
-    .btn-close {
-      color: #374151;
-      background-color: #ffffff;
-      border-color: #d1d5db;
-    }
-
-    .btn-close:hover {
-      background-color: #f3f4f6;
-      transform: translateY(-2px);
-    }
-
     .total-cell {
       background-color: #f3f4f6;
       font-weight: 600;
@@ -138,29 +73,10 @@
       font-size: 10px;
       color: #9ca3af;
     }
-  </style>
+@endsection
 
-  <style media="print">
-    @page {
-      size: A4 landscape;
-      margin: 1cm;
-    }
-    body { margin: 0; }
-    .dontPrint { display: none !important; }
-  </style>
-</head>
-<body>
-
-  <div class="dontPrint">
-    <button type="button" class="btn btn-print" onclick="window.print();return false;">
-      <span>🖨️</span> Imprimir Planilla
-    </button>
-    <button type="button" class="btn btn-close" onclick="window.close();">
-      <span>✕</span> Cerrar
-    </button>
-  </div>
-
-  <div class="header">
+@section('content')
+<div class="header">
     <div style="display: flex; align-items: center;">
       @if($config->logo)
         <img src="{{ asset($config->logo) }}" alt="Logo" class="header-logo">
@@ -175,9 +91,9 @@
       <div>{{ $subject->career->name }}</div>
       <div>Ciclo Lectivo: {{ request()->query('cycle') ?? date('Y') }}</div>
     </div>
-  </div>
+</div>
 
-  <table>
+<table>
     <thead>
       <tr>
         <th rowspan="2" style="width: 180px;">Apellido y Nombre</th>
@@ -268,11 +184,9 @@
         </tr>
       @endforeach
     </tbody>
-  </table>
+</table>
 
-  <div class="footer">
+<div class="footer">
     Reporte generado desde el Sistema de Gestión Académica • {{ date('d/m/Y H:i') }}
-  </div>
-
-</body>
-</html>
+</div>
+@endsection

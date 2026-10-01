@@ -29,4 +29,9 @@ class PaymentRecord extends Model
     {
         return $this->belongsTo(UserPayment::class, 'userpayments_id');
     }
+
+    public function invoice()
+    {
+        return $this->belongsTo(PaymentInvoice::class, 'payment_invoice_id');
+    }
 }

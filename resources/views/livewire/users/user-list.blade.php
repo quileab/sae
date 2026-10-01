@@ -1,8 +1,10 @@
 <div>
     <!-- HEADER -->
     <x-header title="Usuarios">
-        <x-slot:middle class="!justify-end">
-            <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" />
+        <x-slot:middle class="!justify-end flex items-center gap-2">
+            <x-select :options="$this->statuses" wire:model.live="filterStatus" placeholder="Todos los estados" placeholder-value=""
+                icon="o-flag" class="select-sm w-44" />
+            <x-input placeholder="Buscar..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass" class="input-sm" />
         </x-slot:middle>
         <x-slot:actions>
             <x-button label="NUEVO" link="/user/" responsive icon="o-user-plus" class="btn-success" />
@@ -27,6 +29,9 @@
             @scope('cell_role', $user)
             {{ \App\Models\User::getRoleName($user->role) }}
             @endscope
+            @scope('cell_status', $user)
+            <span class="badge badge-sm {{ $user->status_badge }}">{{ $user->status_label }}</span>
+            @endscope
             @scope('actions', $user)
             <x-dropdown>
                 <x-slot:trigger>
@@ -36,11 +41,8 @@
                 <x-button icon="o-academic-cap" wire:click="selectForEnrollment({{ $user['id'] }})" spinner
                     class="btn-ghost btn-sm text-lime-500" title="Asignar Materias" />
                 
-                @if(auth()->user()->hasRole('admin') && $user->id !== auth()->id())
-                    <x-button icon="o-trash" wire:click="delete({{ $user['id'] }})" 
-                        wire:confirm="¿ESTÁS COMPLETAMENTE SEGURO? Esta acción ELIMINARÁ PERMANENTEMENTE al usuario, incluyendo todas sus notas, pagos, asistencias e inscripciones. Esta acción NO PUEDE DESHACERSE."
-                        spinner class="btn-ghost btn-sm text-red-500" title="Eliminar permanentemente" />
-                @endif
+                <x-button icon="o-currency-dollar" link="{{ route('user-payments', $user->id) }}"
+                    class="btn-ghost btn-sm text-emerald-500" title="Registrar Pago" />
             </x-dropdown>
             @endscope
         </x-table>

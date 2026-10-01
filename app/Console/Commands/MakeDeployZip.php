@@ -53,102 +53,189 @@ class MakeDeployZip extends Command
             @unlink($tempPath);
         }
 
-        $zip = new ZipArchive;
-        if ($zip->open($tempPath, ZipArchive::CREATE) !== true) {
-            $this->error('❌ No se pudo crear el archivo ZIP en la raíz.');
+        $this->info("🤐 Comprimiendo archivos para {$zipName}...");
 
-            return 1;
-        }
+        $sevenZipPath = $this->find7ZipPath();
 
-        $this->info('📂 Analizando y agregando archivos...');
+        if ($sevenZipPath) {
+            $this->info("⚡ 7-Zip detectado ({$sevenZipPath}). Usando compresión ultra-rápida y confiable...");
 
-        $rootPath = realpath(base_path());
-        $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($rootPath, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::LEAVES_ONLY
-        );
+            // Crear archivo temporal con lista de exclusiones para 7z
+            $excludeFile = base_path('temp_7z_exclude.txt');
+            $excludes = [
+                'vendor',
+                'vendor/*',
+                'node_modules',
+                'node_modules/*',
+                '.git',
+                '.git/*',
+                'tests',
+                'tests/*',
+                'storage',
+                'storage/*',
+                'bootstrap/cache',
+                'bootstrap/cache/*',
+                'public/hot',
+                '*.sqlite',
+                '*.zip',
+                '*.tar.gz',
+                $tempZipName,
+                $zipName,
+            ];
 
-        $count = 0;
-        foreach ($files as $name => $file) {
-            $filePath = $file->getRealPath();
-            $relativePath = ltrim(str_replace($rootPath, '', $filePath), DIRECTORY_SEPARATOR);
+            // Archivos ocultos dotfiles excepto .htaccess y .env.example
+            $excludes[] = '.*';
 
-            // Convert Windows separators to Linux separators for ZIP internal structure
-            $zipPath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath);
-
-            // --- REGLAS DE EXCLUSIÓN ESTRICTAS ---
-
-            // 1. Excluir carpetas pesadas y de desarrollo
-            if (Str::startsWith($zipPath, 'vendor/') ||
-                Str::startsWith($zipPath, 'node_modules/') ||
-                Str::startsWith($zipPath, '.git/') ||
-                Str::startsWith($zipPath, 'tests/')) {
-                continue;
+            if (! $this->option('include-env')) {
+                $excludes[] = '.env';
             }
 
-            // 2. Excluir TODA la carpeta storage y bootstrap/cache, y public/hot
-            if (Str::startsWith($zipPath, 'storage/') ||
-                Str::startsWith($zipPath, 'bootstrap/cache/') ||
-                $zipPath === 'public/hot') {
-                continue;
+            file_put_contents($excludeFile, implode("\r\n", $excludes));
+
+            $cmd = [
+                $sevenZipPath,
+                'a',
+                '-tzip',
+                '-mx=7',
+                $finalPath,
+                '.',
+                "-xr@{$excludeFile}",
+            ];
+
+            $process = new Process($cmd, base_path());
+            $process->setTimeout(600);
+            $process->run(function ($type, $buffer) {
+                if (Str::contains($buffer, ['Scanning', 'Archive size', 'Everything is Ok', 'Files read'])) {
+                    $this->output->write($buffer);
+                }
+            });
+
+            @unlink($excludeFile);
+
+            if (! $process->isSuccessful() || ! file_exists($finalPath)) {
+                $this->error('❌ Error al ejecutar 7-Zip: ' . $process->getErrorOutput());
+                return 1;
+            }
+        } else {
+            $this->line('ℹ️ 7-Zip no detectado. Utilizando ZipArchive nativo de PHP...');
+            $zip = new ZipArchive;
+            if ($zip->open($tempPath, ZipArchive::CREATE) !== true) {
+                $this->error('❌ No se pudo crear el archivo ZIP en la raíz.');
+
+                return 1;
             }
 
-            // 3. Excluir archivos ocultos de configuración local (excepto .htaccess y .env.example)
-            $pathParts = explode('/', $zipPath);
-            if (collect($pathParts)->contains(fn ($part) => Str::startsWith($part, '.') && $part !== '.htaccess' && $part !== '.env.example')) {
-                // Special check for .env
-                if ($zipPath === '.env' && $this->option('include-env')) {
-                    // Include it
-                } else {
+            $this->info('📂 Analizando y agregando archivos...');
+
+            $rootPath = realpath(base_path());
+            $files = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($rootPath, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::LEAVES_ONLY
+            );
+
+            $count = 0;
+            foreach ($files as $name => $file) {
+                $filePath = $file->getRealPath();
+                $relativePath = ltrim(str_replace($rootPath, '', $filePath), DIRECTORY_SEPARATOR);
+
+                // Convert Windows separators to Linux separators for ZIP internal structure
+                $zipPath = str_replace(DIRECTORY_SEPARATOR, '/', $relativePath);
+
+                // --- REGLAS DE EXCLUSIÓN ESTRICTAS ---
+
+                // 1. Excluir carpetas pesadas y de desarrollo
+                if (Str::startsWith($zipPath, 'vendor/') ||
+                    Str::startsWith($zipPath, 'node_modules/') ||
+                    Str::startsWith($zipPath, '.git/') ||
+                    Str::startsWith($zipPath, 'tests/')) {
                     continue;
                 }
-            }
 
-            // 4. Excluir archivos de base de datos local (sqlite) y otros archivos ZIP (excepto el que estamos creando)
-            if (Str::endsWith($zipPath, '.sqlite') || (Str::endsWith($zipPath, '.zip') && ! Str::startsWith($zipPath, 'deploy_'))) {
-                if ($zipPath !== $zipName) {
+                // 2. Excluir TODA la carpeta storage y bootstrap/cache, y public/hot
+                if (Str::startsWith($zipPath, 'storage/') ||
+                    Str::startsWith($zipPath, 'bootstrap/cache/') ||
+                    $zipPath === 'public/hot') {
                     continue;
                 }
+
+                // 3. Excluir archivos ocultos de configuración local (excepto .htaccess y .env.example)
+                $pathParts = explode('/', $zipPath);
+                if (collect($pathParts)->contains(fn ($part) => Str::startsWith($part, '.') && $part !== '.htaccess' && $part !== '.env.example')) {
+                    // Special check for .env
+                    if ($zipPath === '.env' && $this->option('include-env')) {
+                        // Include it
+                    } else {
+                        continue;
+                    }
+                }
+
+                // 4. Excluir archivos de base de datos local (sqlite) y cualquier archivo comprimido (.zip, .tar.gz)
+                if (Str::endsWith($zipPath, '.sqlite') || Str::endsWith($zipPath, '.zip') || Str::endsWith($zipPath, '.tar.gz')) {
+                    continue;
+                }
+
+                // 5. No incluirse a sí mismo
+                if ($zipPath === $tempZipName || $zipPath === $zipName) {
+                    continue;
+                }
+
+                $zip->addFile($filePath, $zipPath);
+                $count++;
             }
 
-            // 5. No incluirse a sí mismo
-            if ($zipPath === $tempZipName || $zipPath === $zipName) {
-                continue;
+            $this->info("🤐 Comprimiendo {$count} archivos... (esto puede tardar)");
+
+            // El error Permission Denied suele ser aquí. Intentamos capturarlo.
+            try {
+                $closed = $zip->close();
+            } catch (\Exception $e) {
+                $closed = false;
             }
 
-            $zip->addFile($filePath, $zipPath);
-            $count++;
-        }
+            if (! $closed) {
+                $this->error('❌ Error: Windows o un Antivirus bloqueó el cierre del archivo ZIP.');
+                $this->line('💡 Intenta desactivar temporalmente el Antivirus o cerrar programas que usen la carpeta.');
+                if (file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
 
-        $this->info("🤐 Comprimiendo {$count} archivos... (esto puede tardar)");
-
-        // El error Permission Denied suele ser aquí. Intentamos capturarlo.
-        try {
-            $closed = $zip->close();
-        } catch (\Exception $e) {
-            $closed = false;
-        }
-
-        if (! $closed) {
-            $this->error('❌ Error: Windows o un Antivirus bloqueó el cierre del archivo ZIP.');
-            $this->line('💡 Intenta desactivar temporalmente el Antivirus o cerrar programas que usen la carpeta.');
-            if (file_exists($tempPath)) {
-                @unlink($tempPath);
+                return 1;
             }
 
-            return 1;
-        }
+            // 3. Renombrar al nombre final
+            if (! @rename($tempPath, $finalPath)) {
+                $this->error("❌ No se pudo renombrar el archivo a {$zipName}, pero se creó como {$tempZipName}");
 
-        // 3. Renombrar al nombre final
-        if (! @rename($tempPath, $finalPath)) {
-            $this->error("❌ No se pudo renombrar el archivo a {$zipName}, pero se creó como {$tempZipName}");
-
-            return 1;
+                return 1;
+            }
         }
 
         $this->info("✅ ¡Éxito! Paquete generado: {$zipName}");
         $this->line('🚀 Listo para subir a tu hosting compartido.');
 
         return 0;
+    }
+
+    private function find7ZipPath(): ?string
+    {
+        $candidates = [
+            '7z',
+            'C:\\Program Files\\7-Zip\\7z.exe',
+            'C:\\Program Files (x86)\\7-Zip\\7z.exe',
+        ];
+
+        foreach ($candidates as $candidate) {
+            try {
+                $process = new Process([$candidate]);
+                $process->run();
+                if ($process->isSuccessful() || $process->getExitCode() === 0) {
+                    return $candidate;
+                }
+            } catch (\Exception $e) {
+                // continuar probando otros candidatos
+            }
+        }
+
+        return null;
     }
 }

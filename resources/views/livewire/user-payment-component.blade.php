@@ -57,16 +57,19 @@
                 <x-button label="{{ __('Salir') }}" @click="$wire.modifyPaymentModal = false" class="btn-secondary" />
             </x-slot:actions>
         </x-modal>
+    @endif
 
-        {{-- Header & Search --}}
-        <div
-            class="flex flex-col lg:flex-row items-center justify-between gap-4 px-4 py-4 bg-base-200 rounded-lg shadow-sm mb-6">
-            <div class="flex items-center gap-4 w-full lg:w-auto">
-                @if($isAdmin)
-                    <x-button icon="o-magnifying-glass" wire:click="$set('userId', null); $set('user', null)"
-                        class="btn-ghost btn-circle" tooltip="{{ __('Nueva búsqueda') }}" />
-                @endif
-                <div>
+    {{-- Header & Search --}}
+    <div
+        class="flex flex-col lg:flex-row items-center justify-between gap-4 px-4 py-4 bg-base-200 rounded-lg shadow-sm mb-6">
+        <div class="flex items-center gap-4 w-full lg:w-auto">
+            @if($isAdmin)
+                <div class="p-2 bg-primary/10 text-primary rounded-full">
+                    <x-icon name="o-user" class="w-6 h-6" />
+                </div>
+            @endif
+            <div>
+                @if($user)
                     <h1 class="text-xl font-bold leading-tight">
                         {{ $user->full_name }}
                         <span class="text-primary text-sm font-normal ml-1"># {{ $user->id }}</span>
@@ -74,60 +77,85 @@
                     @if($user->careers->isNotEmpty())
                         <div class="text-xs text-gray-500">{{ $user->careers->pluck('name')->implode(', ') }}</div>
                     @endif
-                </div>
-            </div>
-
-            @if($isAdmin)
-                <div class="w-full lg:w-80">
-                    <livewire:students.search />
-                </div>
-            @endif
-
-            @if($isStudent && $this->nextPaymentToPay)
-                <div class="flex items-center gap-4 p-2 bg-base-100 rounded-lg shadow-inner">
-                    <div class="text-right leading-tight text-sm">
-                        <div class="font-semibold">{{ $this->nextPaymentToPay->title }}</div>
-                        <div class="text-primary font-bold">$
-                            {{ number_format($this->nextPaymentToPay->amount - $this->nextPaymentToPay->paid, 2) }}
-                        </div>
-                    </div>
-                    <livewire:online-payment :userPaymentId="$this->nextPaymentToPay->id" />
-                </div>
-            @endif
-
-            <div class="flex gap-2">
-                @if($isAdmin || ($isStudent && $this->userPayments->isNotEmpty()))
-                    <x-button icon="o-printer" label="{{ __('Resumen HTML') }}"
-                        link="{{ route('user-payments.summary', $user->id) }}" external target="_blank"
-                        class="btn-ghost btn-sm md:btn-md" />
-                @endif
-                @if($isAdmin)
-                    @if ($this->userPayments->isNotEmpty())
-                        @if ($this->totals['paid'] < $this->totals['debt'])
-                            <x-button wire:click="addPaymentToUser" icon="o-currency-dollar" label="{{ __('Ingresar Pago') }}"
-                                class="btn-success btn-sm md:btn-md" spinner="addPaymentToUser" />
-                        @endif
-                        <x-button icon="o-list-bullet" label="{{ __('Ver Pagos') }}"
-                            link="{{ route('payments-details', $user->id) }}" class="btn-primary btn-sm md:btn-md" />
-                    @endif
-                    <x-button wire:click="$set('openModal',true)" icon="o-plus-circle" label="{{ __('Agregar Plan') }}"
-                        class="btn-primary btn-sm md:btn-md" />
+                @else
+                    <h1 class="text-xl font-bold leading-tight text-base-content/70">
+                        {{ __('Sin estudiante seleccionado') }}
+                    </h1>
+                    <div class="text-xs text-base-content/50">{{ __('Utilice el buscador para cargar las cuotas') }}</div>
                 @endif
             </div>
         </div>
 
-        {{-- Notifications --}}
-        @foreach(['success', 'error', 'info'] as $type)
-            @if (session($type))
-                <x-alert icon="o-information-circle"
-                    class="alert-{{ $type === 'success' ? 'success' : ($type === 'error' ? 'error' : 'info') }} mb-4" dismissible>
-                    {{ session($type) }}
-                    @if($type === 'success') - {{ __('El pago puede tardar unos minutos en actualizarse.') }} @endif
-                </x-alert>
-            @endif
-        @endforeach
+        @if($isAdmin)
+            <div class="w-full lg:w-80">
+                <livewire:students.search />
+            </div>
+        @endif
 
-        {{-- Payment Grid --}}
+        @if($isStudent && $this->nextPaymentToPay)
+            <div class="flex items-center gap-4 p-2 bg-base-100 rounded-lg shadow-inner">
+                <div class="text-right leading-tight text-sm">
+                    <div class="font-semibold">{{ $this->nextPaymentToPay->title }}</div>
+                    <div class="text-primary font-bold">$
+                        {{ number_format($this->nextPaymentToPay->amount - $this->nextPaymentToPay->paid, 2) }}
+                    </div>
+                </div>
+                <livewire:online-payment :userPaymentId="$this->nextPaymentToPay->id" />
+            </div>
+        @endif
+
+        @if($user && ($isAdmin || ($isStudent && $this->userPayments->isNotEmpty())))
+            <div class="grid grid-cols-2 gap-2 w-full sm:w-auto">
+                {{-- Fila 1 / Botón 1 --}}
+                <x-button icon="o-printer" label="{{ __('Resumen HTML') }}"
+                    link="{{ route('user-payments.summary', $user->id) }}" external target="_blank"
+                    class="btn-ghost btn-sm w-full justify-start" />
+
+                {{-- Fila 1 / Botón 2 --}}
+                @if($isAdmin)
+                    <x-button wire:click="$set('openModal',true)" icon="o-plus-circle" label="{{ __('Asignar Plan') }}"
+                        class="btn-primary btn-sm w-full justify-start" />
+                @endif
+
+                {{-- Fila 2 / Botón 3 --}}
+                @if($isAdmin && $this->userPayments->isNotEmpty() && $this->totals['paid'] < $this->totals['debt'])
+                    <x-button wire:click="addPaymentToUser" icon="o-currency-dollar" label="{{ __('Ingresar Pago') }}"
+                        class="btn-success btn-sm w-full justify-start" spinner="addPaymentToUser" />
+                @else
+                    <div></div>
+                @endif
+
+                {{-- Fila 2 / Botón 4 --}}
+                @if($isAdmin && $this->userPayments->isNotEmpty())
+                    <x-button icon="o-list-bullet" label="{{ __('Ver Pagos') }}"
+                        link="{{ route('payments-details', $user->id) }}" class="btn-info btn-soft btn-sm w-full justify-start" />
+                @else
+                    <div></div>
+                @endif
+            </div>
+        @endif
+    </div>
+
+    {{-- Notifications --}}
+    @foreach(['success', 'error', 'info'] as $type)
+        @if (session($type))
+            <x-alert icon="o-information-circle"
+                class="alert-{{ $type === 'success' ? 'success' : ($type === 'error' ? 'error' : 'info') }} mb-4" dismissible>
+                {{ session($type) }}
+                @if($type === 'success') - {{ __('El pago puede tardar unos minutos en actualizarse.') }} @endif
+            </x-alert>
+        @endif
+    @endforeach
+
+    @if($userId && !$user)
+        <x-alert icon="o-exclamation-triangle" title="{{ __('Estudiante no encontrado') }}"
+            class="alert-error mb-6 shadow-lg" dismissible>
+            {{ __('No se ha podido encontrar un estudiante con el ID :id.', ['id' => $userId]) }}
+        </x-alert>
+    @endif
+
+    {{-- Payment Grid --}}
+    @if($user && $this->userPayments->isNotEmpty())
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 px-2 mb-8">
             @php $currentYear = null; @endphp
             @foreach ($this->userPayments as $userPayment)
@@ -182,65 +210,30 @@
                 @endif
             @endforeach
         </div>
-
-        {{-- Totals --}}
-        <div class="max-w-md ml-auto px-4 py-4 bg-base-200 rounded-xl shadow-inner text-right space-y-1">
-            <div class="flex justify-between items-center text-gray-500">
-                <span>{{ __('Deuda Total') }}</span>
-                <span class="font-mono text-lg">$ {{ number_format($this->totals['debt'], 2, ',', '.') }}</span>
-            </div>
-            <div class="flex justify-between items-center text-success">
-                <span>{{ __('Total Pagado') }}</span>
-                <span class="font-mono text-lg font-bold">$ {{ number_format($this->totals['paid'], 2, ',', '.') }}</span>
-            </div>
-            <div
-                class="pt-2 border-t border-gray-300 dark:border-gray-600 flex justify-between items-center text-xl font-bold">
-                <span>{{ __('Saldo Pendiente') }}</span>
-                <span class="text-primary font-mono">$
-                    {{ number_format($this->totals['debt'] - $this->totals['paid'], 2, ',', '.') }}</span>
-            </div>
-        </div>
-    @else
-        {{-- Search State --}}
-        <div class="max-w-2xl mx-auto mt-16 px-4">
-            @if($userId)
-                <x-alert icon="o-exclamation-triangle" title="{{ __('Estudiante no encontrado') }}"
-                    class="alert-error mb-6 shadow-lg" dismissible>
-                    {{ __('No se ha podido encontrar un estudiante con el ID :id.', ['id' => $userId]) }}
-                </x-alert>
-            @endif
-
-            <x-card class="bg-base-100 shadow-xl border border-base-300" separator>
-                <x-slot:title>
-                    <div class="flex items-center gap-3">
-                        <div class="p-3 bg-primary/10 text-primary rounded-full">
-                            <x-icon name="o-currency-dollar" class="w-8 h-8" />
-                        </div>
-                        <div>
-                            <div class="text-2xl font-black">{{ __('Control de Pagos') }}</div>
-                            <div class="text-sm font-normal opacity-70">{{ __('Administración centralizada de cuentas') }}
-                            </div>
-                        </div>
-                    </div>
-                </x-slot:title>
-
-                <div class="py-8">
-                    <div class="mb-4 text-center text-sm font-semibold opacity-60 uppercase tracking-widest">
-                        {{ __('Buscar Estudiante') }}
-                    </div>
-                    <livewire:students.search />
-                </div>
-
-                <x-slot:actions>
-                    <div class="flex justify-center w-full gap-4 border-t border-base-200 pt-4">
-                        <x-button label="{{ __('Reporte General') }}" link="{{ route('report-payments') }}"
-                            icon="o-document-chart-bar" class="btn-ghost btn-sm" />
-                        <x-button label="{{ __('Ayuda') }}" icon="o-question-mark-circle" class="btn-ghost btn-sm" />
-                    </div>
-                </x-slot:actions>
-            </x-card>
+    @elseif($user)
+        <div class="py-12 text-center text-base-content/60 bg-base-200/40 rounded-xl border border-dashed border-base-300 mb-8">
+            <x-icon name="o-clipboard-document-list" class="w-10 h-10 mx-auto opacity-40 mb-2" />
+            <p class="font-medium">{{ __('El estudiante no posee ningún plan de pagos asignado.') }}</p>
         </div>
     @endif
+
+    {{-- Totals --}}
+    <div class="max-w-md ml-auto px-4 py-4 bg-base-200 rounded-xl shadow-inner text-right space-y-1">
+        <div class="flex justify-between items-center text-gray-500">
+            <span>{{ __('Deuda Total') }}</span>
+            <span class="font-mono text-lg">$ {{ number_format($this->totals['debt'], 2, ',', '.') }}</span>
+        </div>
+        <div class="flex justify-between items-center text-success">
+            <span>{{ __('Total Pagado') }}</span>
+            <span class="font-mono text-lg font-bold">$ {{ number_format($this->totals['paid'], 2, ',', '.') }}</span>
+        </div>
+        <div
+            class="pt-2 border-t border-gray-300 dark:border-gray-600 flex justify-between items-center text-xl font-bold">
+            <span>{{ __('Saldo Pendiente') }}</span>
+            <span class="text-primary font-mono">$
+                {{ number_format($this->totals['debt'] - $this->totals['paid'], 2, ',', '.') }}</span>
+        </div>
+    </div>
 
     <div x-data="{}" @open-receipt.window="window.open($event.detail.url, '_blank')"></div>
 </div>

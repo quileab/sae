@@ -26,10 +26,7 @@
                     </div>
                 @endforeach
 
-                @if(!auth()->user()->hasRole('student'))
-                    <x-stat title="Sin carrera" description="Estudiantes sin inscripción"
-                        value="{{ $this->usersWithoutCareerCount }}" icon="o-user-minus" class="text-warning" />
-                @endif
+
             </div>
             @placeholder
                 <div class="grid grid-cols-1 gap-2 mt-4 md:grid-cols-2 w-full">
@@ -49,15 +46,52 @@
         <x-select label="Seleccionar Materia" wire:model.live="subject_id" :options="$this->subjects"
             option-label="full_name" option-value="id" icon="o-queue-list" />
         <div class="grid grid-cols-3 gap-2 mt-4">
-            <x-button label="VER LIBRO" icon="o-book-open" class="btn-warning btn-sm w-full"
+            <x-button label="LIBRO TEMAS" icon="o-book-open" class="btn-warning btn-soft btn-sm w-full"
                 link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}?cycle={{ $this->cycleYear }}" external
                 no-wire-navigate :disabled="!$subject_id" />
-            <x-button label="CONTENIDO" icon="o-document-text" class="btn-primary btn-sm w-full"
+            <x-button label="CONTENIDO" icon="o-document-text" class="btn-warning btn-soft btn-sm w-full"
                 link="/subjects-content/{{ $subject_id }}" no-wire-navigate :disabled="!$subject_id" />
-            <x-button label="CHAT" icon="o-chat-bubble-left-right" class="btn-info btn-sm w-full"
+            <x-button label="CHAT" icon="o-chat-bubble-left-right" class="btn-warning btn-soft btn-sm w-full"
                 link="/chat?subject_id={{ $subject_id }}" no-wire-navigate :disabled="!$subject_id" />
         </div>
     </x-card>
+
+    @if(auth()->user()->isStaff())
+        {{-- Panel de Estadísticas de Estudiantes --}}
+        <x-card title="Estadísticas de Estudiantes" subtitle="Información general de alumnos activos" shadow-md class="bg-base-100 border-t-4 border-t-primary md:col-span-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="flex flex-col items-center justify-center p-3.5 rounded-lg bg-base-200 border border-base-300 text-center">
+                    <x-icon name="o-users" class="w-6 h-6 text-base-content/70 mb-1" />
+                    <div class="font-semibold text-sm">Total Activos</div>
+                    <span class="text-2xl font-bold">{{ $this->studentStats['total'] }}</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-3.5 rounded-lg bg-success/10 border border-success/20 text-center">
+                    <x-icon name="o-check-circle" class="w-6 h-6 text-success mb-1" />
+                    <div class="font-semibold text-success text-sm">Habilitados</div>
+                    <span class="text-2xl font-bold text-success">{{ $this->studentStats['enabled'] }}</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-3.5 rounded-lg bg-error/10 border border-error/20 text-center">
+                    <x-icon name="o-no-symbol" class="w-6 h-6 text-error mb-1" />
+                    <div class="font-semibold text-error text-sm">Deshabilitados</div>
+                    <span class="text-2xl font-bold text-error">{{ $this->studentStats['disabled'] }}</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-3.5 rounded-lg bg-info/10 border border-info/20 text-center">
+                    <x-icon name="o-calendar-days" class="w-6 h-6 text-info mb-1" />
+                    <div class="font-semibold text-info text-sm">Asistieron (Mes)</div>
+                    <span class="text-2xl font-bold text-info">{{ $this->studentStats['with_attendance'] }}</span>
+                </div>
+
+                <div class="flex flex-col items-center justify-center p-3.5 rounded-lg bg-warning/10 border border-warning/20 text-center">
+                    <x-icon name="o-user-minus" class="w-6 h-6 text-warning mb-1" />
+                    <div class="font-semibold text-warning text-sm">Sin Carrera</div>
+                    <span class="text-2xl font-bold text-warning">{{ $this->studentStats['without_career'] }}</span>
+                </div>
+            </div>
+        </x-card>
+    @endif
 
     @if(auth()->user()->hasRole('student') && $this->nextPayment)
         <x-card title="Próximo Pago Pendiente" shadow-md class="bg-warning/5 border-t-4 border-t-warning">

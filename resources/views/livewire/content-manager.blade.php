@@ -1,178 +1,327 @@
 <div>
-    <!-- HEADER -->
+    @php
+        $effectiveStudent = $isStudent || $viewAsStudent;
+    @endphp
+
+    {{-- HEADER --}}
     <x-header title="Contenidos" subtitle="{{ $subject->name }}" separator progress-indicator>
         <x-slot:middle class="!justify-end">
             <x-select wire:model.live="subject_id" :options="$this->subjects" option-label="full_name"
                 option-value="id" placeholder="Cambiar materia..." icon="o-academic-cap" class="min-w-64" />
         </x-slot:middle>
-        @if(!$isStudent)
+        @if (!$effectiveStudent)
             <x-slot:actions>
                 <x-button label="Nueva Unidad" icon="o-plus" class="btn-primary" wire:click="addUnit" />
             </x-slot:actions>
         @endif
     </x-header>
 
-    @if(!$isStudent)
-        <div class="mb-6 flex justify-end gap-2">
-            <input type="file" wire:model="upload" class="hidden" id="upload-{{ $this->id() }}">
-            <x-button label="Importar" icon="o-arrow-up-tray" class="btn-ghost btn-sm" onclick="document.getElementById('upload-{{ $this->id() }}').click()" />
-            <x-button label="Exportar" icon="o-arrow-down-tray" class="btn-ghost btn-sm" wire:click="exportContent" spinner />
+    @if (!$isStudent)
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl bg-base-100 border border-base-300">
+            <div class="flex items-center gap-2">
+                <x-toggle
+                    label="Ver como estudiante"
+                    wire:model.live="viewAsStudent"
+                    class="toggle-primary toggle-sm" />
+                @if ($viewAsStudent)
+                    <x-badge value="Modo vista previa de estudiante activa" class="badge-warning badge-sm font-medium" />
+                @endif
+            </div>
+
+            @if (!$viewAsStudent)
+                <div class="flex items-center gap-2">
+                    <input type="file" wire:model="upload" class="hidden" id="upload-{{ $this->id() }}">
+                    <x-button label="Importar" icon="o-arrow-up-tray" class="btn-sm btn-secondary"
+                        onclick="document.getElementById('upload-{{ $this->id() }}').click()" />
+                    <x-button label="Exportar" icon="o-arrow-down-tray" class="btn-sm btn-accent"
+                        wire:click="exportContent" spinner />
+                </div>
+            @endif
         </div>
     @endif
 
     @php
         $units = $subject->units->sortBy('order');
-        if ($isStudent) {
+        if ($effectiveStudent) {
             $units = $units->where('is_visible', true);
         }
+        $selectedUnit = $units->firstWhere('id', $selectedUnitId);
     @endphp
 
     @if ($units->isEmpty())
-        <x-alert icon="o-information-circle" class="alert-info shadow-sm">No hay contenidos disponibles para esta materia.</x-alert>
+        <x-alert icon="o-information-circle" class="alert-info shadow-sm">
+            No hay contenidos disponibles para esta materia.
+        </x-alert>
     @else
-        <div class="space-y-6">
-            @foreach ($units as $index => $unit)
-                @php
-                    $colorClass   = $colors[$index % count($colors)];
-                    $bgColorClass = $bgColors[$index % count($bgColors)];
-                @endphp
+        {{-- TABS MÓVIL (visible solo en pantallas pequeñas menores a lg) --}}
+        <div class="lg:hidden mb-4 overflow-x-auto pb-1">
+            <div class="flex gap-2 min-w-max">
+                @foreach ($units as $index => $unit)
+                    @php
+                        $colorClass = $colors[$index % count($colors)];
+                        $bgColorClass = $bgColors[$index % count($bgColors)];
+                        $isActive = $unit->id == $selectedUnitId;
+                    @endphp
+                    <button
+                        type="button"
+                        wire:click="toggleTopics({{ $unit->id }})"
+                        @class([
+                            'flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all whitespace-nowrap cursor-pointer',
+                            'bg-primary text-primary-content border-primary shadow' => $isActive,
+                            'bg-base-100 border-base-300 hover:border-primary/50' => !$isActive,
+                            'opacity-60' => !$effectiveStudent && !$unit->is_visible,
+                        ])>
+                        <span class="w-5 h-5 rounded-full {{ $isActive ? 'bg-primary-content/20' : $bgColorClass }} text-white text-xs flex items-center justify-center font-bold">
+                            {{ $unit->order }}
+                        </span>
+                        <span>{{ $unit->name }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </div>
 
-                <div @class([
-                    "bg-base-100 rounded-xl shadow-sm border border-base-300 transition-all duration-300",
-                    "border-l-8 $colorClass",
-                    "opacity-60 grayscale-[0.5]" => !$isStudent && !$unit->is_visible
-                ])>
-                    {{-- Unit Header --}}
-                    <div class="p-4 flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center gap-4 flex-1 min-w-[200px]">
-                            <div class="w-12 h-12 rounded-lg {{ $bgColorClass }} text-white flex items-center justify-center font-bold text-xl shadow-sm">
-                                {{ $unit->order }}
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-bold">{{ $unit->name }}</h3>
-                                <p class="text-sm opacity-70 line-clamp-1">{{ $unit->description }}</p>
-                            </div>
-                        </div>
+        {{-- LAYOUT PRINCIPAL: sidebar + panel --}}
+        <div class="flex gap-6 items-start">
 
-                        <div class="flex items-center gap-1">
-                            @if(!$isStudent)
-                                <x-button icon="o-pencil" class="btn-circle btn-ghost btn-sm"
-                                    wire:click="editUnit({{ $unit->id }})" tooltip="Editar Unidad" />
-                                <x-button icon="o-trash" class="btn-circle btn-ghost btn-sm text-error"
-                                    wire:click="deleteUnit({{ $unit->id }})"
-                                    wire:confirm="¿Estás seguro de eliminar esta unidad y todo su contenido?"
-                                    tooltip="Eliminar" />
-                                <div class="divider divider-horizontal mx-1"></div>
-                            @endif
-
-                            <x-button
-                                label="{{ $unit->id == $selectedUnitId ? 'Cerrar' : 'Ver Temas' }}"
-                                icon="{{ $unit->id == $selectedUnitId ? 'o-chevron-up' : 'o-chevron-down' }}"
-                                class="btn-sm {{ $unit->id == $selectedUnitId ? 'btn-active' : 'btn-ghost' }}"
-                                wire:click="toggleTopics({{ $unit->id }})" />
-
-                            @if(!$isStudent)
-                                <x-button label="Nuevo Tema" icon="o-plus" class="btn-sm btn-primary"
-                                    wire:click="addTopic({{ $unit->id }})" />
-                                <x-button
-                                    :icon="$unit->is_visible ? 'o-eye' : 'o-eye-slash'"
-                                    class="btn-circle btn-ghost btn-sm ml-1"
-                                    wire:click="toggleVisibility('unit', {{ $unit->id }})"
-                                    wire:loading.attr="disabled"
-                                    wire:target="toggleVisibility('unit', {{ $unit->id }})"
-                                    :tooltip="$unit->is_visible ? 'Ocultar de alumnos' : 'Mostrar a alumnos'" />
-                            @endif
-                        </div>
-                    </div>
-
-                    {{-- Topics Content --}}
-                    @if ($unit->id == $selectedUnitId)
+            {{-- SIDEBAR (visible en lg+) --}}
+            <aside class="hidden lg:block w-80 shrink-0">
+                <div class="sticky top-4 space-y-2">
+                    @foreach ($units as $index => $unit)
                         @php
-                            $topics = $unit->topics->sortBy('order');
-                            if ($isStudent) {
-                                $topics = $topics->where('is_visible', true);
-                            }
+                            $colorClass = $colors[$index % count($colors)];
+                            $bgColorClass = $bgColors[$index % count($bgColors)];
+                            $isActive = $unit->id == $selectedUnitId;
+                            $topicsCount = $effectiveStudent
+                                ? $unit->topics->where('is_visible', true)->count()
+                                : $unit->topics->count();
                         @endphp
-                        <div class="p-4 pt-0 space-y-4 border-t border-base-200 mt-2 bg-base-200/30 rounded-b-xl">
-                            @if ($topics->isEmpty())
-                                <div class="py-8 text-center opacity-50 italic">No hay temas disponibles en esta unidad.</div>
-                            @else
-                                <div class="grid gap-4 mt-4">
-                                    @foreach ($topics as $topic)
-                                        @php
-                                            $resources = $topic->resources;
-                                            if ($isStudent) {
-                                                $resources = $resources->where('is_visible', true);
-                                            }
-                                        @endphp
-                                        <div @class([
-                                            "bg-base-100 p-4 rounded-lg border border-base-300 shadow-sm",
-                                            "opacity-75" => !$isStudent && !$topic->is_visible
-                                        ])>
-                                            <div class="flex justify-between items-start mb-2">
-                                                <div class="flex items-center gap-2">
-                                                    <x-badge value="{{ $topic->order }}" class="{{ $bgColorClass }} text-white border-none" />
-                                                    <h4 class="font-bold text-md">{{ $topic->name }}</h4>
-                                                </div>
-                                                @if(!$isStudent)
-                                                    <div class="flex gap-1 items-center">
-                                                        <x-button icon="o-pencil" class="btn-xs btn-ghost"
-                                                            wire:click="editTopic({{ $topic->id }})"
-                                                            tooltip="Editar tema" />
-                                                        <x-button icon="o-trash" class="btn-xs btn-ghost text-error"
-                                                            wire:click="deleteTopic({{ $topic->id }})"
-                                                            wire:confirm="¿Estás seguro de eliminar este tema?"
-                                                            tooltip="Eliminar tema" />
-                                                        <x-button
-                                                            :icon="$topic->is_visible ? 'o-eye' : 'o-eye-slash'"
-                                                            class="btn-xs btn-ghost"
-                                                            wire:click="toggleVisibility('topic', {{ $topic->id }})"
-                                                            wire:loading.attr="disabled"
-                                                            wire:target="toggleVisibility('topic', {{ $topic->id }})"
-                                                            :tooltip="$topic->is_visible ? 'Ocultar de alumnos' : 'Mostrar a alumnos'" />
-                                                    </div>
-                                                @endif
-                                            </div>
+                        <div @class([
+                            'group rounded-xl border transition-all duration-200 overflow-hidden',
+                            'border-primary shadow-md bg-base-100' => $isActive,
+                            'border-base-300 bg-base-100 hover:border-primary/40 hover:shadow-sm' => !$isActive,
+                            'opacity-60' => !$effectiveStudent && !$unit->is_visible,
+                        ])>
+                            <button
+                                type="button"
+                                wire:click="toggleTopics({{ $unit->id }})"
+                                class="w-full flex items-center gap-3 p-3 text-left cursor-pointer">
+                                <div @class([
+                                    'w-9 h-9 rounded-lg text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs',
+                                    $bgColorClass,
+                                ])>
+                                    {{ $unit->order }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p @class([
+                                        'font-semibold text-sm truncate',
+                                        'text-primary' => $isActive,
+                                    ])>{{ $unit->name }}</p>
+                                    <p class="text-xs opacity-60 mt-0.5">{{ $topicsCount }} {{ \Illuminate\Support\Str::plural('tema', $topicsCount) }}</p>
+                                </div>
+                                @if ($isActive)
+                                    <x-icon name="o-chevron-right" class="w-4 h-4 text-primary shrink-0" />
+                                @endif
+                            </button>
 
-                                            <div class="prose prose-sm max-w-none mb-4 text-base-content/80">
-                                                {!! $topic->content !!}
-                                            </div>
-
-                                            <div class="border-t border-base-200 pt-3 flex flex-wrap items-center gap-2">
-                                                <span class="text-xs font-bold opacity-50 uppercase tracking-widest mr-2">Recursos:</span>
-                                                @foreach ($resources as $resource)
-                                                    <div class="group relative flex items-center gap-2 bg-base-200 px-3 py-1.5 rounded-full border border-base-300 hover:border-primary transition-colors">
-                                                        <a href="{{ $resource->url }}" target="_blank" class="flex items-center gap-2 text-sm hover:text-primary transition-colors">
-                                                            <x-icon name="{{ $resource->icon }}" class="w-4 h-4 text-primary" />
-                                                            <span class="max-w-[150px] truncate font-medium">{{ $resource->title }}</span>
-                                                        </a>
-                                                        @if(!$isStudent)
-                                                            <div class="flex gap-1">
-                                                                <x-button icon="o-pencil" class="btn-xs btn-ghost opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    wire:click="editResource({{ $resource->id }})"
-                                                                    tooltip="Editar recurso" />
-                                                                <x-button icon="o-trash" class="btn-xs btn-ghost text-error opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                    wire:click="deleteResource({{ $resource->id }})"
-                                                                    wire:confirm="¿Borrar recurso?"
-                                                                    tooltip="Eliminar recurso" />
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
-
-                                                @if(!$isStudent)
-                                                    <x-button label="Recurso" icon="o-plus" class="btn-xs btn-outline btn-primary rounded-full"
-                                                        wire:click="addResource({{ $topic->id }})" />
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @endforeach
+                            @if (!$effectiveStudent)
+                                <div @class([
+                                    'flex items-center gap-1 px-3 pb-2 border-t border-base-200 pt-2',
+                                    'hidden group-hover:flex' => !$isActive,
+                                ])>
+                                    <x-button icon="o-pencil" class="btn-xs btn-ghost"
+                                        wire:click="editUnit({{ $unit->id }})" tooltip="Editar unidad" />
+                                    <x-button icon="o-trash" class="btn-xs btn-ghost text-error"
+                                        wire:click="deleteUnit({{ $unit->id }})"
+                                        wire:confirm="¿Estás seguro de eliminar esta unidad y todo su contenido?"
+                                        tooltip="Eliminar unidad" />
+                                    <x-button
+                                        :icon="$unit->is_visible ? 'o-eye' : 'o-eye-slash'"
+                                        class="btn-xs btn-ghost ml-auto"
+                                        wire:click="toggleVisibility('unit', {{ $unit->id }})"
+                                        wire:loading.attr="disabled"
+                                        wire:target="toggleVisibility('unit', {{ $unit->id }})"
+                                        :tooltip="$unit->is_visible ? 'Ocultar de alumnos' : 'Mostrar a alumnos'" />
                                 </div>
                             @endif
                         </div>
+                    @endforeach
+
+                    @if (!$effectiveStudent)
+                        <x-button label="Nueva Unidad" icon="o-plus" class="btn-sm btn-ghost w-full border border-dashed border-base-300"
+                            wire:click="addUnit" />
                     @endif
                 </div>
-            @endforeach
+            </aside>
+
+            {{-- PANEL PRINCIPAL --}}
+            <main class="flex-1 min-w-0">
+                @if ($selectedUnit)
+                    @php
+                        $topics = $selectedUnit->topics->sortBy('order');
+                        if ($isStudent) {
+                            $topics = $topics->where('is_visible', true);
+                        }
+                        $unitIndex = $units->values()->search(fn($u) => $u->id === $selectedUnit->id);
+                        $panelBgColor = $bgColors[$unitIndex % count($bgColors)];
+                        $panelBorderColor = $colors[$unitIndex % count($colors)];
+                        $panelResourceBg = $resourceBgColors[$unitIndex % count($resourceBgColors)];
+                        $panelResourceText = $resourceTextColors[$unitIndex % count($resourceTextColors)];
+                    @endphp
+
+                    {{-- Encabezado de la unidad seleccionada --}}
+                    <div class="mb-5 flex items-start justify-between gap-4 p-4 rounded-xl bg-base-100 border border-base-300 shadow-xs">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl {{ $panelBgColor }} text-white flex items-center justify-center font-bold text-xl shadow-xs shrink-0">
+                                {{ $selectedUnit->order }}
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold leading-tight">{{ $selectedUnit->name }}</h2>
+                                @if ($selectedUnit->description)
+                                    <p class="text-sm opacity-70 mt-0.5">{{ $selectedUnit->description }}</p>
+                                @endif
+                            </div>
+                        </div>
+                        @if (!$effectiveStudent)
+                            <x-button label="Nuevo Tema" icon="o-plus" class="btn-sm btn-primary shrink-0"
+                                wire:click="addTopic({{ $selectedUnit->id }})" />
+                        @endif
+                    </div>
+
+                    {{-- Acordeón de Temas --}}
+                    @if ($topics->isEmpty())
+                        <div class="py-16 text-center opacity-40 italic bg-base-100 rounded-xl border border-base-300">
+                            No hay temas disponibles en esta unidad.
+                        </div>
+                    @else
+                        <div class="space-y-3">
+                            @foreach ($topics as $topic)
+                                @php
+                                    $topicResources = $topic->resources;
+                                    if ($effectiveStudent) {
+                                        $topicResources = $topicResources->where('is_visible', true);
+                                    }
+                                    $isTopicOpen = $topic->id == $selectedTopicId;
+                                @endphp
+                                <div @class([
+                                    'rounded-xl border shadow-xs overflow-hidden transition-all duration-200 bg-base-100',
+                                    'border-primary/40 shadow-sm ring-1 ring-primary/20' => $isTopicOpen,
+                                    'border-base-300' => !$isTopicOpen,
+                                    'opacity-70' => !$effectiveStudent && !$topic->is_visible,
+                                ])>
+                                    {{-- Cabecera del tema (clickable para acordeón) --}}
+                                    <div class="flex items-center justify-between p-3.5 hover:bg-base-200/40 transition-colors">
+                                        <button
+                                            type="button"
+                                            wire:click="toggleResources({{ $topic->id }})"
+                                            class="flex items-center gap-3 flex-1 text-left cursor-pointer">
+                                            <x-badge value="{{ $topic->order }}" class="{{ $panelBgColor }} text-white border-none font-bold" />
+                                            <span class="font-bold text-base">{{ $topic->name }}</span>
+                                            <x-icon
+                                                name="{{ $isTopicOpen ? 'o-chevron-up' : 'o-chevron-down' }}"
+                                                class="w-4 h-4 opacity-50 ml-auto mr-2 shrink-0" />
+                                        </button>
+
+                                        @if (!$effectiveStudent)
+                                            <div class="flex items-center gap-1 border-l border-base-200 pl-2">
+                                                <x-button icon="o-pencil" class="btn-xs btn-ghost"
+                                                    wire:click="editTopic({{ $topic->id }})"
+                                                    tooltip="Editar tema" />
+                                                <x-button icon="o-trash" class="btn-xs btn-ghost text-error"
+                                                    wire:click="deleteTopic({{ $topic->id }})"
+                                                    wire:confirm="¿Estás seguro de eliminar este tema?"
+                                                    tooltip="Eliminar tema" />
+                                                <x-button
+                                                    :icon="$topic->is_visible ? 'o-eye' : 'o-eye-slash'"
+                                                    class="btn-xs btn-ghost"
+                                                    wire:click="toggleVisibility('topic', {{ $topic->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="toggleVisibility('topic', {{ $topic->id }})"
+                                                    :tooltip="$topic->is_visible ? 'Ocultar de alumnos' : 'Mostrar a alumnos'" />
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Contenido del tema (desplegable) --}}
+                                    @if ($isTopicOpen)
+                                        <div class="border-t border-base-200 bg-base-100">
+                                            @if ($topic->content)
+                                                <div class="p-4 prose prose-sm max-w-none text-base-content/90">
+                                                    {!! $topic->content !!}
+                                                </div>
+                                            @endif
+
+                                            {{-- Recursos del tema --}}
+                                            <div class="p-3 {{ $topic->content ? 'border-t border-base-200 bg-base-200/20' : '' }}">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <span class="text-xs font-bold uppercase tracking-wider opacity-60">Recursos de aprendizaje</span>
+                                                    @if (!$effectiveStudent)
+                                                        <x-button label="Nuevo Recurso" icon="o-plus"
+                                                            class="btn-xs btn-outline btn-primary"
+                                                            wire:click="addResource({{ $topic->id }})" />
+                                                    @endif
+                                                </div>
+
+                                                @if ($topicResources->isEmpty())
+                                                    <p class="text-xs opacity-50 italic">No hay recursos agregados en este tema.</p>
+                                                @else
+                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        @foreach ($topicResources as $resource)
+                                                            <div @class([
+                                                                "group flex items-center justify-between gap-2.5 $panelResourceBg hover:brightness-95 border border-base-300/80 rounded-xl p-2 transition-all relative overflow-visible",
+                                                                'opacity-60' => !$effectiveStudent && !$resource->is_visible,
+                                                            ])>
+                                                                {{-- Contenedor del ícono un nivel fuera para mayor presencia y overflow visible --}}
+                                                                <a href="{{ $resource->url }}" target="_blank"
+                                                                   class="w-11 h-11 rounded-lg {{ $panelBgColor }}/20 {{ $panelResourceText }} flex items-center justify-center shrink-0 shadow-2xs relative overflow-visible group-hover:scale-105 transition-transform">
+                                                                    <x-icon name="{{ $resource->icon }}" class="w-13 h-13 -rotate-15 transform scale-125 drop-shadow-xs pointer-events-none" />
+                                                                </a>
+
+                                                                {{-- Información del recurso --}}
+                                                                <a href="{{ $resource->url }}" target="_blank"
+                                                                   class="flex items-center gap-2 flex-1 min-w-0 hover:opacity-90 transition-opacity">
+                                                                    <div class="flex-1 min-w-0">
+                                                                        <p class="text-sm font-semibold truncate">{{ $resource->title }}</p>
+                                                                        <p class="text-xs opacity-55 truncate">{{ parse_url($resource->url, PHP_URL_HOST) ?? $resource->url }}</p>
+                                                                    </div>
+                                                                </a>
+
+                                                                {{-- Acciones en grilla de 2 por 2 --}}
+                                                                @if (!$effectiveStudent)
+                                                                    <div class="grid grid-cols-2 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 bg-base-100/90 backdrop-blur-xs p-0.5 rounded-lg border border-base-300/60 shadow-xs z-10">
+                                                                        <x-button icon="o-pencil" class="btn-xs btn-ghost btn-square tooltip-left"
+                                                                            wire:click="editResource({{ $resource->id }})"
+                                                                            tooltip="Editar recurso" />
+                                                                        <x-button icon="o-trash" class="btn-xs btn-ghost btn-square text-error tooltip-left"
+                                                                            wire:click="deleteResource({{ $resource->id }})"
+                                                                            wire:confirm="¿Borrar recurso?"
+                                                                            tooltip="Eliminar recurso" />
+                                                                        <x-button
+                                                                            :icon="$resource->is_visible ? 'o-eye' : 'o-eye-slash'"
+                                                                            class="btn-xs btn-ghost btn-square tooltip-left"
+                                                                            wire:click="toggleVisibility('resource', {{ $resource->id }})"
+                                                                            wire:loading.attr="disabled"
+                                                                            wire:target="toggleVisibility('resource', {{ $resource->id }})"
+                                                                            :tooltip="$resource->is_visible ? 'Ocultar de alumnos' : 'Mostrar a alumnos'" />
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                @else
+                    <x-alert icon="o-information-circle" class="alert-info">
+                        Seleccioná una unidad del panel lateral para ver su contenido.
+                    </x-alert>
+                @endif
+            </main>
+
         </div>
     @endif
 

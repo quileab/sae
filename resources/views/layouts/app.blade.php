@@ -77,10 +77,21 @@
 
                     @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
                         <x-menu-item title="Usuarios" icon="o-users" link="/users" />
-                        <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
-                            <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
-                            <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
-                            <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
+                        <div class="text-primary font-bold">
+                            <x-menu-sub title="{{ config('app.name') }}" icon="o-building-library">
+                                <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
+                                <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
+                                <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
+                            </x-menu-sub>
+                        </div>
+                    @endif
+
+                    {{-- Grupos ordenados alfabéticamente (después de Dashboard e Institución) --}}
+                    @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                        <x-menu-sub title="Biblioteca" icon="o-book-open">
+                            <x-menu-item title="Libros" icon="o-book-open" link="/books" />
+                            <x-menu-item title="Tejuelos" icon="o-qr-code" link="/books/spines" />
+                            <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
                         </x-menu-sub>
                     @endif
 
@@ -95,10 +106,10 @@
                     @endif
 
                     @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
-                        <x-menu-sub title="Biblioteca" icon="o-book-open">
-                            <x-menu-item title="Libros" icon="o-book-open" link="/books" />
-                            <x-menu-item title="Tejuelos" icon="o-qr-code" link="/books/spines" />
-                            <x-menu-item title="Préstamos" icon="o-arrow-path" link="/books/loans" />
+                        <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
+                            <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
+                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/config-manager" />
+                            <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
                         </x-menu-sub>
 
                         <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
@@ -106,18 +117,19 @@
                             <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
                             <x-menu-item title="Inscriciones PDFs" icon="o-clipboard-document" link="/inscriptions/pdfs" />
                         </x-menu-sub>
-                        
+
                         <x-menu-sub title="Pagos" icon="o-currency-dollar">
                             <x-menu-item title="Registrar Pagos" icon="o-users" link="/user-payments" />
                             <x-menu-item title="Planes de Pago" icon="o-calendar-days" link="/pay-plans" />
                             <x-menu-item title="Reporte de Pagos" icon="o-chart-bar" link="/report-payments" />
                             <x-menu-item title="Reporte de Deudas" icon="o-exclamation-circle" link="/report-debts" />
                         </x-menu-sub>
-                        
-                        <x-menu-sub title="Configuración" icon="o-cog-6-tooth">
-                            <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
-                            <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/config-manager" />
-                            <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
+                    @endif
+
+                    @if($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                        <x-menu-sub title="Preinscripciones" icon="o-clipboard-document-list">
+                            <x-menu-item title="Inscriptos" icon="o-users" link="/pre-enrollments" />
+                            <x-menu-item title="Documentos" icon="o-document-text" link="/pre-enrollments/materials" />
                         </x-menu-sub>
                     @endif
 
@@ -138,11 +150,29 @@
                 @endauth
 
             </x-menu>
+            <script>
+            document.addEventListener('click', e => {
+                const summary = e.target.closest('li[x-data] summary');
+                if (!summary) return;
+                const currentLi = summary.closest('li[x-data]');
+                // Close other submenus on next tick (after Alpine toggles current)
+                setTimeout(() => {
+                    document.querySelectorAll('li[x-data]').forEach(li => {
+                        if (li !== currentLi) {
+                            const data = Alpine.$data(li);
+                            if (data && data.show) data.show = false;
+                        }
+                    });
+                }, 0);
+            }, true);
+            </script>
         </x-slot:sidebar>
 
-        {{-- The `$slot` goes here --}}
+        {{-- CONTENT --}}
         <x-slot:content>
-            {{ $slot }}
+            <div class="content-list">
+                {{ $slot }}
+            </div>
         </x-slot:content>
     </x-main>
 
