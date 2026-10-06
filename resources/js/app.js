@@ -1,4 +1,5 @@
 import './bootstrap';
+import './evaluation-table-design';
 
 // Registrar Service Worker para soporte PWA offline
 if ('serviceWorker' in navigator) {

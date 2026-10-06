@@ -158,14 +158,24 @@ class StudentEvaluationState
             $total += count($section['blocks'] ?? []);
         }
 
+        $blocksById = [];
+
+        foreach ($evaluation->content['sections'] ?? [] as $section) {
+            foreach ($section['blocks'] ?? [] as $block) {
+                if (isset($block['id'])) {
+                    $blocksById[$block['id']] = $block;
+                }
+            }
+        }
+
         $answered = 0;
 
         foreach ($attempt?->answers ?? [] as $blockId => $answer) {
-            if ($blockId === '_metadata') {
+            if (! isset($blocksById[$blockId])) {
                 continue;
             }
 
-            if ($answer !== null && $answer !== '' && $answer !== []) {
+            if (EvaluationContent::isAnswered($blocksById[$blockId], $answer)) {
                 $answered++;
             }
         }

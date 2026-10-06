@@ -5,6 +5,25 @@ namespace App\Services\Evaluations;
 class EvaluationContent
 {
     /**
+     * Whether a stored answer is substantial enough to count as answered.
+     *
+     * Block types store different answer shapes, so emptiness cannot be decided
+     * with a single empty() check: open_text and table_design nest their values,
+     * matching stores a sparse index map, and take.blade.php stashes the shuffled
+     * content under a reserved `_metadata` key that is never an answer.
+     */
+    public static function isAnswered(array $block, mixed $answer): bool
+    {
+        return match ($block['type'] ?? null) {
+            'open_text' => filled($answer['text'] ?? null) || filled($answer['variant'] ?? null),
+            'table_design' => filled($answer['tables'] ?? null) || filled($answer['relations'] ?? null),
+            'checkboxes' => ! empty($answer),
+            'matching' => collect(is_array($answer) ? $answer : [])->filter()->isNotEmpty(),
+            default => filled($answer),
+        };
+    }
+
+    /**
      * Calcula el puntaje máximo total de la evaluación sumando los puntos de cada bloque.
      *
      * Normalizes first so legacy content stored as a flat block array (pre-sections)
