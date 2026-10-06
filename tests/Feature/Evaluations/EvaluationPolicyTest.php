@@ -81,11 +81,13 @@ class EvaluationPolicyTest extends TestCase
     }
 
     #[Test]
-    public function a_student_cannot_open_the_management_index(): void
+    public function a_student_cannot_reach_the_management_screens(): void
     {
         $student = $this->studentOf($this->ownSubject);
+        $evaluation = $this->evaluationIn($this->ownSubject);
 
-        $this->actingAs($student)->get('/evaluations')->assertForbidden();
+        $this->actingAs($student)->get('/evaluations/create')->assertForbidden();
+        $this->actingAs($student)->get("/evaluations/{$evaluation->id}/edit")->assertForbidden();
     }
 
     #[Test]

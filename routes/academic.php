@@ -48,7 +48,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/final-grades', 'final-grades.index')->name('final-grades.index')->middleware('roles:admin,administrative,director,preceptor,teacher');
     // Per-evaluation authorisation is enforced inside each component via
     // OnlineEvaluationPolicy; the routes only gate the roles that may reach them.
-    Volt::route('/evaluations', 'evaluations.index')->name('evaluations.index')->middleware('roles:admin,teacher,principal,director,administrative');
+    Volt::route('/evaluations', 'evaluations.index')->name('evaluations.index')->middleware('roles:admin,teacher,principal,director,administrative,student');
     Volt::route('/evaluations/create', 'evaluations.editor')->name('evaluations.create')->middleware('roles:admin,teacher,principal,director,administrative');
     Volt::route('/evaluations/{id}/edit', 'evaluations.editor')->name('evaluations.edit')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative');
     Volt::route('/evaluations/{id}/results', 'evaluations.results')->name('evaluations.results')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative,student');

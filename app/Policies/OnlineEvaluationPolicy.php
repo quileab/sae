@@ -43,6 +43,14 @@ class OnlineEvaluationPolicy
         return $user->hasAnyRole(self::MANAGERS);
     }
 
+    /**
+     * Reaching the evaluations screen at all. Students get their own list here.
+     */
+    public function takeAny(User $user): bool
+    {
+        return $user->hasAnyRole([...self::MANAGERS, 'student']);
+    }
+
     public function update(User $user, OnlineEvaluation $evaluation): bool
     {
         return $this->manage($user, $evaluation);

@@ -21,6 +21,9 @@
     <meta name="theme-color" content="#570df8">
     <meta name="robots" content="noindex, nofollow">
 
+    <!-- TinyMCE -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js" referrerpolicy="origin"></script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
@@ -99,6 +102,7 @@
                         <x-menu-sub title="Clases" icon="o-document-duplicate">
                             <x-menu-item title="Libros de Temas" icon="o-book-open" link="/class-sessions" />
                             <x-menu-item title="Directorio Estudiantes" icon="o-user-group" link="/students-directory" />
+                            <x-menu-item title="Evaluaciones Online" icon="o-pencil-square" link="/evaluations" />
                             <x-menu-item title="Cierre de Actas" icon="o-document-check" link="/final-grades" />
                             <x-menu-item title="Alumnos en Riesgo" icon="o-exclamation-triangle" link="/reports/risk" />
                             <x-menu-item title="Contenidos" icon="o-academic-cap" link="/subjects-content" />
@@ -135,6 +139,7 @@
 
                     @if($user->hasAnyRole(['student']))
                         <x-menu-item title="Calendario" icon="o-calendar" link="/calendar" />
+                        <x-menu-item title="Mis Evaluaciones" icon="o-pencil-square" link="/evaluations" />
                         <x-menu-item title="Matricularse" icon="o-academic-cap" link="/enrollments" />
                         <x-menu-item title="Inscripciones" icon="o-clipboard-document-check" link="/inscriptions" />
                         <x-menu-item title="Mis Pagos" icon="o-currency-dollar" link="{{ route('my-payment-plan') }}" />
