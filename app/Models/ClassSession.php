@@ -48,6 +48,11 @@ class ClassSession extends Model
         return $this->belongsToMany(User::class, 'enrollments', 'class_session_id', 'user_id');
     }
 
+    public function evaluations(): HasMany
+    {
+        return $this->hasMany(OnlineEvaluation::class);
+    }
+
     public static function count($subject_id, ?int $year = null): int
     {
         $year ??= session('cycle_id') ?? date('Y');

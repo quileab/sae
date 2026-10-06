@@ -202,4 +202,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(JustifiedAbsence::class);
     }
+
+    public function evaluationAttempts(): HasMany
+    {
+        return $this->hasMany(EvaluationAttempt::class);
+    }
+
+    public function authoredEvaluations(): HasMany
+    {
+        return $this->hasMany(OnlineEvaluation::class, 'teacher_id');
+    }
 }

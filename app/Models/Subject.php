@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Subject extends Model
 {
@@ -53,8 +54,13 @@ class Subject extends Model
         return $this->hasMany(Unit::class);
     }
 
-    public function classSessions()
+    public function classSessions(): HasMany
     {
         return $this->hasMany(ClassSession::class);
+    }
+
+    public function evaluations(): HasMany
+    {
+        return $this->hasMany(OnlineEvaluation::class);
     }
 }
