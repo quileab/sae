@@ -229,6 +229,27 @@ class EvaluationContent
         }
     }
 
+    /**
+     * Grading a relational schema design exercise.
+     *
+     * The rubric is expressed in units so partial designs earn partial credit:
+     *
+     *   per expected table
+     *     1.0  the table exists (name matched)
+     *     1.0  its column set matches the expected one
+     *     0.5  the primary key sits on the expected column
+     *     0.5  its foreign keys match the expected ones
+     *   per expected relation
+     *     1.0  origin, target and cardinality all match
+     *
+     * A table name alone is worth one unit out of three, so listing the right
+     * names with an empty schema no longer scores full marks.
+     *
+     * Answer keys stored before column detail existed cannot be graded reliably,
+     * so they are flagged for manual review instead of being auto-marked.
+     *
+     * @return array{score: float, requires_manual: bool}
+     */
     protected static function gradeTableDesign(array $block, mixed $answer, float $maxPoints): array
     {
         if (! is_array($answer)) {
@@ -238,41 +259,208 @@ class EvaluationContent
         $expectedTables = $block['answer_key']['tables'] ?? [];
         $expectedRelations = $block['answer_key']['relations'] ?? [];
 
-        $totalExpectedItems = count($expectedTables) + count($expectedRelations);
-        if ($totalExpectedItems === 0) {
-            // Si no hay answer_key, requiere corrección manual
+        $totalUnits = self::tableDesignUnits($expectedTables) + count($expectedRelations);
+
+        if ($totalUnits === 0) {
+            // No answer key at all: there is nothing to compare against.
             return ['score' => 0.0, 'requires_manual' => true];
         }
 
-        $pointsPerItem = $maxPoints / $totalExpectedItems;
-        $earnedPoints = 0;
-
         $studentTables = $answer['tables'] ?? [];
+        $studentRelations = $answer['relations'] ?? [];
+
+        $earned = 0.0;
+
         foreach ($expectedTables as $expectedTable) {
-            foreach ($studentTables as $studentTable) {
-                if (mb_strtolower(trim($studentTable['name'])) === mb_strtolower(trim($expectedTable['name']))) {
-                    $earnedPoints += $pointsPerItem;
-                    break;
+            $name = self::normalizeLabel($expectedTable['name'] ?? '');
+            $match = self::findStudentTable($studentTables, $name);
+
+            if ($match === null) {
+                continue;
+            }
+
+            $earned += 1.0;
+
+            // A key with no column expectation can only score the name unit.
+            if (! isset($expectedTable['columns']) || ! is_array($expectedTable['columns'])) {
+                continue;
+            }
+
+            $studentColumns = self::columnNames($match);
+            $expectedColumns = self::normalizeAll($expectedTable['columns']);
+
+            if (self::normalizeAll($studentColumns) === $expectedColumns) {
+                $earned += 1.0;
+            }
+
+            if (isset($expectedTable['pk']) && is_string($expectedTable['pk']) && trim($expectedTable['pk']) !== '') {
+                if (self::primaryKeyOf($match) === self::normalizeLabel($expectedTable['pk'])) {
+                    $earned += 0.5;
+                }
+            }
+
+            if (isset($expectedTable['fks']) && is_array($expectedTable['fks'])) {
+                if (self::normalizeAll(self::foreignKeysOf($match)) === self::normalizeAll($expectedTable['fks'])) {
+                    $earned += 0.5;
                 }
             }
         }
 
-        $studentRelations = $answer['relations'] ?? [];
         foreach ($expectedRelations as $expectedRelation) {
+            $from = self::normalizeLabel($expectedRelation['from'] ?? '');
+            $to = self::normalizeLabel($expectedRelation['to'] ?? '');
+
             foreach ($studentRelations as $studentRelation) {
                 if (
-                    mb_strtolower(trim($studentRelation['from'])) === mb_strtolower(trim($expectedRelation['from'])) &&
-                    mb_strtolower(trim($studentRelation['to'])) === mb_strtolower(trim($expectedRelation['to']))
+                    self::normalizeLabel($studentRelation['from'] ?? '') === $from
+                    && self::normalizeLabel($studentRelation['to'] ?? '') === $to
+                    && self::normalizeLabel($studentRelation['type'] ?? '') === self::normalizeLabel($expectedRelation['type'] ?? '')
                 ) {
-                    $earnedPoints += $pointsPerItem;
+                    $earned += 1.0;
                     break;
                 }
             }
         }
 
         return [
-            'score' => min($maxPoints, $earnedPoints),
-            'requires_manual' => false,
+            'score' => min($maxPoints, round($earned / $totalUnits * $maxPoints, 2)),
+            // A key with no column detail can only score the name unit, so the
+            // teacher still has to confirm the mark.
+            'requires_manual' => ! self::hasColumnDetail($expectedTables),
         ];
+    }
+
+    /**
+     * How many units the expected tables are worth.
+     *
+     * Mirrors exactly what the grading loop can award, so a table with no primary
+     * key (a junction table, typically) is not charged for a pk unit the student
+     * could never earn.
+     *
+     * @param  array<int, array<string, mixed>>  $expectedTables
+     */
+    private static function tableDesignUnits(array $expectedTables): float
+    {
+        $units = 0.0;
+
+        foreach ($expectedTables as $table) {
+            $units += 1.0; // name
+
+            if (isset($table['columns']) && is_array($table['columns'])) {
+                $units += 1.0;
+            }
+
+            if (isset($table['pk']) && is_string($table['pk']) && trim($table['pk']) !== '') {
+                $units += 0.5;
+            }
+
+            if (isset($table['fks']) && is_array($table['fks'])) {
+                $units += 0.5;
+            }
+        }
+
+        return $units;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $expectedTables
+     */
+    private static function hasColumnDetail(array $expectedTables): bool
+    {
+        foreach ($expectedTables as $table) {
+            if (isset($table['columns']) && is_array($table['columns'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $studentTables
+     * @return array<string, mixed>|null
+     */
+    private static function findStudentTable(array $studentTables, string $normalizedName): ?array
+    {
+        foreach ($studentTables as $table) {
+            if (self::normalizeLabel($table['name'] ?? '') === $normalizedName) {
+                return $table;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $table
+     * @return array<int, string>
+     */
+    private static function columnNames(array $table): array
+    {
+        $names = [];
+
+        foreach ($table['columns'] ?? [] as $column) {
+            $name = self::normalizeLabel($column['name'] ?? '');
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    /**
+     * @param  array<string, mixed>  $table
+     */
+    private static function primaryKeyOf(array $table): string
+    {
+        foreach ($table['columns'] ?? [] as $column) {
+            if (strtoupper((string) ($column['type'] ?? '')) === 'PK') {
+                return self::normalizeLabel($column['name'] ?? '');
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $table
+     * @return array<int, string>
+     */
+    private static function foreignKeysOf(array $table): array
+    {
+        $names = [];
+
+        foreach ($table['columns'] ?? [] as $column) {
+            if (strtoupper((string) ($column['type'] ?? '')) === 'FK') {
+                $name = self::normalizeLabel($column['name'] ?? '');
+                if ($name !== '') {
+                    $names[] = $name;
+                }
+            }
+        }
+
+        sort($names);
+
+        return $names;
+    }
+
+    private static function normalizeLabel(?string $value): string
+    {
+        return mb_strtolower(trim((string) $value));
+    }
+
+    /**
+     * @param  array<int, mixed>  $values
+     * @return array<int, string>
+     */
+    private static function normalizeAll(array $values): array
+    {
+        $normalized = array_map(self::normalizeLabel(...), $values);
+        sort($normalized);
+
+        return $normalized;
     }
 }
