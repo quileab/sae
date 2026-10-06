@@ -6,18 +6,31 @@ class EvaluationContent
 {
     /**
      * Calcula el puntaje máximo total de la evaluación sumando los puntos de cada bloque.
+     *
+     * Normalizes first so legacy content stored as a flat block array (pre-sections)
+     * reports the same total as the sectioned shape.
      */
     public static function getMaxScore(array $content): float
     {
         $maxScore = 0;
-        $sections = $content['sections'] ?? [];
-        foreach ($sections as $section) {
+
+        foreach (self::sections($content) as $section) {
             foreach ($section['blocks'] ?? [] as $block) {
                 $maxScore += (float) ($block['points'] ?? 0);
             }
         }
 
         return $maxScore;
+    }
+
+    /**
+     * Content as a list of sections, whatever shape it was stored in.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected static function sections(array $content): array
+    {
+        return self::normalize($content)['sections'] ?? [];
     }
 
     /**
@@ -128,7 +141,7 @@ class EvaluationContent
         $points = (float) ($block['points'] ?? 1);
 
         if (empty($answer) && $answer !== '0' && $answer !== 0 && $answer !== false && ! is_array($answer)) {
-            return ['score' => 0, 'requires_manual' => false];
+            return ['score' => 0.0, 'requires_manual' => false];
         }
 
         switch ($block['type']) {
@@ -137,13 +150,13 @@ class EvaluationContent
                 $correct = ($block['correct_option'] ?? null) === $answer;
 
                 return [
-                    'score' => $correct ? $points : 0,
+                    'score' => $correct ? $points : 0.0,
                     'requires_manual' => false,
                 ];
 
             case 'checkboxes':
                 if (! is_array($answer)) {
-                    return ['score' => 0, 'requires_manual' => false];
+                    return ['score' => 0.0, 'requires_manual' => false];
                 }
                 $expected = $block['correct_options'] ?? [];
 
@@ -165,16 +178,16 @@ class EvaluationContent
                 }
 
                 $fraction = ($correctChoices - $wrongChoices) / $totalExpected;
-                $earned = max(0, $fraction * $points);
+                $earned = max(0.0, $fraction * $points);
 
                 return [
-                    'score' => $earned,
+                    'score' => (float) $earned,
                     'requires_manual' => false,
                 ];
 
             case 'matching':
                 if (! is_array($answer)) {
-                    return ['score' => 0, 'requires_manual' => false];
+                    return ['score' => 0.0, 'requires_manual' => false];
                 }
                 $expectedPairs = $block['pairs'] ?? [];
                 $totalPairs = count($expectedPairs);
@@ -203,23 +216,23 @@ class EvaluationContent
                     $isCorrect = mb_strtolower(trim($answer)) === mb_strtolower(trim($block['correct_answer']));
 
                     return [
-                        'score' => $isCorrect ? $points : 0,
+                        'score' => $isCorrect ? $points : 0.0,
                         'requires_manual' => false,
                     ];
                 }
 
-                return ['score' => 0, 'requires_manual' => true];
+                return ['score' => 0.0, 'requires_manual' => true];
 
             case 'open_text':
             default:
-                return ['score' => 0, 'requires_manual' => true];
+                return ['score' => 0.0, 'requires_manual' => true];
         }
     }
 
     protected static function gradeTableDesign(array $block, mixed $answer, float $maxPoints): array
     {
         if (! is_array($answer)) {
-            return ['score' => 0, 'requires_manual' => false];
+            return ['score' => 0.0, 'requires_manual' => false];
         }
 
         $expectedTables = $block['answer_key']['tables'] ?? [];
@@ -228,7 +241,7 @@ class EvaluationContent
         $totalExpectedItems = count($expectedTables) + count($expectedRelations);
         if ($totalExpectedItems === 0) {
             // Si no hay answer_key, requiere corrección manual
-            return ['score' => 0, 'requires_manual' => true];
+            return ['score' => 0.0, 'requires_manual' => true];
         }
 
         $pointsPerItem = $maxPoints / $totalExpectedItems;

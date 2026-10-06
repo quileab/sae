@@ -4,7 +4,7 @@ use App\Enums\AttemptStatus;
 use App\Enums\EvaluationStatus;
 use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
-use App\Services\Evaluations\EvaluationContent;
+use App\Services\Evaluations\AttemptGrader;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Layout;
 use Mary\Traits\Toast;
@@ -163,44 +163,14 @@ new #[Layout('layouts.app')] class extends Component {
             abort(403, 'El plazo de entrega de esta evaluación ha finalizado.');
         }
 
-        // Auto correct blocks
-        $score = 0;
-        $maxScore = EvaluationContent::getMaxScore($this->content ?? []);
+        $result = app(AttemptGrader::class)->submit($this->attempt, $this->answers);
 
-        $blockScores = [];
-        $requiresManual = false;
+        $this->success(
+            $result['requires_manual']
+                ? 'Evaluación entregada. Quedó pendiente la corrección del docente.'
+                : 'Evaluación entregada correctamente.'
+        );
 
-        $sections = $this->content['sections'] ?? [];
-        foreach ($sections as $section) {
-            foreach ($section['blocks'] ?? [] as $block) {
-                $blockId = $block['id'];
-                $answer = $this->answers[$blockId] ?? null;
-
-                $result = EvaluationContent::gradeBlock($block, $answer);
-
-                $blockScores[$blockId] = $result['score'];
-                $score += $result['score'];
-
-                if ($result['requires_manual']) {
-                    $requiresManual = true;
-                }
-            }
-        }
-
-        // Normalize score to 10 based on maxScore
-        $finalScore = $maxScore > 0 ? ($score / $maxScore) * 10 : 0;
-
-        $this->attempt->update([
-            'answers' => $this->answers,
-            'status' => $requiresManual
-                ? AttemptStatus::Submitted->value
-                : AttemptStatus::Graded->value,
-            'submitted_at' => now(),
-            'score' => round($finalScore, 2),
-            'block_scores' => $blockScores
-        ]);
-
-        $this->success('Evaluación entregada correctamente.');
         return $this->redirectRoute('evaluations.results', ['id' => $this->evaluation->id]);
     }
 }

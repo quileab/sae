@@ -1,10 +1,9 @@
 <?php
 
-use App\Enums\AttemptStatus;
 use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
 use App\Models\Grade;
-use App\Services\Evaluations\EvaluationContent;
+use App\Services\Evaluations\AttemptGrader;
 use App\Services\Evaluations\FinalGradeResolver;
 use App\Services\Evaluations\GradeSyncPreview;
 use Livewire\Volt\Component;
@@ -151,20 +150,18 @@ public function mount($id)
             'feedback' => 'nullable|string|max:5000',
         ]);
 
-        // Grade against the frozen content, not the current evaluation, so a
-        // later edit cannot silently drop blocks or change the denominator.
-        $content = $attempt->content_snapshot ?? $this->evaluation->content ?? [];
+        $grader = app(AttemptGrader::class);
+        $content = $grader->contentFor($attempt);
 
-        $totalEarned = array_sum(array_map('floatval', $this->manualScores));
-        $maxScore = EvaluationContent::getMaxScore($content);
-        $finalScore = $maxScore > 0 ? ($totalEarned / $maxScore) * 10 : 0;
+        foreach ($grader->blocks($content) as $block) {
+            // Re-check the per-block maximum server-side; the input's `max`
+            // attribute is advisory only.
+            $this->validate([
+                'manualScores.'.$block['id'] => 'nullable|numeric|min:0|max:'.(float) ($block['points'] ?? 1),
+            ]);
+        }
 
-        $attempt->update([
-            'block_scores' => $this->manualScores,
-            'score' => round($finalScore, 2),
-            'status' => AttemptStatus::Graded->value,
-            'feedback' => $this->feedback,
-        ]);
+        $grader->applyManualMarks($attempt, $this->manualScores, $this->feedback);
 
         unset($this->attempts, $this->stats);
 
