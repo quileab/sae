@@ -46,11 +46,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reports/risk', RiskReport::class)->name('reports.risk')->middleware('roles:admin,teacher,principal,director,administrative');
     Route::livewire('/attendance', 'attendance.attendance-list')->name('attendance')->middleware('roles:preceptor,admin,principal,director,administrative');
     Volt::route('/final-grades', 'final-grades.index')->name('final-grades.index')->middleware('roles:admin,administrative,director,preceptor,teacher');
+    // Per-evaluation authorisation is enforced inside each component via
+    // OnlineEvaluationPolicy; the routes only gate the roles that may reach them.
     Volt::route('/evaluations', 'evaluations.index')->name('evaluations.index')->middleware('roles:admin,teacher,principal,director,administrative');
     Volt::route('/evaluations/create', 'evaluations.editor')->name('evaluations.create')->middleware('roles:admin,teacher,principal,director,administrative');
-    Volt::route('/evaluations/{id}/edit', 'evaluations.editor')->name('evaluations.edit')->middleware('roles:admin,teacher,principal,director,administrative');
+    Volt::route('/evaluations/{id}/edit', 'evaluations.editor')->name('evaluations.edit')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative');
     Volt::route('/evaluations/{id}/results', 'evaluations.results')->name('evaluations.results')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative,student');
-    Volt::route('/evaluations/{id}/take', 'evaluations.take')->name('evaluations.take')->middleware('roles:admin,student,teacher,principal,director,administrative');
+    Volt::route('/evaluations/{id}/take', 'evaluations.take')->name('evaluations.take')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative,student');
     Route::livewire('/profile', 'users.profile')->name('profile');
 
     // Internal Routes for Attendance PWA (Full session support)

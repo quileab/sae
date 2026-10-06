@@ -18,7 +18,10 @@ new class extends Component {
     public function mount()
     {
         $user = auth()->user();
-        if ($user->hasRole('admin') || $user->hasRole('principal') || $user->hasRole('director') || $user->hasRole('administrative')) {
+
+        $this->authorize('viewAny', OnlineEvaluation::class);
+
+        if ($user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
             $this->subjects = Subject::orderBy('name')->get();
         } else {
             $this->subjects = $user->subjects()->orderBy('name')->get();
@@ -41,20 +44,25 @@ new class extends Component {
     #[Computed]
     public function evaluations()
     {
-        if (!$this->subject_id) {
+        if (! $this->subject_id) {
             return collect();
         }
 
         return OnlineEvaluation::where('subject_id', $this->subject_id)
+            ->manageableBy(auth()->user())
             ->with(['teacher', 'classSession'])
-            ->orderBy('created_at', 'desc')
+            ->orderByDesc('created_at')
             ->get();
     }
 
     public function deleteEvaluation($id)
     {
         $evaluation = OnlineEvaluation::findOrFail($id);
+
+        $this->authorize('delete', $evaluation);
+
         $evaluation->delete();
+
         $this->success('Evaluación eliminada correctamente.');
     }
 }

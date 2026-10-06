@@ -26,11 +26,12 @@ new #[Layout('layouts.app')] class extends Component {
         $this->evaluation = OnlineEvaluation::findOrFail($id);
         $user = auth()->user();
 
-        $this->isPreview = $user->hasRole('admin') || $user->hasRole('teacher') || $user->hasRole('principal') || $user->hasRole('director');
+        $this->isPreview = $user->hasAnyRole(['admin', 'teacher', 'principal', 'director']);
 
-        // Check if the evaluation is open to this student.
-        if ($this->evaluation->status !== EvaluationStatus::Published->value && !$this->isPreview) {
-            abort(403, 'Esta evaluación no está disponible aún.');
+        if ($this->isPreview) {
+            $this->authorize('preview', $this->evaluation);
+        } else {
+            $this->authorize('take', $this->evaluation);
         }
 
         if ($this->isPreview) {
@@ -41,6 +42,8 @@ new #[Layout('layouts.app')] class extends Component {
             $this->warning('Modo Vista Previa: Estás viendo la evaluación como estudiante, pero tus respuestas no se guardarán.');
             return;
         }
+
+        $this->guardEvaluationStillOpen();
 
         // Handle Attempts
         $latestAttempt = EvaluationAttempt::where('user_id', $user->id)
@@ -75,17 +78,20 @@ new #[Layout('layouts.app')] class extends Component {
 
         $this->answers = $this->attempt->answers ?? [];
 
+        // The snapshot freezes what this student was shown, so editing the
+        // evaluation later cannot change the questions mid-attempt.
+        $snapshot = $this->attempt->content_snapshot ?? $this->evaluation->content;
+
         // Apply Shuffling and preserve structure
-        if (!isset($this->answers['_metadata']['shuffled_content'])) {
-            $content = $this->evaluation->content;
+        if (! isset($this->answers['_metadata']['shuffled_content'])) {
+            $content = $snapshot;
             if ($this->evaluation->shuffle_questions) {
-                if (isset($content['sections'])) {
-                    foreach ($content['sections'] as &$section) {
-                        if (isset($section['blocks'])) {
-                            shuffle($section['blocks']);
-                        }
+                foreach ($content['sections'] ?? [] as &$section) {
+                    if (isset($section['blocks'])) {
+                        shuffle($section['blocks']);
                     }
                 }
+                unset($section);
             }
             $this->content = $content;
             $this->answers['_metadata'] = ['shuffled_content' => $content];
@@ -101,6 +107,33 @@ new #[Layout('layouts.app')] class extends Component {
 
         if ($this->remainingSeconds <= 0 && !$this->attempt->isFinished()) {
             $this->submitAttempt(); // Auto submit
+        }
+    }
+
+    /**
+     * The evaluation must still be inside its availability window.
+     *
+     * Re-checked on every action so a long-lived browser tab cannot start,
+     * resume or submit after the deadline has passed.
+     */
+    protected function guardEvaluationStillOpen(): void
+    {
+        $evaluation = $this->evaluation;
+
+        if ($evaluation->status !== EvaluationStatus::Published->value) {
+            abort(403, 'Esta evaluación no está disponible.');
+        }
+
+        if ($evaluation->starts_at && now()->lt($evaluation->starts_at)) {
+            abort(403, 'Esta evaluación todavía no está disponible.');
+        }
+
+        if ($evaluation->ends_at && now()->gt($evaluation->ends_at)) {
+            abort(403, 'El plazo de entrega de esta evaluación ha finalizado.');
+        }
+
+        if (! $evaluation->enrollsUser(auth()->user())) {
+            abort(403, 'No estás inscribed en esta evaluación.');
         }
     }
 
@@ -123,6 +156,11 @@ new #[Layout('layouts.app')] class extends Component {
 
         if ($this->attempt?->isFinished()) {
             return;
+        }
+
+        // A tab left open past the deadline must not be able to submit.
+        if ($this->evaluation->ends_at && now()->gt($this->evaluation->ends_at)) {
+            abort(403, 'El plazo de entrega de esta evaluación ha finalizado.');
         }
 
         // Auto correct blocks

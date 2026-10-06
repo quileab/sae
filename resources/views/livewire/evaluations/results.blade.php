@@ -1,8 +1,12 @@
 <?php
 
+use App\Enums\AttemptStatus;
 use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
 use App\Models\Grade;
+use App\Services\Evaluations\EvaluationContent;
+use App\Services\Evaluations\FinalGradeResolver;
+use App\Services\Evaluations\GradeSyncPreview;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
 use Mary\Traits\Toast;
@@ -15,23 +19,31 @@ new class extends Component {
 
     // Manual grading state
     public $gradingAttemptId = null;
+    public ?EvaluationAttempt $gradingAttempt = null;
     public $manualScores = [];
     public $feedback = '';
 
-    public function mount($id)
+    // Grade sync state
+    public $showSyncModal = false;
+    public $syncPreview = [];
+    public $syncUserIds = [];
+
+public function mount($id)
     {
         $this->evaluation = OnlineEvaluation::findOrFail($id);
         $user = auth()->user();
 
-        $this->isTeacher = $user->hasRole('admin') || $user->hasRole('teacher') || $user->hasRole('principal') || $user->hasRole('director');
+        $this->authorize('results', $this->evaluation);
 
-        if (!$this->isTeacher) {
+        $this->isTeacher = $user->hasAnyRole(['admin', 'teacher', 'principal', 'director', 'administrative']);
+
+        if (! $this->isTeacher) {
             $hasAttempts = EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
                 ->where('user_id', $user->id)
-                ->whereIn('status', ['submitted', 'graded'])
+                ->finished()
                 ->exists();
-                
-            if (!$hasAttempts) {
+
+            if (! $hasAttempts) {
                 abort(403, 'Aún no has entregado esta evaluación.');
             }
         }
@@ -39,26 +51,17 @@ new class extends Component {
 
     public function getFinalGrade($studentAttempts)
     {
-        $validAttempts = $studentAttempts->where('status', 'graded');
-        if ($validAttempts->isEmpty()) return null;
-
-        $scores = $validAttempts->pluck('score');
-        switch ($this->evaluation->grading_method) {
-            case 'average': return round($scores->average(), 2);
-            case 'first': return $validAttempts->sortBy('attempt_number')->first()->score;
-            case 'last': return $validAttempts->sortByDesc('attempt_number')->first()->score;
-            case 'highest':
-            default: return $scores->max();
-        }
+        return FinalGradeResolver::resolve($this->evaluation, $studentAttempts);
     }
 
     #[Computed]
     public function stats()
     {
-        if (!$this->isTeacher) return null;
+        if (! $this->isTeacher) return null;
 
         $attemptsByUser = EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
-            ->whereIn('status', ['submitted', 'graded'])
+            ->finished()
+            ->with('user')
             ->get()
             ->groupBy('user_id');
 
@@ -67,27 +70,28 @@ new class extends Component {
         }
 
         $finalScores = collect();
-        foreach ($attemptsByUser as $userId => $attempts) {
-            $final = $this->getFinalGrade($attempts);
+        foreach ($attemptsByUser as $userAttempts) {
+            $final = FinalGradeResolver::resolve($this->evaluation, $userAttempts);
             if ($final !== null) {
                 $finalScores->push($final);
             }
         }
 
         if ($finalScores->isEmpty()) {
-            return ['total' => $attemptsByUser->count(), 'average' => 0, 'approved' => 0, 'max' => 0, 'min' => 0, 'passRate' => 0];
+            return ['total' => $attemptsByUser->count(), 'average' => 0, 'approved' => 0, 'max' => 0, 'min' => 0, 'passRate' => 0, 'pending' => $attemptsByUser->count()];
         }
 
         $passingScore = $this->evaluation->passing_score;
-        $approvedCount = $finalScores->filter(fn($score) => $score >= $passingScore)->count();
+        $approvedCount = $finalScores->filter(fn ($score) => $score >= $passingScore)->count();
 
         return [
-            'total' => $attemptsByUser->count(), // Total students who submitted
+            'total' => $finalScores->count(),
+            'pending' => $attemptsByUser->count() - $finalScores->count(),
             'average' => round($finalScores->average(), 2),
             'approved' => $approvedCount,
             'passRate' => round(($approvedCount / $finalScores->count()) * 100),
             'max' => $finalScores->max(),
-            'min' => $finalScores->min()
+            'min' => $finalScores->min(),
         ];
     }
 
@@ -117,98 +121,190 @@ new class extends Component {
 
     public function openGrading($attemptId)
     {
-        $attempt = EvaluationAttempt::find($attemptId);
+        $attempt = EvaluationAttempt::findOrFail($attemptId);
+
+        $this->authorize('grade', $this->evaluation);
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
         $this->gradingAttemptId = $attempt->id;
+        $this->gradingAttempt = $attempt->load('user');
         $this->manualScores = $attempt->block_scores ?? [];
         $this->feedback = $attempt->feedback ?? '';
     }
 
+    public function closeGrading()
+    {
+        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback']);
+    }
+
     public function saveGrading()
     {
-        $attempt = EvaluationAttempt::find($this->gradingAttemptId);
-        if (!$attempt) return;
+        $this->authorize('grade', $this->evaluation);
 
-        // Recalcular el puntaje final basado en manualScores
-        $totalEarned = array_sum($this->manualScores);
-        $maxScore = \App\Services\Evaluations\EvaluationContent::getMaxScore($this->evaluation->content ?? []);
+        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
+
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        $this->validate([
+            'manualScores' => 'required|array',
+            'manualScores.*' => 'nullable|numeric|min:0',
+            'feedback' => 'nullable|string|max:5000',
+        ]);
+
+        // Grade against the frozen content, not the current evaluation, so a
+        // later edit cannot silently drop blocks or change the denominator.
+        $content = $attempt->content_snapshot ?? $this->evaluation->content ?? [];
+
+        $totalEarned = array_sum(array_map('floatval', $this->manualScores));
+        $maxScore = EvaluationContent::getMaxScore($content);
         $finalScore = $maxScore > 0 ? ($totalEarned / $maxScore) * 10 : 0;
 
         $attempt->update([
             'block_scores' => $this->manualScores,
             'score' => round($finalScore, 2),
-            'status' => 'graded',
-            'feedback' => $this->feedback
+            'status' => AttemptStatus::Graded->value,
+            'feedback' => $this->feedback,
         ]);
 
+        unset($this->attempts, $this->stats);
+
         $this->success('Corrección guardada.');
-        $this->gradingAttemptId = null;
+        $this->closeGrading();
     }
 
-    public function syncGrades()
+    /**
+     * Build the diff of what syncing would change. Writes nothing.
+     */
+    public function previewSyncGrades()
     {
-        if (!$this->isTeacher) return;
+        $this->authorize('syncGrades', $this->evaluation);
 
-        if (!$this->evaluation->class_session_id) {
+        if (! $this->evaluation->class_session_id) {
             $this->error('Esta evaluación no está vinculada a una Clase.');
+
             return;
         }
 
-        $attemptsByUser = EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
-            ->get()
-            ->groupBy('user_id');
+        $rows = app(GradeSyncPreview::class)->build($this->evaluation);
 
-        $synced = 0;
-        $passingScore = $this->evaluation->passing_score;
+        if ($rows === []) {
+            $this->warning('No hay intentos corregidos para sincronizar todavía.');
 
-        foreach ($attemptsByUser as $userId => $userAttempts) {
-            $finalGrade = $this->getFinalGrade($userAttempts);
-            
-            if ($finalGrade !== null) {
-                Grade::updateOrCreate(
-                    [
-                        'user_id' => $userId,
-                        'class_session_id' => $this->evaluation->class_session_id,
-                        'type' => Grade::TYPE_EVALUATION,
-                    ],
-                    [
-                        'grade' => $finalGrade,
-                        'approved' => $finalGrade >= $passingScore,
-                        'attendance' => true,
-                        'comments' => 'Evaluación Online: ' . $this->evaluation->title,
-                    ]
-                );
-                $synced++;
-            }
+            return;
         }
 
-        $this->success("Se sincronizaron $synced notas finales basadas en el método de calificación de la evaluación.");
+        $this->syncPreview = $rows;
+        $this->syncUserIds = collect($rows)
+            ->whereIn('action', [
+                GradeSyncPreview::ACTION_CREATE,
+                GradeSyncPreview::ACTION_UPDATE,
+                GradeSyncPreview::ACTION_CONFLICT,
+            ])
+            ->pluck('user_id')
+            ->values()
+            ->all();
+
+        $this->showSyncModal = true;
+    }
+
+    public function closeSyncPreview()
+    {
+        $this->reset(['syncPreview', 'syncUserIds', 'showSyncModal']);
+    }
+
+    /**
+     * Apply the previewed sync, but only for the students the teacher confirmed.
+     */
+    public function confirmSyncGrades()
+    {
+        $this->authorize('syncGrades', $this->evaluation);
+
+        if (! $this->evaluation->class_session_id) {
+            $this->error('Esta evaluación no está vinculada a una Clase.');
+            $this->closeSyncPreview();
+
+            return;
+        }
+
+        // Recompute server-side; never trust the preview payload from the client.
+        $rows = app(GradeSyncPreview::class)->build($this->evaluation);
+        $confirmed = array_map('intval', $this->syncUserIds ?? []);
+
+        $synced = 0;
+        $skippedConflicts = 0;
+
+        foreach ($rows as $row) {
+            if (! in_array((int) $row['user_id'], $confirmed, true)) {
+                continue;
+            }
+
+            if ($row['action'] === GradeSyncPreview::ACTION_SKIPPED || $row['proposed_grade'] === null) {
+                continue;
+            }
+
+            $finalGrade = (float) $row['proposed_grade'];
+
+            Grade::updateOrCreate(
+                [
+                    'user_id' => $row['user_id'],
+                    'class_session_id' => $this->evaluation->class_session_id,
+                    'type' => Grade::TYPE_EVALUATION,
+                ],
+                [
+                    'grade' => $finalGrade,
+                    'approved' => $finalGrade >= $this->evaluation->passing_score,
+                    'attendance' => true,
+                    'comments' => GradeSyncPreview::PROVENANCE_PREFIX.' '.$this->evaluation->title,
+                ]
+            );
+
+            $synced++;
+        }
+
+        $skippedConflicts = collect($rows)
+            ->where('action', GradeSyncPreview::ACTION_CONFLICT)
+            ->reject(fn ($row) => in_array((int) $row['user_id'], $confirmed, true))
+            ->count();
+
+        $this->closeSyncPreview();
+
+        $message = "Se sincronizaron $synced notas finales al libro de temas.";
+        if ($skippedConflicts > 0) {
+            $message .= " $skippedConflicts notas manuales quedaron sin tocar.";
+        }
+
+        $this->success($message);
     }
 }
 ?>
 
 <div class="max-w-7xl mx-auto pb-10">
     <!-- Header General -->
-    <div class="flex justify-between items-start mb-8">
+    <div class="flex flex-col lg:flex-row justify-between items-start gap-4 mb-8">
         <div>
             <div class="text-sm font-bold text-primary uppercase tracking-wider mb-1">{{ $evaluation->subject->name }}</div>
-            <h1 class="text-3xl font-extrabold">{{ $evaluation->title }} - Resultados</h1>
-            <div class="text-sm text-base-content/70 mt-1">
-                Método de calificación: 
-                <span class="font-bold">
-                    @if($evaluation->grading_method === 'highest') Nota más alta
-                    @elseif($evaluation->grading_method === 'average') Promedio
-                    @elseif($evaluation->grading_method === 'first') Primer intento
-                    @elseif($evaluation->grading_method === 'last') Último intento
-                    @endif
-                </span>
-                | Nota de aprobación: <span class="font-bold">{{ $evaluation->passing_score }}</span>
+            <h1 class="text-2xl md:text-3xl font-extrabold">{{ $evaluation->title }} <span class="text-base-content/40 font-bold">· Resultados</span></h1>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-base-content/70 mt-2">
+                <span>Método de calificación: <span class="font-bold">{{ $evaluation->grading_method_short_label }}</span></span>
+                <span>Nota de aprobación: <span class="font-bold">{{ $evaluation->passing_score }}</span></span>
+                @if($evaluation->class_session_id)
+                    <span>Clase: <span class="font-bold">#{{ $evaluation->classSession->class_number }}</span></span>
+                @else
+                    <span class="text-warning">Sin clase vinculada</span>
+                @endif
             </div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             @if($this->isTeacher)
                 <x-button label="Volver a la Clase" icon="o-arrow-left" link="/class-sessions" class="btn-ghost" />
                 @if($evaluation->class_session_id)
-                    <x-button label="Sincronizar Notas" icon="o-arrows-right-left" class="btn-primary" wire:click="syncGrades" wire:confirm="Esto actualizará las calificaciones finales de los alumnos en el libro de temas. ¿Continuar?" />
+                    <x-button
+                        label="Sincronizar Notas"
+                        icon="o-arrows-right-left"
+                        class="btn-primary"
+                        wire:click="previewSyncGrades"
+                        spinner="previewSyncGrades"
+                    />
                 @endif
             @else
                 <x-button label="Volver al Inicio" icon="o-home" link="/dashboard" class="btn-ghost" />
@@ -216,15 +312,96 @@ new class extends Component {
         </div>
     </div>
 
+    @if($showSyncModal)
+        @php
+            $actionLabels = [
+                App\Services\Evaluations\GradeSyncPreview::ACTION_CREATE => ['Nuevo', 'badge-info'],
+                App\Services\Evaluations\GradeSyncPreview::ACTION_UPDATE => ['Actualizar', 'badge-warning'],
+                App\Services\Evaluations\GradeSyncPreview::ACTION_CONFLICT => ['Nota manual', 'badge-error'],
+                App\Services\Evaluations\GradeSyncPreview::ACTION_UNCHANGED => ['Sin cambios', 'badge-ghost'],
+                App\Services\Evaluations\GradeSyncPreview::ACTION_SKIPPED => ['Sin corregir', 'badge-ghost'],
+            ];
+        @endphp
+        <x-card title="Confirmar sincronización con el libro de temas" class="mb-8 border-warning">
+            <x-slot:menu>
+                <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="closeSyncPreview" />
+            </x-slot:menu>
+
+            <x-alert icon="o-exclamation-triangle" class="alert-warning mb-4">
+                Revisá qué notas se van a escribir. Las que ya cargaste a mano en el libro
+                quedan marcadas y <strong>no se tocan</strong> salvo que las marques explícitamente.
+            </x-alert>
+
+            <div class="overflow-x-auto">
+                <table class="table table-sm table-zebra">
+                    <thead>
+                        <tr>
+                            <th class="w-10"></th>
+                            <th>Alumno</th>
+                            <th>Acción</th>
+                            <th class="text-right">Nota actual</th>
+                            <th class="text-right">Nota propuesta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($syncPreview as $row)
+                            @php
+                                $label = $actionLabels[$row['action']] ?? ['—', 'badge-ghost'];
+                                $selectable = in_array($row['action'], [
+                                    App\Services\Evaluations\GradeSyncPreview::ACTION_CREATE,
+                                    App\Services\Evaluations\GradeSyncPreview::ACTION_UPDATE,
+                                    App\Services\Evaluations\GradeSyncPreview::ACTION_CONFLICT,
+                                ], true);
+                            @endphp
+                            <tr class="{{ $selectable ? '' : 'opacity-50' }}">
+                                <td>
+                                    @if($selectable)
+                                        <input
+                                            type="checkbox"
+                                            wire:model="syncUserIds"
+                                            value="{{ $row['user_id'] }}"
+                                            class="checkbox checkbox-sm checkbox-primary"
+                                        />
+                                    @endif
+                                </td>
+                                <td class="font-semibold">{{ $row['user_name'] }}</td>
+                                <td>
+                                    <span class="badge {{ $label[1] }}">{{ $label[0] }}</span>
+                                    @if($row['action'] === App\Services\Evaluations\GradeSyncPreview::ACTION_CONFLICT)
+                                        <div class="text-xs text-base-content/60 mt-1">{{ $row['current_comments'] ?: 'sin comentario' }}</div>
+                                    @endif
+                                </td>
+                                <td class="text-right tabular-nums">{{ $row['current_grade'] ?? '—' }}</td>
+                                <td class="text-right font-bold tabular-nums">{{ $row['proposed_grade'] ?? '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-4">
+                <x-button label="Cancelar" wire:click="closeSyncPreview" />
+                <x-button
+                    label="Aplicar ({{ count($syncUserIds) }})"
+                    icon="o-check"
+                    class="btn-primary"
+                    wire:click="confirmSyncGrades"
+                    wire:loading.attr="disabled"
+                    :disabled="empty($syncUserIds)"
+                />
+            </div>
+        </x-card>
+    @endif
+
     @if($this->isTeacher)
-        @if($gradingAttemptId)
+        @if($gradingAttemptId && $gradingAttempt)
             @php
-                $attemptToGrade = EvaluationAttempt::find($gradingAttemptId);
-                $sections = $evaluation->content['sections'] ?? [];
+                $attemptToGrade = $gradingAttempt;
+                $sections = ($attemptToGrade->content_snapshot ?? $evaluation->content)['sections'] ?? [];
             @endphp
             <x-card title="Corrigiendo: {{ $attemptToGrade->user->fullname }} (Intento {{ $attemptToGrade->attempt_number }})">
                 <x-slot:menu>
-                    <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="$set('gradingAttemptId', null)" />
+                    <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="closeGrading" />
                 </x-slot:menu>
 
                 <div class="space-y-8">
@@ -237,18 +414,30 @@ new class extends Component {
                                     $studentAnswer = $attemptToGrade->answers[$bId] ?? null;
                                 @endphp
                                 <div class="bg-base-200 p-4 rounded-lg">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div class="font-semibold">{{ $block['prompt'] }}</div>
-                                        <div class="w-24">
-                                            <x-input wire:model="manualScores.{{ $bId }}" type="number" step="0.1" max="{{ $block['points'] ?? 1 }}" min="0" suffix="/ {{ $block['points'] ?? 1 }}" class="input-sm" />
+                                    <div class="flex justify-between items-start gap-4 mb-2">
+                                        <div class="font-semibold">
+                                            @if(! empty($block['prompt']))
+                                                {{ $block['prompt'] }}
+                                            @else
+                                                <span class="italic text-base-content/60">Sin consigna</span>
+                                            @endif
+                                            @php $blockType = App\Enums\EvaluationBlockType::tryFrom($block['type'] ?? ''); @endphp
+                                            <span class="badge badge-ghost badge-xs ml-1">{{ $blockType?->shortLabel() ?? '?' }}</span>
+                                        </div>
+                                        <div class="w-28 shrink-0">
+                                            <x-input
+                                                wire:model="manualScores.{{ $bId }}"
+                                                type="number"
+                                                step="0.1"
+                                                max="{{ $block['points'] ?? 1 }}"
+                                                min="0"
+                                                suffix="/ {{ $block['points'] ?? 1 }}"
+                                                class="input-sm"
+                                            />
                                         </div>
                                     </div>
-                                    <div class="bg-base-100 p-3 rounded text-sm italic border border-base-300">
-                                        @if(is_array($studentAnswer))
-                                            <pre class="text-xs whitespace-pre-wrap">{{ json_encode($studentAnswer, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
-                                        @else
-                                            {{ $studentAnswer ?: 'Sin respuesta' }}
-                                        @endif
+                                    <div class="bg-base-100 p-3 rounded text-sm border border-base-300">
+                                        <x-evaluation-answer :block="$block" :answer="$studentAnswer" />
                                     </div>
                                 </div>
                             @endforeach
@@ -265,10 +454,32 @@ new class extends Component {
         @else
             <!-- KPIs Docente -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <x-stat title="Estudiantes (Entregas)" value="{{ $this->stats['total'] }}" icon="o-users" class="bg-base-100 shadow-sm border border-base-200" />
-                <x-stat title="Promedio General" value="{{ $this->stats['average'] }}" icon="o-chart-bar" class="bg-base-100 shadow-sm border border-base-200" />
-                <x-stat title="Aprobados" value="{{ $this->stats['passRate'] ?? 0 }}%" description="{{ $this->stats['approved'] }} alumnos" icon="o-check-badge" class="bg-base-100 shadow-sm border border-base-200 text-success" />
-                <x-stat title="Rango de Notas" value="{{ $this->stats['min'] }} - {{ $this->stats['max'] }}" icon="o-arrows-up-down" class="bg-base-100 shadow-sm border border-base-200" />
+                <x-stat
+                    title="Alumnos corrijidos"
+                    value="{{ $this->stats['total'] }}"
+                    description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' pendientes') : 'todos corregidos' }}"
+                    icon="o-users"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
+                <x-stat
+                    title="Promedio General"
+                    value="{{ $this->stats['average'] }}"
+                    icon="o-chart-bar"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
+                <x-stat
+                    title="Tasa de Aprobación"
+                    value="{{ $this->stats['passRate'] ?? 0 }}%"
+                    description="{{ $this->stats['approved'] }} de {{ $this->stats['total'] }} aprobados"
+                    icon="o-check-badge"
+                    class="bg-base-100 shadow-sm border border-base-200 text-success"
+                />
+                <x-stat
+                    title="Rango de Notas"
+                    value="{{ $this->stats['min'] }} – {{ $this->stats['max'] }}"
+                    icon="o-arrows-up-down"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
             </div>
 
             <x-card title="Detalle de Intentos por Estudiante">

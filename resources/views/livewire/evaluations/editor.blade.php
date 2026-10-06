@@ -40,6 +40,8 @@ new class extends Component {
     {
         if ($id) {
             $this->evaluation = OnlineEvaluation::findOrFail($id);
+            $this->authorize('update', $this->evaluation);
+
             $this->subject_id = $this->evaluation->subject_id;
             $this->class_session_id = $this->evaluation->class_session_id;
             $this->title = $this->evaluation->title;
@@ -268,6 +270,8 @@ new class extends Component {
 
     public function save()
     {
+        $this->authorize($this->evaluation ? 'update' : 'create', $this->evaluation ?? OnlineEvaluation::class);
+
         $this->validate([
             'title' => 'required|string|max:255',
             'duration_minutes' => 'required|integer|min:1|max:600',
@@ -275,7 +279,9 @@ new class extends Component {
             'passing_score' => 'required|numeric|min:0|max:10',
             'max_attempts' => 'required|integer|min:0',
             'grading_method' => ['required', Rule::enum(EvaluationGradingMethod::class)],
+            'starts_at' => 'nullable|date',
             'ends_at' => 'nullable|date|after_or_equal:starts_at',
+            'subject_id' => 'required|integer|exists:subjects,id',
             'sections' => 'required|array|min:1',
         ]);
 
