@@ -8,6 +8,7 @@ use App\Models\OnlineEvaluation;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -46,7 +47,27 @@ class EvaluationPagesRenderTest extends TestCase
         $this->actingAs($teacher)
             ->get('/evaluations/create?subject_id='.$this->subject->id)
             ->assertOk()
-            ->assertSee('Configuración Avanzada', false);
+            ->assertSee('Datos')
+            ->assertSee('Reglas')
+            ->assertSee('Contenido');
+    }
+
+    #[Test]
+    public function the_editor_shows_the_moodle_settings_on_the_rules_tab(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher']);
+        $this->teacherOwnsSubject($teacher);
+
+        // mount() redirects when no subject is selected, so seed the session.
+        session(['current_subject_id' => $this->subject->id]);
+
+        Volt::actingAs($teacher)
+            ->test('evaluations.editor')
+            ->set('subject_id', $this->subject->id)
+            ->assertSet('activeTab', 'data')
+            ->set('activeTab', 'rules')
+            ->assertSee('Nota mínima para aprobar')
+            ->assertSee('Promedio de intentos');
     }
 
     #[Test]
@@ -62,9 +83,11 @@ class EvaluationPagesRenderTest extends TestCase
             'grading_method' => 'average',
         ]);
 
-        $this->actingAs($teacher)
-            ->get("/evaluations/{$evaluation->id}/edit")
-            ->assertOk()
+        Volt::actingAs($teacher)
+            ->test('evaluations.editor', ['id' => $evaluation->id])
+            ->assertSet('grading_method', 'average')
+            ->assertSet('passing_score', 7)
+            ->set('activeTab', 'rules')
             ->assertSee('Promedio de intentos');
     }
 

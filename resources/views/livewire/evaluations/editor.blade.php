@@ -9,6 +9,7 @@ use App\Services\Evaluations\EvaluationContent;
 use App\Services\Evaluations\MarkdownImporter;
 use Illuminate\Validation\Rule;
 use Livewire\Volt\Component;
+use Livewire\Attributes\Computed;
 use Mary\Traits\Toast;
 
 new class extends Component {
@@ -35,6 +36,19 @@ new class extends Component {
 
     // El contenido principal: array de secciones
     public $sections = [];
+
+    /**
+     * Which editor panel is open: data, rules or content.
+     */
+    public $activeTab = 'data';
+
+    /**
+     * Whether the form differs from what was loaded, so the UI can warn before
+     * discarding work.
+     */
+    public $isDirty = false;
+
+    public $totalPoints = 0;
 
     public function mount($id = null)
     {
@@ -68,6 +82,24 @@ new class extends Component {
             }
             $this->addSection();
         }
+    }
+
+    public function updated($property): void
+    {
+        $this->isDirty = true;
+    }
+
+    #[Computed]
+    public function totalPoints()
+    {
+        return EvaluationContent::getMaxScore(['sections' => array_values($this->sections)]);
+    }
+
+    #[Computed]
+    public function questionCount()
+    {
+        return collect($this->sections)
+            ->sum(fn (array $section) => count($section['blocks'] ?? []));
     }
 
     public function getSubjectProperty()
@@ -159,9 +191,223 @@ new class extends Component {
 
     public function removeBlock($sectionIndex, $blockIndex)
     {
-        unset($this->sections[$sectionIndex]['blocks'][$blockIndex]);
-        $this->sections[$sectionIndex]['blocks'] = array_values($this->sections[$sectionIndex]['blocks']);
+        $block = &$this->sections[$sectionIndex];
+
+        unset($block['blocks'][$blockIndex]);
+        $block['blocks'] = array_values($block['blocks']);
     }
+
+public function addPair($sectionIndex, $blockIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $block['pairs'][] = ['prompt' => '', 'answer' => ''];
+    }
+
+public function removePair($sectionIndex, $blockIndex, $pairIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        unset($block['pairs'][$pairIndex]);
+        $block['pairs'] = array_values($block['pairs']);
+    }
+
+public function addAttribute($sectionIndex, $blockIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+        $block['attributes'][] = '';
+    }
+
+public function removeAttribute($sectionIndex, $blockIndex, $attributeIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        unset($block['attributes'][$attributeIndex]);
+        $block['attributes'] = array_values($block['attributes']);
+    }
+
+public function addSchemaTable($sectionIndex, $blockIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $block['tables'][] = [
+            'key' => 't'.(count($block['tables']) + 1),
+            'name' => '',
+            'rows' => 2,
+        ];
+    }
+
+public function removeSchemaTable($sectionIndex, $blockIndex, $tableIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $name = $block['tables'][$tableIndex]['name'] ?? null;
+
+        unset($block['tables'][$tableIndex]);
+        $block['tables'] = array_values($block['tables']);
+
+        // Drop the answer key entry and any relation that referenced it.
+        $this->synchroniseAnswerKey($block, $name);
+    }
+
+
+public function addKeyTable($sectionIndex, $blockIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $block['answer_key']['tables'][] = [
+            'name' => '',
+            'columns' => [],
+            'pk' => null,
+            'fks' => [],
+        ];
+    }
+
+public function removeKeyTable($sectionIndex, $blockIndex, $tableIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $name = $block['answer_key']['tables'][$tableIndex]['name'] ?? null;
+
+        unset($block['answer_key']['tables'][$tableIndex]);
+        $block['answer_key']['tables'] = array_values($block['answer_key']['tables']);
+
+        $this->synchroniseAnswerKey($block, $name);
+    }
+
+public function addKeyColumn($sectionIndex, $blockIndex, $tableIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+        $block['answer_key']['tables'][$tableIndex]['columns'][] = '';
+    }
+
+public function removeKeyColumn($sectionIndex, $blockIndex, $tableIndex, $columnIndex)
+    {
+        $table = $this->keyTable($sectionIndex, $blockIndex, $tableIndex);
+
+        $column = $table['columns'][$columnIndex] ?? null;
+
+        unset($table['columns'][$columnIndex]);
+
+        $this->writeKeyTable($sectionIndex, $blockIndex, $tableIndex, [
+            ...$table,
+            'columns' => array_values($table['columns']),
+            'pk' => $table['pk'] === $column ? null : $table['pk'],
+            'fks' => array_values(array_filter(
+                $table['fks'] ?? [],
+                fn ($fk) => $fk !== $column
+            )),
+        ]);
+    }
+
+public function addKeyRelation($sectionIndex, $blockIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $block['answer_key']['relations'][] = [
+            'from' => '',
+            'to' => '',
+            'type' => '1:N',
+        ];
+    }
+
+public function removeKeyRelation($sectionIndex, $blockIndex, $relationIndex)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        unset($block['answer_key']['relations'][$relationIndex]);
+        $block['answer_key']['relations'] = array_values($block['answer_key']['relations']);
+    }
+
+public function toggleKeyForeignKey($sectionIndex, $blockIndex, $tableIndex, $column)
+    {
+        $table = $this->keyTable($sectionIndex, $blockIndex, $tableIndex);
+        $foreignKeys = array_values($table['fks'] ?? []);
+
+        $position = array_search($column, $foreignKeys, true);
+
+        if ($position === false) {
+            $foreignKeys[] = $column;
+        } else {
+            unset($foreignKeys[$position]);
+            $foreignKeys = array_values($foreignKeys);
+        }
+
+        $this->writeKeyTable($sectionIndex, $blockIndex, $tableIndex, [
+            ...$table,
+            'fks' => $foreignKeys,
+        ]);
+    }
+
+public function setKeyPrimaryKey($sectionIndex, $blockIndex, $tableIndex, $column)
+    {
+        $table = $this->keyTable($sectionIndex, $blockIndex, $tableIndex);
+
+        $primaryKey = $table['pk'] === $column ? null : $column;
+
+        $this->writeKeyTable($sectionIndex, $blockIndex, $tableIndex, [
+            ...$table,
+            'pk' => $primaryKey,
+            // A column cannot be both the primary key and a foreign key.
+            'fks' => $primaryKey === null
+                ? array_values($table['fks'] ?? [])
+                : array_values(array_filter($table['fks'] ?? [], fn ($fk) => $fk !== $primaryKey)),
+        ]);
+    }
+
+public function toggleKeyRelationType($sectionIndex, $blockIndex, $relationIndex, $type)
+    {
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        $relation = $block['answer_key']['relations'][$relationIndex] ?? ['from' => '', 'to' => '', 'type' => '1:N'];
+
+        $block['answer_key']['relations'][$relationIndex] = [
+            ...$relation,
+            'type' => $relation['type'] === $type ? '1:N' : $type,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function keyTable($sectionIndex, $blockIndex, $tableIndex): array
+    {
+        return $this->sections[$sectionIndex]['blocks'][$blockIndex]['answer_key']['tables'][$tableIndex] ?? [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $table
+     */
+    protected function writeKeyTable($sectionIndex, $blockIndex, $tableIndex, array $table): void
+    {
+        // Assign through a reference: Livewire public properties are magic, so a
+        // plain $this->sections[...] write would mutate a temporary and be lost.
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+        $block['answer_key']['tables'][$tableIndex] = $table;
+    }
+
+/**
+ * Keep the answer key aligned with the tables the student is asked to build:
+ * dropping a table also drops its key entry and its relations.
+ *
+ * @param  array<string, mixed>  $block
+ */
+protected function synchroniseAnswerKey(array &$block, ?string $tableName): void
+{
+    if ($tableName === null || $tableName === '') {
+        return;
+    }
+
+    $block['answer_key']['tables'] = array_values(array_filter(
+        $block['answer_key']['tables'] ?? [],
+        fn (array $key) => ($key['name'] ?? null) !== $tableName
+    ));
+
+    $block['answer_key']['relations'] = array_values(array_filter(
+        $block['answer_key']['relations'] ?? [],
+        fn (array $relation) => ($relation['from'] ?? null) !== $tableName && ($relation['to'] ?? null) !== $tableName
+    ));
+}
 
     public function moveBlockUp($sectionIndex, $blockIndex)
     {
@@ -190,7 +436,8 @@ new class extends Component {
         $options = $this->sections[$sectionIndex]['blocks'][$blockIndex]['options'];
         $nextKey = $this->nextOptionKey($options);
 
-        $this->sections[$sectionIndex]['blocks'][$blockIndex]['options'][] = ['key' => $nextKey, 'text' => ''];
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+        $block['options'][] = ['key' => $nextKey, 'text' => ''];
     }
 
     /**
@@ -221,8 +468,10 @@ new class extends Component {
 
     public function removeOption($sectionIndex, $blockIndex, $optionIndex)
     {
-        unset($this->sections[$sectionIndex]['blocks'][$blockIndex]['options'][$optionIndex]);
-        $this->sections[$sectionIndex]['blocks'][$blockIndex]['options'] = array_values($this->sections[$sectionIndex]['blocks'][$blockIndex]['options']);
+        $block = &$this->sections[$sectionIndex]['blocks'][$blockIndex];
+
+        unset($block['options'][$optionIndex]);
+        $block['options'] = array_values($block['options']);
 
         $this->repairCorrectAnswers($sectionIndex, $blockIndex);
     }
@@ -310,6 +559,8 @@ new class extends Component {
             $this->success('Evaluación creada correctamente.');
         }
 
+        $this->isDirty = false;
+
         return $this->redirectRoute('evaluations.index');
     }
 }
@@ -318,12 +569,52 @@ new class extends Component {
 <div>
     <x-header :title="$evaluation ? 'Editar Evaluación' : 'Nueva Evaluación'" :subtitle="$this->subject->name">
         <x-slot:actions>
+            @if($isDirty)
+                <span class="badge badge-warning badge-sm gap-1">
+                    <x-icon name="o-pencil" class="w-3 h-3" />
+                    Sin guardar
+                </span>
+            @endif
             <x-button label="Cancelar" link="{{ route('evaluations.index') }}" />
             <x-button label="Guardar" icon="o-check" class="btn-primary" wire:click="save" spinner="save" />
         </x-slot:actions>
     </x-header>
 
-    <div class="max-w-4xl mx-auto space-y-6 pb-20">
+    {{-- Warn before discarding an unsaved evaluation. --}}
+    <div x-data="{
+            dirty: @entangle('isDirty'),
+        }"
+        x-init="window.addEventListener('beforeunload', (event) => {
+            if (this.dirty) { event.preventDefault(); event.returnValue = ''; }
+        })"
+    ></div>
+
+    <div class="max-w-5xl mx-auto space-y-6 pb-20">
+
+        {{-- Tabs --}}
+        <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 p-1">
+            <button role="tab"
+                    class="tab gap-2 {{ $activeTab === 'data' ? 'tab-active' : '' }}"
+                    wire:click="$set('activeTab', 'data')">
+                <x-icon name="o-document-text" class="w-4 h-4" />
+                Datos
+            </button>
+            <button role="tab"
+                    class="tab gap-2 {{ $activeTab === 'rules' ? 'tab-active' : '' }}"
+                    wire:click="$set('activeTab', 'rules')">
+                <x-icon name="o-adjustments-horizontal" class="w-4 h-4" />
+                Reglas
+            </button>
+            <button role="tab"
+                    class="tab gap-2 {{ $activeTab === 'content' ? 'tab-active' : '' }}"
+                    wire:click="$set('activeTab', 'content')">
+                <x-icon name="o-list-bullet" class="w-4 h-4" />
+                Contenido
+                <span class="badge badge-neutral badge-sm">{{ $this->questionCount }}</span>
+            </button>
+        </div>
+
+        @if($activeTab === 'data')
         <!-- Configuraciones Principales -->
         <x-card>
             <div class="space-y-4">
@@ -353,8 +644,8 @@ new class extends Component {
                 </div>
             </div>
         </x-card>
-
-        <x-card title="Configuración Avanzada" class="bg-base-200/50">
+        @elseif($activeTab === 'rules')
+        <x-card title="Reglas de corrección">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <x-input label="Nota mínima para aprobar" wire:model="passing_score" type="number" step="0.1" min="0" max="10" required />
                 <x-input label="Intentos permitidos" wire:model="max_attempts" type="number" min="0" required hint="0 = ilimitados" />
@@ -368,13 +659,32 @@ new class extends Component {
                 />
                 <x-toggle label="Mezclar orden de preguntas" wire:model="shuffle_questions" />
             </div>
-        </x-card>
 
+            <x-alert icon="o-calculator" class="alert-info mt-4 text-sm">
+                El puntaje se normaliza sobre <strong>{{ $this->totalPoints }}</strong>
+                {{ $this->totalPoints == 1 ? 'punto disponible' : 'puntos disponibles' }}
+                en {{ $this->questionCount }} preguntas y se lleva a una escala de
+                <strong>0 a 10</strong>. Las preguntas de desarrollo quedan pendientes
+                hasta que las corrijas a mano.
+            </x-alert>
+        </x-card>
+        @else
         <!-- Importar MD -->
         <x-card title="Importar Rápido (Markdown)">
-            <x-textarea wire:model="markdown_content" rows="3" placeholder="Pegá preguntas aquí..." />
+            <p class="text-sm text-base-content/70 mb-2">
+                Pegá preguntas con el formato
+                <code class="text-xs">#### 1. Pregunta</code> /
+                <code class="text-xs">A. Opción</code> /
+                <code class="text-xs">**Respuesta correcta: A**</code>.
+                Se agregan como una sección nueva, sin tocar las existentes.
+            </p>
+            <x-textarea wire:model="markdown_content" rows="4" placeholder="#### 1. ¿Qué es una base de datos Normalizada?
+A. Una base sin duplicados
+B. Una base vacía
+
+**Respuesta correcta: A**" />
             <div class="mt-2 text-right">
-                <x-button label="Importar a una nueva sección" icon="o-arrow-down" wire:click="parseMarkdown" class="btn-sm btn-secondary" />
+                <x-button label="Importar como nueva sección" icon="o-arrow-down" wire:click="parseMarkdown" class="btn-sm btn-secondary" spinner="parseMarkdown" />
             </div>
         </x-card>
 
@@ -465,20 +775,231 @@ new class extends Component {
                                     </div>
                                     
                                 @elseif(($block['type'] ?? null) === 'matching')
-                                    <div class="alert alert-info py-2">
-                                        <x-icon name="o-information-circle" />
-                                        <span>Editor avanzado de pares. (Por simplicidad en la demo, se puede editar vía JSON o usar una UI básica de pares).</span>
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-semibold">
+                                            Pares (término → concepto)
+                                        </label>
+                                        @foreach($block['pairs'] ?? [] as $pIndex => $pair)
+                                            <div class="flex items-center gap-2" wire:key="pair-{{ $pIndex }}">
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.pairs.{{ $pIndex }}.prompt"
+                                                    placeholder="Término"
+                                                    class="flex-1 input-sm"
+                                                />
+                                                <x-icon name="o-arrow-right" class="w-4 h-4 text-base-content/50 shrink-0" />
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.pairs.{{ $pIndex }}.answer"
+                                                    placeholder="Concepto"
+                                                    class="flex-1 input-sm"
+                                                />
+                                                <x-button
+                                                    icon="o-x-mark"
+                                                    class="btn-ghost btn-xs text-error shrink-0"
+                                                    wire:click="removePair({{ $sIndex }}, {{ $bIndex }}, {{ $pIndex }})"
+                                                    tooltip="Quitar par"
+                                                />
+                                            </div>
+                                        @endforeach
+                                        <x-button
+                                            label="Agregar Par"
+                                            icon="o-plus"
+                                            class="btn-ghost btn-sm"
+                                            wire:click="addPair({{ $sIndex }}, {{ $bIndex }})"
+                                        />
+                                        <p class="text-xs text-base-content/60">
+                                            Las respuestas se mezclan al azar en la evaluación; el alumno
+                                            decide a qué término corresponde cada concepto.
+                                        </p>
                                     </div>
-                                
+
                                 @elseif(($block['type'] ?? null) === 'short_text')
-                                    <x-input wire:model="sections.{{$sIndex}}.blocks.{{$bIndex}}.correct_answer" label="Respuesta correcta esperada (opcional)" />
-                                
+                                    <x-input wire:model="sections.{{$sIndex}}.blocks.{{$bIndex}}.correct_answer" label="Respuesta correcta esperada (opcional)" hint="Si lo dejás vacío, la corrects a mano." />
+
                                 @elseif(($block['type'] ?? null) === 'table_design')
-                                    <div class="alert alert-info py-2">
-                                        <x-icon name="o-information-circle" />
-                                        <span>El diseño relacional se edita con código o UI avanzada.</span>
+                                    {{-- ATTRIBUTES --}}
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-semibold">Atributos disponibles</label>
+                                        @foreach($block['attributes'] ?? [] as $aIndex => $attribute)
+                                            <div class="flex items-center gap-2" wire:key="attr-{{ $aIndex }}">
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.attributes.{{ $aIndex }}"
+                                                    placeholder="Nombre del atributo"
+                                                    class="flex-1 input-sm"
+                                                />
+                                                <x-button
+                                                    icon="o-x-mark"
+                                                    class="btn-ghost btn-xs text-error shrink-0"
+                                                    wire:click="removeAttribute({{ $sIndex }}, {{ $bIndex }}, {{ $aIndex }})"
+                                                    tooltip="Quitar"
+                                                />
+                                            </div>
+                                        @endforeach
+                                        <x-button
+                                            label="Agregar Atributo"
+                                            icon="o-plus"
+                                            class="btn-ghost btn-sm"
+                                            wire:click="addAttribute({{ $sIndex }}, {{ $bIndex }})"
+                                        />
                                     </div>
-                                    <x-textarea wire:model="sections.{{$sIndex}}.blocks.{{$bIndex}}.prompt" label="Consigna del Ejercicio" rows="2" />
+
+                                    {{-- TABLES --}}
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-semibold">Tablas que debe armar el alumno</label>
+                                        @foreach($block['tables'] ?? [] as $tIndex => $table)
+                                            <div class="flex items-center gap-2" wire:key="schema-table-{{ $tIndex }}">
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.tables.{{ $tIndex }}.name"
+                                                    placeholder="NOMBRE_TABLA"
+                                                    class="flex-1 input-sm font-mono"
+                                                />
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.tables.{{ $tIndex }}.rows"
+                                                    type="number"
+                                                    min="1"
+                                                    max="12"
+                                                    suffix="filas"
+                                                    class="w-28 input-sm shrink-0"
+                                                />
+                                                <x-button
+                                                    icon="o-x-mark"
+                                                    class="btn-ghost btn-xs text-error shrink-0"
+                                                    wire:click="removeSchemaTable({{ $sIndex }}, {{ $bIndex }}, {{ $tIndex }})"
+                                                    tooltip="Quitar tabla"
+                                                />
+                                            </div>
+                                        @endforeach
+                                        <x-button
+                                            label="Agregar Tabla"
+                                            icon="o-plus"
+                                            class="btn-ghost btn-sm"
+                                            wire:click="addSchemaTable({{ $sIndex }}, {{ $bIndex }})"
+                                        />
+                                    </div>
+
+                                    {{-- ANSWER KEY: TABLES --}}
+                                    <div class="space-y-3 border border-base-300 rounded-lg p-3 bg-base-200/40">
+                                        <div class="flex justify-between items-center">
+                                            <label class="text-sm font-semibold">
+                                                Respuesta esperada · Tablas
+                                            </label>
+                                            <x-button
+                                                label="Agregar"
+                                                icon="o-plus"
+                                                class="btn-ghost btn-xs"
+                                                wire:click="addKeyTable({{ $sIndex }}, {{ $bIndex }})"
+                                            />
+                                        </div>
+
+                                        @foreach($block['answer_key']['tables'] ?? [] as $kIndex => $keyTable)
+                                            <div class="bg-base-100 rounded-lg p-3 space-y-2 border border-base-300" wire:key="key-table-{{ $kIndex }}">
+                                                <div class="flex items-center gap-2">
+                                                    <x-input
+                                                        wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.answer_key.tables.{{ $kIndex }}.name"
+                                                        placeholder="Nombre de la tabla"
+                                                        class="flex-1 input-sm font-mono"
+                                                    />
+                                                    <x-button
+                                                        icon="o-x-mark"
+                                                        class="btn-ghost btn-xs text-error shrink-0"
+                                                        wire:click="removeKeyTable({{ $sIndex }}, {{ $bIndex }}, {{ $kIndex }})"
+                                                        tooltip="Quitar"
+                                                    />
+                                                </div>
+
+                                                <div class="text-xs text-base-content/60">
+                                                    Marcá la <strong>clave primaria</strong> y las
+                                                    <strong>foráneas</strong> de cada columna.
+                                                </div>
+
+                                                @foreach($keyTable['columns'] ?? [] as $cIndex => $column)
+                                                    <div class="flex items-center gap-2" wire:key="key-column-{{ $kIndex }}-{{ $cIndex }}">
+                                                        <x-input
+                                                            wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.answer_key.tables.{{ $kIndex }}.columns.{{ $cIndex }}"
+                                                            placeholder="Columna"
+                                                            class="flex-1 input-sm"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            wire:click="setKeyPrimaryKey({{ $sIndex }}, {{ $bIndex }}, {{ $kIndex }}, @js($column))"
+                                                            class="btn btn-xs shrink-0 {{ ($keyTable['pk'] ?? null) === $column ? 'btn-primary' : 'btn-outline' }}"
+                                                            title="Clave primaria">
+                                                            PK
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="toggleKeyForeignKey({{ $sIndex }}, {{ $bIndex }}, {{ $kIndex }}, @js($column))"
+                                                            class="btn btn-xs shrink-0 {{ in_array($column, $keyTable['fks'] ?? [], true) ? 'btn-info' : 'btn-outline' }}"
+                                                            title="Clave foránea">
+                                                            FK
+                                                        </button>
+                                                        <x-button
+                                                            icon="o-x-mark"
+                                                            class="btn-ghost btn-xs text-error shrink-0"
+                                                            wire:click="removeKeyColumn({{ $sIndex }}, {{ $bIndex }}, {{ $kIndex }}, {{ $cIndex }})"
+                                                        />
+                                                    </div>
+                                                @endforeach
+
+                                                <x-button
+                                                    label="Agregar Columna"
+                                                    icon="o-plus"
+                                                    class="btn-ghost btn-xs"
+                                                    wire:click="addKeyColumn({{ $sIndex }}, {{ $bIndex }}, {{ $kIndex }})"
+                                                />
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    {{-- ANSWER KEY: RELATIONS --}}
+                                    <div class="space-y-2 border border-base-300 rounded-lg p-3 bg-base-200/40">
+                                        <div class="flex justify-between items-center">
+                                            <label class="text-sm font-semibold">
+                                                Respuesta esperada · Relaciones
+                                            </label>
+                                            <x-button
+                                                label="Agregar"
+                                                icon="o-plus"
+                                                class="btn-ghost btn-xs"
+                                                wire:click="addKeyRelation({{ $sIndex }}, {{ $bIndex }})"
+                                            />
+                                        </div>
+
+                                        @foreach($block['answer_key']['relations'] ?? [] as $rIndex => $relation)
+                                            <div class="flex flex-wrap items-center gap-2" wire:key="key-relation-{{ $rIndex }}">
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.answer_key.relations.{{ $rIndex }}.from"
+                                                    placeholder="Origen"
+                                                    class="flex-1 input-sm font-mono min-w-24"
+                                                />
+                                                <x-icon name="o-arrow-right" class="w-4 h-4 text-base-content/50 shrink-0" />
+                                                <x-input
+                                                    wire:model="sections.{{ $sIndex }}.blocks.{{ $bIndex }}.answer_key.relations.{{ $rIndex }}.to"
+                                                    placeholder="Destino"
+                                                    class="flex-1 input-sm font-mono min-w-24"
+                                                />
+                                                <div class="join shrink-0">
+                                                    @foreach(['1:1', '1:N', 'N:N'] as $type)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="toggleKeyRelationType({{ $sIndex }}, {{ $bIndex }}, {{ $rIndex }}, @js($type))"
+                                                            class="btn btn-xs join-item {{ ($relation['type'] ?? '1:N') === $type ? 'btn-primary' : 'btn-outline' }}">
+                                                            {{ $type }}
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                                <x-button
+                                                    icon="o-x-mark"
+                                                    class="btn-ghost btn-xs text-error shrink-0"
+                                                    wire:click="removeKeyRelation({{ $sIndex }}, {{ $bIndex }}, {{ $rIndex }})"
+                                                />
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <x-alert icon="o-light-bulb" class="alert-info text-sm">
+                                        Sin columnas marcadas en la clave, el ejercicio no se puede
+                                        corregir solo y queda pendiente de revisión del docente.
+                                    </x-alert>
                                 @endif
                             </div>
                         </div>
@@ -501,5 +1022,6 @@ new class extends Component {
         <div class="text-center">
             <x-button label="Agregar Sección" icon="o-plus" class="btn-secondary btn-wide" wire:click="addSection" />
         </div>
+        @endif
     </div>
 </div>

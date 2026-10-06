@@ -120,7 +120,7 @@ class MyEvaluationsTest extends TestCase
         EvaluationAttempt::factory()->create([
             'user_id' => $this->student->id,
             'online_evaluation_id' => $evaluation->id,
-            'answers' => ['b1' => 'A'],
+            'answers' => [$this->onlyBlockId($evaluation) => 'A'],
         ]);
 
         $state = $this->stateFor($evaluation);
@@ -128,6 +128,26 @@ class MyEvaluationsTest extends TestCase
         $this->assertSame(StudentEvaluationState::IN_PROGRESS, $state['key']);
         $this->assertTrue($state['actionable']);
         $this->assertSame(1, $state['answered']);
+        $this->assertSame(1, $state['total']);
+    }
+
+    #[Test]
+    public function answers_for_unknown_blocks_are_not_counted_as_progress(): void
+    {
+        $evaluation = $this->publishedEvaluation('En curso', [
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addWeek(),
+        ]);
+
+        EvaluationAttempt::factory()->create([
+            'user_id' => $this->student->id,
+            'online_evaluation_id' => $evaluation->id,
+            'answers' => ['ghost-block' => 'A', '_metadata' => ['shuffled_content' => []]],
+        ]);
+
+        $state = $this->stateFor($evaluation);
+
+        $this->assertSame(0, $state['answered']);
         $this->assertSame(1, $state['total']);
     }
 
@@ -289,6 +309,14 @@ class MyEvaluationsTest extends TestCase
     private function teacherId(): int
     {
         return User::factory()->create(['role' => 'teacher'])->id;
+    }
+
+    /**
+     * The single block id of the default factory content.
+     */
+    private function onlyBlockId(OnlineEvaluation $evaluation): string
+    {
+        return $evaluation->content['sections'][0]['blocks'][0]['id'];
     }
 
     #[Test]
