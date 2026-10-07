@@ -23,8 +23,6 @@ new class extends Component {
      */
     public $isStudent = false;
 
-    public $showFilters = false;
-
     public array $sortBy = ['column' => 'created_at', 'direction' => 'desc'];
 
     public function mount()

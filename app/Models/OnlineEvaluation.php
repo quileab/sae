@@ -149,11 +149,6 @@ class OnlineEvaluation extends Model
         return EvaluationStatus::tryFrom($this->status)?->badgeClass() ?? 'badge-neutral';
     }
 
-    public function getGradingMethodLabelAttribute(): string
-    {
-        return EvaluationGradingMethod::tryFrom($this->grading_method)?->label() ?? '—';
-    }
-
     public function getGradingMethodShortLabelAttribute(): string
     {
         return EvaluationGradingMethod::tryFrom($this->grading_method)?->shortLabel() ?? '—';
