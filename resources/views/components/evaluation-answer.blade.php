@@ -52,23 +52,62 @@
     @endif
     <span class="whitespace-pre-wrap">{{ $answer['text'] ?? '' }}</span>
 @elseif($type === 'table_design')
+    @php
+        $detailed = App\Services\Evaluations\EvaluationContent::gradeTableDesignDetailed(
+            $block,
+            $answer,
+            (float) ($block['points'] ?? 1)
+        );
+        $number = fn (float $value): string => rtrim(rtrim(number_format($value, 1, ',', '.'), '0'), ',');
+        $label = fn (?string $name): string => strtoupper(str_replace('_', ' ', (string) $name));
+    @endphp
+
     <div class="space-y-3 text-xs">
+        {{-- Per-dimension breakdown, so the teacher sees why points were lost --}}
+        <div class="flex flex-wrap gap-1">
+            @foreach($detailed['breakdown'] as $dimension)
+                <span @class([
+                    'badge badge-xs gap-1 font-normal',
+                    'badge-success' => $dimension['total'] > 0 && $dimension['earned'] >= $dimension['total'],
+                    'badge-warning' => $dimension['earned'] < $dimension['total'],
+                    'badge-ghost' => $dimension['total'] == 0,
+                ])>
+                    {{ $dimension['label'] }}:
+                    <span class="font-mono">{{ $number($dimension['earned']) }}</span>
+                    <span class="opacity-60">/ {{ $number($dimension['total']) }}</span>
+                </span>
+            @endforeach
+        </div>
+
         @foreach(($answer['tables'] ?? []) as $table)
-            <div>
-                <div class="font-bold">{{ $table['name'] ?? '' }}</div>
-                <table class="table table-xs mt-1">
-                    <thead>
-                        <tr>
-                            <th>PK</th>
-                            <th>FK</th>
-                            <th>Columna</th>
-                        </tr>
-                    </thead>
+            @php $verdict = $detailed['per_table'][$table['name'] ?? ''] ?? null; @endphp
+            <div class="border border-base-300 rounded overflow-hidden">
+                <div class="bg-base-200 px-2 py-1 flex items-center justify-between gap-2">
+                    <span class="font-mono font-bold">{{ $label($table['name'] ?? '') }}</span>
+                    @if($verdict === null)
+                        <span class="badge badge-ghost badge-xs">tabla extra</span>
+                    @else
+                        <span class="flex gap-1">
+                            <span class="badge badge-xs {{ ($verdict['missing'] || ! $verdict['columns']) ? 'badge-error' : 'badge-success' }}"
+                                  title="{{ ($verdict['missing'] || ! $verdict['columns']) ? 'Distribución incorrecta' : 'Distribución correcta' }}">dist</span>
+                            @if($verdict['pk'] !== null)
+                                <span class="badge badge-xs {{ $verdict['pk'] ? 'badge-success' : 'badge-error' }}"
+                                      title="{{ $verdict['pk'] ? 'PK correcta' : 'PK incorrecta' }}">pk</span>
+                            @endif
+                            @if($verdict['fks'] !== null)
+                                <span class="badge badge-xs {{ $verdict['fks'] ? 'badge-success' : 'badge-error' }}"
+                                      title="{{ $verdict['fks'] ? 'FK correctas' : 'FK incorrectas' }}">fk</span>
+                            @endif
+                        </span>
+                    @endif
+                </div>
+                <table class="table table-xs font-mono">
                     <tbody>
                         @foreach($table['columns'] ?? [] as $column)
                             <tr>
-                                <td>{{ ($column['type'] ?? '') === 'PK' ? '🔑' : '' }}</td>
-                                <td>{{ ($column['type'] ?? '') === 'FK' ? '🔗' : '' }}</td>
+                                <td class="w-16 text-center {{ in_array(strtoupper($column['type'] ?? ''), ['PK', 'FK'], true) ? 'font-bold' : 'opacity-40' }}">
+                                    [{{ $column['type'] ?? '' }}]
+                                </td>
                                 <td>{{ $column['name'] ?? '' }}</td>
                             </tr>
                         @endforeach
@@ -79,10 +118,26 @@
 
         @if(! empty($answer['relations']))
             <div>
-                <div class="font-bold mt-2">Relaciones</div>
-                <ul class="list-disc list-inside">
+                <div class="font-bold uppercase text-base-content/60 mb-1">Relaciones</div>
+                <ul class="space-y-1">
                     @foreach($answer['relations'] as $relation)
-                        <li>{{ $relation['from'] ?? '?' }} → {{ $relation['to'] ?? '?' }} ({{ $relation['type'] ?? '?' }})</li>
+                        @php
+                            $clave = $relation['clave'] ?? null;
+                            $expected = collect($block['answer_key']['relations'] ?? [])->firstWhere('clave', $clave);
+                            $ok = $detailed['per_relation'][$clave] ?? false;
+                            $name = $expected
+                                ? $label($expected['from'] ?? '').' → '.$label($expected['to'] ?? '')
+                                : $label($relation['from'] ?? $clave);
+                        @endphp
+                        <li class="flex flex-wrap items-center gap-1">
+                            <x-icon name="{{ $ok ? 'o-check-circle' : 'o-x-circle' }}"
+                                    class="w-3.5 h-3.5 shrink-0 {{ $ok ? 'text-success' : 'text-error' }}" />
+                            <span class="font-mono">{{ $name }}</span>
+                            <code class="font-mono">{{ $relation['type'] ?: '— sin tipo —' }}</code>
+                            @unless($ok && $expected)
+                                <span class="opacity-60">esperaba {{ $expected['type'] ?? '—' }}</span>
+                            @endunless
+                        </li>
                     @endforeach
                 </ul>
             </div>

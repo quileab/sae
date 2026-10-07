@@ -255,7 +255,7 @@ public function saveProgress()
 >
     <!-- Sticky toolbar: timer + progress stay visible while scrolling -->
     <div class="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-base-200/80 backdrop-blur border-b border-base-300 mb-6">
-        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary text-primary-content font-bold tabular-nums shadow-sm"
                      :class="{'bg-error text-error-content animate-pulse': remaining <= 300}">
@@ -270,12 +270,40 @@ public function saveProgress()
 
             <div class="flex items-center gap-3">
                 @unless($isPreview)
-                    <div class="text-right" wire:loading.remove wire:target="saveProgress">
-                        <span class="badge badge-ghost badge-sm gap-1">
-                            <x-icon name="o-cloud-arrow-up" class="w-3 h-3" />
-                            {{ $this->answeredCount }} de {{ $this->totalBlocks }} respondidas
-                        </span>
-                    </div>
+                    <span class="text-xs text-base-content/60 hidden sm:inline-flex items-center gap-1"
+                          wire:loading.remove wire:target="saveProgress">
+                        <x-icon name="o-cloud-arrow-up" class="w-3.5 h-3.5" />
+                        Guardado
+                    </span>
+
+                    {{-- Horizontal navigator: keeps the full width for the questions --}}
+                    <details class="dropdown dropdown-end">
+                        <summary class="btn btn-sm btn-ghost gap-2 list-none">
+                            <x-icon name="o-list-bullet" class="w-4 h-4" />
+                            <span class="hidden sm:inline">Ir a la pregunta</span>
+                            <span class="badge badge-sm badge-ghost tabular-nums">{{ $this->answeredCount }}/{{ $this->totalBlocks }}</span>
+                        </summary>
+                        <div class="dropdown-content z-40 mt-2 card bg-base-100 border border-base-200 shadow-lg max-h-[60vh] overflow-y-auto w-64">
+                            <ul class="menu menu-sm p-2 gap-0.5">
+                                @foreach($this->questionIndex as $entry)
+                                    <li>
+                                        <a href="#q-{{ $entry['block_id'] }}"
+                                           class="flex items-center justify-between gap-2 {{ $entry['answered'] ? '' : 'opacity-60' }}">
+                                            <span class="flex items-center gap-2 min-w-0">
+                                                <span class="badge badge-xs shrink-0 tabular-nums {{ $entry['answered'] ? 'badge-success' : 'badge-ghost' }}">
+                                                    {{ $entry['number'] }}
+                                                </span>
+                                                <span class="truncate">{{ $entry['section'] }}</span>
+                                            </span>
+                                            @if($entry['answered'])
+                                                <x-icon name="o-check" class="w-3.5 h-3.5 text-success shrink-0" />
+                                            @endif
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+</details>
                 @endunless
             </div>
         </div>
@@ -288,7 +316,7 @@ public function saveProgress()
     </div>
 
     @if($evaluation->description)
-        <div class="max-w-6xl mx-auto mb-6">
+        <div class="max-w-7xl mx-auto mb-6">
             <x-alert icon="o-information-circle" class="alert-info text-sm">
                 {{ $evaluation->description }}
             </x-alert>
@@ -296,7 +324,7 @@ public function saveProgress()
     @endif
 
     @if($isPreview)
-        <div class="max-w-6xl mx-auto mb-6">
+        <div class="max-w-7xl mx-auto mb-6">
             <x-alert icon="o-eye" class="alert-warning text-sm">
                 <strong>Vista previa.</strong> Estás viendo la evaluación como la vería un alumno,
                 pero tus respuestas no se guardan ni cuentan para ninguna nota.
@@ -304,38 +332,10 @@ public function saveProgress()
         </div>
     @endif
 
-    <div class="max-w-6xl mx-auto lg:grid lg:grid-cols-[240px_1fr] lg:gap-6">
-        {{-- Navigator --}}
-        @unless($isPreview)
-            <aside class="hidden lg:block">
-                <div class="sticky top-24 card bg-base-100 border border-base-200 shadow-sm">
-                    <div class="card-body p-4">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-base-content/60 mb-2">
-                            Navegación
-                        </h3>
-                        <nav class="flex flex-col gap-1.5 max-h-[60vh] overflow-y-auto pr-1">
-                            @foreach($this->questionIndex as $entry)
-                                <a href="#q-{{ $entry['block_id'] }}"
-                                   class="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-sm hover:bg-base-200 transition
-                                          {{ $entry['answered'] ? 'text-base-content' : 'text-base-content/50' }}">
-                                    <span class="flex items-center gap-2 min-w-0">
-                                        <span class="badge badge-xs shrink-0
-                                            {{ $entry['answered'] ? 'badge-success' : 'badge-ghost' }} tabular-nums">
-                                            {{ $entry['number'] }}
-                                        </span>
-                                        <span class="truncate">{{ $entry['section'] }}</span>
-                                    </span>
-                                    @if($entry['answered'])
-                                        <x-icon name="o-check" class="w-3.5 h-3.5 text-success shrink-0" />
-                                    @endif
-                                </a>
-                            @endforeach
-                        </nav>
-                    </div>
-                </div>
-            </aside>
-        @endunless
-
+    {{-- Questions always take the full available width: the relational design
+         exercise draws tables side by side, and a sidebar column left them
+         unusably narrow. Navigation lives in the sticky toolbar instead. --}}
+    <div class="max-w-7xl mx-auto">
         {{-- Questions --}}
         <div class="space-y-6 pb-32">
             @forelse($this->questionIndex as $entry)
@@ -367,7 +367,7 @@ public function saveProgress()
 
     {{-- Sticky submit bar --}}
     <div class="fixed bottom-0 left-0 right-0 z-30 bg-base-100 border-t border-base-300 shadow-lg">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="text-sm">
                 @if($isPreview)
                     <span class="text-base-content/60">

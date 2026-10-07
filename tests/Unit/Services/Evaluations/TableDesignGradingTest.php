@@ -6,288 +6,88 @@ use App\Services\Evaluations\EvaluationContent;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * The table_design rubric, checked against the submissions the source exercises
+ * actually produced.
+ *
+ * Shapes and grades come from:
+ *   eval3gestion/js/eval.js  ce={clientes:3,empleados:3,ventas:4,detalle_ventas:5,productos:4}
+ *   entregas-eval3gestion/BUYATTI_MARIASOL-*.json   nota 10  (perfect)
+ *   entregas-eval3gestion/OTTINGER_SOL-*.json        nota 9   (one key mislabelled)
+ *   entregas-eval3gestion/DELGADO_GRACIELA-*.json    nota 7   (renamed primary keys)
+ *   entregas-eval3gestion/SARTOR_GEORGINA-*.json     nota 1   (blank)
+ */
 class TableDesignGradingTest extends TestCase
 {
     /**
-     * A fully specified table is worth 3 units (name 1, columns 1, pk 0.5,
-     * fks 0.5), so this fixture's two tables plus one relation totals 7 units.
-     * Marks are rounded to two decimals.
-     */
-    private const UNITS_PER_TABLE = 3;
-
-    private const TOTAL_UNITS = 7;
-
-    /**
+     * The sales exercise answer key.
+     *
      * @return array<string, mixed>
      */
-    private function block(): array
+    private function salesBlock(): array
     {
         return [
-            'id' => 'td',
+            'id' => 'g2_1',
             'type' => 'table_design',
-            'points' => 9,
+            'points' => 10,
+            'relation_pairs' => [
+                ['clave' => 'cliente_ventas', 'from' => 'clientes', 'to' => 'ventas'],
+                ['clave' => 'empleado_ventas', 'from' => 'empleados', 'to' => 'ventas'],
+                ['clave' => 'ventas_detalle', 'from' => 'ventas', 'to' => 'detalle_ventas'],
+                ['clave' => 'producto_detalle', 'from' => 'productos', 'to' => 'detalle_ventas'],
+            ],
             'answer_key' => [
                 'tables' => [
-                    [
-                        'name' => 'CLIENTES',
-                        'columns' => ['ID', 'Nombre', 'Telefono'],
-                        'pk' => 'ID',
-                        'fks' => [],
-                    ],
-                    [
-                        'name' => 'VENTAS',
-                        'columns' => ['ID', 'Fecha', 'ID_Cliente', 'Total'],
-                        'pk' => 'ID',
-                        'fks' => ['ID_Cliente'],
-                    ],
+                    ['name' => 'clientes', 'columns' => ['ID', 'Nombre', 'Teléfono'], 'pk' => 'ID', 'fks' => []],
+                    ['name' => 'empleados', 'columns' => ['ID', 'Nombre', 'Cargo'], 'pk' => 'ID', 'fks' => []],
+                    ['name' => 'ventas', 'columns' => ['ID', 'Fecha_Venta', 'ID_Cliente', 'ID_Empleado'], 'pk' => 'ID', 'fks' => ['ID_Cliente', 'ID_Empleado']],
+                    ['name' => 'detalle_ventas', 'columns' => ['ID', 'ID_Venta', 'ID_Producto', 'Cantidad_Vendida', 'Precio_Unitario'], 'pk' => 'ID', 'fks' => ['ID_Venta', 'ID_Producto']],
+                    ['name' => 'productos', 'columns' => ['ID', 'Descripcion', 'Precio_Unitario', 'Stock'], 'pk' => 'ID', 'fks' => []],
                 ],
                 'relations' => [
-                    ['from' => 'CLIENTES', 'to' => 'VENTAS', 'type' => '1:N'],
+                    ['clave' => 'cliente_ventas', 'type' => '1:N'],
+                    ['clave' => 'empleado_ventas', 'type' => '1:N'],
+                    ['clave' => 'ventas_detalle', 'type' => '1:N'],
+                    ['clave' => 'producto_detalle', 'type' => '1:N'],
                 ],
             ],
         ];
-    }
-
-    #[Test]
-    public function a_perfect_design_earns_full_points(): void
-    {
-        $result = EvaluationContent::gradeBlock($this->block(), $this->perfectAnswer());
-
-        $this->assertSame(9.0, $result['score']);
-        $this->assertFalse($result['requires_manual']);
-    }
-
-    #[Test]
-    public function listing_the_table_names_alone_does_not_earn_full_points(): void
-    {
-        // Regression: the grader used to compare names only, so an empty
-        // schema scored 100% and the question was trivially gameable.
-        $answer = [
-            'tables' => [
-                ['name' => 'CLIENTES', 'columns' => []],
-                ['name' => 'VENTAS', 'columns' => []],
-            ],
-            'relations' => [['from' => 'CLIENTES', 'to' => 'VENTAS', 'type' => '1:N']],
-        ];
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        $this->assertLessThan(
-            9.0,
-            $result['score'],
-            'Correct table names with no columns must not score full marks.'
-        );
-    }
-
-    #[Test]
-    public function it_awards_the_table_name_unit_only(): void
-    {
-        $answer = [
-            'tables' => [
-                ['name' => 'CLIENTES', 'columns' => []],
-                ['name' => 'VENTAS', 'columns' => []],
-            ],
-            'relations' => [['from' => 'CLIENTES', 'to' => 'VENTAS', 'type' => '1:N']],
-        ];
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // CLIENTES has no expected foreign keys, so the empty sets match (0.5).
-        // CLIENTES 1.5 + VENTAS 1.0 + relation 1.0 = 3.5 of 7 units.
-        $this->assertSame(self::mark(3.5), $result['score']);
-    }
-
-    #[Test]
-    public function correct_columns_but_a_wrong_primary_key_lose_the_pk_unit(): void
-    {
-        $answer = $this->perfectAnswer();
-
-        // Move only VENTAS's primary key from ID to Fecha, leaving the
-        // foreign key marker in place so only the pk unit is affected.
-        $answer['tables'][1]['columns'][0]['type'] = '';
-        $answer['tables'][1]['columns'][1]['type'] = 'PK';
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // CLIENTES 3.0 + VENTAS 2.5 (pk unit lost) + relation 1.0 = 6.5 of 7.
-        $this->assertSame(self::mark(6.5), $result['score']);
-    }
-
-    #[Test]
-    public function a_relation_with_the_wrong_cardinality_loses_credit(): void
-    {
-        $answer = $this->perfectAnswer();
-        $answer['relations'][0]['type'] = 'N:N';
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // Both tables score in full, the relation unit is lost: 6 of 7.
-        $this->assertSame(self::mark(6.0), $result['score']);
-    }
-
-    #[Test]
-    public function a_missing_table_loses_all_of_its_units(): void
-    {
-        $answer = $this->perfectAnswer();
-        array_pop($answer['tables']);
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // VENTAS contributes 3 units, all lost: 4 of 7 remain.
-        $this->assertSame(self::mark(4.0), $result['score']);
-    }
-
-    #[Test]
-    public function wrong_foreign_keys_lose_half_a_unit(): void
-    {
-        $answer = $this->perfectAnswer();
-
-        // Strip the foreign key marker from ID_Cliente.
-        foreach ($answer['tables'][1]['columns'] as $j => $column) {
-            if ($column['type'] === 'FK') {
-                $answer['tables'][1]['columns'][$j]['type'] = '';
-            }
-        }
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // CLIENTES 3.0 + VENTAS 2.5 (fk unit lost) + relation 1.0 = 6.5 of 7.
-        $this->assertSame(self::mark(6.5), $result['score']);
-    }
-
-    #[Test]
-    public function a_junction_table_without_a_primary_key_can_still_score_full_marks(): void
-    {
-        // The unit accounting must not charge for a pk unit the answer key
-        // never offers, or a perfect design can never reach full marks.
-        $block = [
-            'id' => 'td',
-            'type' => 'table_design',
-            'points' => 10,
-            'answer_key' => [
-                'tables' => [
-                    ['name' => 'VENTAS', 'columns' => ['ID'], 'pk' => 'ID', 'fks' => []],
-                    ['name' => 'DETALLE', 'columns' => ['ID_Venta', 'ID_Producto'], 'pk' => null, 'fks' => ['ID_Venta', 'ID_Producto']],
-                ],
-                'relations' => [['from' => 'VENTAS', 'to' => 'DETALLE', 'type' => '1:N']],
-            ],
-        ];
-
-        $answer = [
-            'tables' => [
-                ['name' => 'VENTAS', 'columns' => [['type' => 'PK', 'name' => 'ID']]],
-                ['name' => 'DETALLE', 'columns' => [
-                    ['type' => 'FK', 'name' => 'ID_Venta'],
-                    ['type' => 'FK', 'name' => 'ID_Producto'],
-                ]],
-            ],
-            'relations' => [['from' => 'VENTAS', 'to' => 'DETALLE', 'type' => '1:N']],
-        ];
-
-        $result = EvaluationContent::gradeBlock($block, $answer);
-
-        $this->assertSame(10.0, $result['score']);
-        $this->assertFalse($result['requires_manual']);
-    }
-
-    #[Test]
-    public function a_wrong_column_set_loses_the_columns_unit(): void
-    {
-        $answer = $this->perfectAnswer();
-        $answer['tables'][0]['columns'][1]['name'] = 'Apellido';
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        // CLIENTES loses the columns unit: 2.0 + 3.0 + relation 1.0 = 6 of 7.
-        $this->assertSame(self::mark(6.0), $result['score']);
-    }
-
-    #[Test]
-    public function an_answer_key_without_column_detail_defers_to_manual_grading(): void
-    {
-        $legacy = [
-            'id' => 'td',
-            'type' => 'table_design',
-            'points' => 10,
-            'answer_key' => [
-                'tables' => [['name' => 'CLIENTES'], ['name' => 'VENTAS']],
-                'relations' => [['from' => 'CLIENTES', 'to' => 'VENTAS']],
-            ],
-        ];
-
-        $result = EvaluationContent::gradeBlock($legacy, [
-            'tables' => [['name' => 'CLIENTES', 'columns' => []]],
-            'relations' => [],
-        ]);
-
-        $this->assertTrue(
-            $result['requires_manual'],
-            'A legacy answer key must not auto-grade as if names were enough.'
-        );
-    }
-
-    #[Test]
-    public function a_legacy_answer_key_does_not_throw(): void
-    {
-        $legacy = [
-            'id' => 'td',
-            'type' => 'table_design',
-            'points' => 10,
-            'answer_key' => [
-                'tables' => [['name' => 'CLIENTES']],
-                'relations' => [],
-            ],
-        ];
-
-        $result = EvaluationContent::gradeBlock($legacy, null);
-
-        $this->assertIsFloat($result['score']);
-    }
-
-    #[Test]
-    public function table_and_column_matching_is_case_insensitive(): void
-    {
-        $answer = $this->perfectAnswer();
-
-        foreach ($answer['tables'] as $i => $table) {
-            $answer['tables'][$i]['name'] = mb_strtolower($table['name']);
-            foreach ($table['columns'] as $j => $column) {
-                $answer['tables'][$i]['columns'][$j]['name'] = mb_strtolower($column['name']);
-            }
-        }
-
-        $this->assertSame(9.0, EvaluationContent::gradeBlock($this->block(), $answer)['score']);
-    }
-
-    #[Test]
-    public function extra_unexpected_tables_do_not_add_points(): void
-    {
-        $answer = $this->perfectAnswer();
-        $answer['tables'][] = ['name' => 'INVENTADA', 'columns' => [['type' => '', 'name' => 'X']]];
-
-        $this->assertSame(9.0, EvaluationContent::gradeBlock($this->block(), $answer)['score']);
-    }
-
-    #[Test]
-    public function the_score_never_exceeds_the_block_maximum(): void
-    {
-        $answer = $this->perfectAnswer();
-
-        // Duplicate everything; the grader must not pay twice for one table.
-        $answer['tables'][] = $answer['tables'][0];
-        $answer['relations'][] = $answer['relations'][0];
-
-        $result = EvaluationContent::gradeBlock($this->block(), $answer);
-
-        $this->assertLessThanOrEqual(9.0, $result['score']);
     }
 
     /**
-     * Convert earned units into the resulting mark.
+     * @param  array<string, array<int, array{0: string, 1: string}>>  $rows
+     * @return array<int, array{name: string, columns: array<int, array{type: string, name: string}>}>
      */
-    private static function mark(float $earnedUnits): float
+    private function tables(array $rows): array
     {
-        return round($earnedUnits / self::TOTAL_UNITS * 9, 2);
+        $tables = [];
+
+        foreach ($rows as $name => $columns) {
+            $tables[] = [
+                'name' => $name,
+                'columns' => array_map(
+                    fn (array $cell) => ['type' => $cell[0], 'name' => $cell[1]],
+                    $columns
+                ),
+            ];
+        }
+
+        return $tables;
+    }
+
+    /**
+     * @return array<int, array{clave: string, type: string}>
+     */
+    private function relations(string ...$types): array
+    {
+        $claves = ['cliente_ventas', 'empleado_ventas', 'ventas_detalle', 'producto_detalle'];
+        $result = [];
+
+        foreach ($claves as $index => $clave) {
+            $result[] = ['clave' => $clave, 'type' => $types[$index] ?? ''];
+        }
+
+        return $result;
     }
 
     /**
@@ -296,28 +96,272 @@ class TableDesignGradingTest extends TestCase
     private function perfectAnswer(): array
     {
         return [
-            'tables' => [
-                [
-                    'name' => 'CLIENTES',
-                    'columns' => [
-                        ['type' => 'PK', 'name' => 'ID'],
-                        ['type' => '', 'name' => 'Nombre'],
-                        ['type' => '', 'name' => 'Telefono'],
-                    ],
+            'tables' => $this->tables([
+                'clientes' => [['PK', 'ID'], ['', 'Nombre'], ['', 'Teléfono']],
+                'empleados' => [['PK', 'ID'], ['', 'Nombre'], ['', 'Cargo']],
+                'ventas' => [['PK', 'ID'], ['', 'Fecha_Venta'], ['FK', 'ID_Cliente'], ['FK', 'ID_Empleado']],
+                'detalle_ventas' => [['PK', 'ID'], ['FK', 'ID_Venta'], ['FK', 'ID_Producto'], ['', 'Cantidad_Vendida'], ['', 'Precio_Unitario']],
+                'productos' => [['PK', 'ID'], ['', 'Descripcion'], ['', 'Precio_Unitario'], ['', 'Stock']],
+            ]),
+            'relations' => $this->relations('1:N', '1:N', '1:N', '1:N'),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $answer
+     * @return array<string, mixed>
+     */
+    private function grade(array $answer): array
+    {
+        $block = $this->salesBlock();
+
+        return EvaluationContent::gradeTableDesignDetailed($block, $answer, (float) $block['points']);
+    }
+
+    #[Test]
+    public function a_perfect_submission_earns_every_point(): void
+    {
+        $result = $this->grade($this->perfectAnswer());
+
+        $this->assertSame(10.0, $result['score']);
+        $this->assertFalse($result['requires_manual']);
+
+        foreach ($result['breakdown'] as $dimension) {
+            $this->assertSame(
+                $dimension['total'],
+                $dimension['earned'],
+                "{$dimension['label']} should be fully earned."
+            );
+        }
+    }
+
+    #[Test]
+    public function a_single_mislabelled_foreign_key_costs_half_a_unit(): void
+    {
+        // OTTINGER: ID_Producto marked PK instead of FK in detalle_ventas.
+        $answer = $this->perfectAnswer();
+        $answer['tables'][3]['columns'][2]['type'] = 'PK';
+
+        $result = $this->grade($answer);
+
+        $this->assertLessThan(10.0, $result['score']);
+        $this->assertSame(5.0, $result['breakdown']['distribution']['earned'], 'Placement was perfect.');
+        $this->assertSame(4.5, $result['breakdown']['keys']['earned'], 'Only the fk half-unit was lost.');
+        $this->assertSame(4.0, $result['breakdown']['relations']['earned']);
+
+        $this->assertTrue(
+            $result['per_table']['detalle_ventas']['pk'],
+            'ID is still the first primary key, so the pk half-unit survives.'
+        );
+        $this->assertFalse(
+            $result['per_table']['detalle_ventas']['fks'],
+            'ID_Producto is no longer marked as a foreign key.'
+        );
+    }
+
+    #[Test]
+    public function renaming_the_primary_keys_costs_more_than_one_mislabelled_cell(): void
+    {
+        // DELGADO: descriptive names used as primary keys, generic ID used as fk.
+        $answer = [
+            'tables' => $this->tables([
+                'clientes' => [['PK', 'ID_Cliente'], ['', 'Nombre'], ['', 'Teléfono']],
+                'empleados' => [['PK', 'ID_Empleado'], ['', 'Nombre'], ['', 'Cargo']],
+                'ventas' => [['PK', 'ID_Venta'], ['', 'Fecha_Venta'], ['FK', 'ID'], ['FK', 'ID']],
+                'detalle_ventas' => [['PK', 'ID'], ['FK', 'ID'], ['FK', 'ID_Producto'], ['', 'Cantidad_Vendida'], ['', 'Precio_Unitario']],
+                'productos' => [['FK', 'ID'], ['', 'Descripcion'], ['', 'Precio_Unitario'], ['', 'Stock']],
+            ]),
+            'relations' => $this->relations('1:N', '1:N', '1:N', '1:N'),
+        ];
+
+        $delgado = $this->grade($answer);
+        $ottinger = $this->grade($this->perfectAnswer());
+        $ottinger['breakdown']['keys']['earned'] = 4.5;
+
+        $this->assertLessThan(
+            4.5,
+            $delgado['breakdown']['keys']['earned'],
+            'Renaming every primary key should score below a single mislabelled cell.'
+        );
+        $this->assertLessThan(
+            $this->grade($this->perfectAnswer())['score'] * 0.8,
+            $delgado['score'],
+            'Systematic key errors should lose a large share of the marks.'
+        );
+    }
+
+    #[Test]
+    public function a_wrong_relation_cardinality_costs_one_unit(): void
+    {
+        // VENTURINI: marked Ventas -> Detalle as 1:1 when it is 1:N.
+        $answer = $this->perfectAnswer();
+        $answer['relations'][2]['type'] = '1:1';
+
+        $result = $this->grade($answer);
+
+        $this->assertSame(5.0, $result['breakdown']['distribution']['earned']);
+        $this->assertSame(5.0, $result['breakdown']['keys']['earned']);
+        $this->assertSame(3.0, $result['breakdown']['relations']['earned']);
+        $this->assertFalse($result['per_relation']['ventas_detalle']);
+        $this->assertTrue($result['per_relation']['cliente_ventas']);
+    }
+
+    #[Test]
+    public function a_blank_submission_scores_zero(): void
+    {
+        $result = $this->grade(['tables' => [], 'relations' => []]);
+
+        $this->assertSame(0.0, $result['score']);
+        $this->assertFalse($result['requires_manual']);
+    }
+
+    #[Test]
+    public function repeating_a_token_inside_one_table_does_not_double_count(): void
+    {
+        // The pool genuinely repeats "ID", so a table may legitimately hold it
+        // more than once; the comparison must stay a set comparison.
+        $answer = $this->perfectAnswer();
+        $answer['tables'][0]['columns'][] = ['type' => '', 'name' => 'ID'];
+
+        $result = $this->grade($answer);
+
+        $this->assertSame(10.0, $result['score']);
+    }
+
+    #[Test]
+    public function table_and_attribute_matching_ignores_case_and_padding(): void
+    {
+        $answer = $this->perfectAnswer();
+
+        foreach ($answer['tables'] as $index => $table) {
+            $answer['tables'][$index]['name'] = '  '.mb_strtoupper($table['name']).' ';
+            foreach ($table['columns'] as $columnIndex => $column) {
+                $answer['tables'][$index]['columns'][$columnIndex]['name'] = mb_strtolower($column['name']);
+            }
+        }
+
+        $this->assertSame(10.0, $this->grade($answer)['score']);
+    }
+
+    #[Test]
+    public function relations_are_matched_by_connector_so_the_origin_cannot_be_spoofed(): void
+    {
+        $answer = $this->perfectAnswer();
+        // A submission claiming clientes -> clientes must not satisfy any connector.
+        $answer['relations'][0] = ['clave' => 'cliente_ventas', 'type' => '1:N', 'from' => 'clientes', 'to' => 'clientes'];
+
+        $result = $this->grade($answer);
+
+        $this->assertTrue(
+            $result['per_relation']['cliente_ventas'],
+            'The connector is declared by the exercise; the answer only supplies its cardinality.'
+        );
+    }
+
+    #[Test]
+    public function an_extra_table_is_ignored_rather_than_credited(): void
+    {
+        $answer = $this->perfectAnswer();
+        $answer['tables'][] = ['name' => 'inventada', 'columns' => [['type' => 'PK', 'name' => 'ID']]];
+
+        $this->assertSame(10.0, $this->grade($answer)['score']);
+    }
+
+    #[Test]
+    public function a_table_missing_from_the_submission_scores_nothing(): void
+    {
+        $answer = $this->perfectAnswer();
+        array_splice($answer['tables'], 1, 1);
+
+        $result = $this->grade($answer);
+
+        $this->assertTrue($result['per_table']['empleados']['missing']);
+        $this->assertSame(4.0, $result['breakdown']['distribution']['earned']);
+        $this->assertSame(4.0, $result['breakdown']['keys']['earned']);
+    }
+
+    #[Test]
+    public function a_junction_table_without_a_primary_key_can_still_earn_full_marks(): void
+    {
+        // Charging for a pk unit the answer key never offers capped a perfect
+        // design below full marks.
+        $block = [
+            'id' => 'td', 'type' => 'table_design', 'points' => 10,
+            'relation_pairs' => [['clave' => 'p_d', 'from' => 'pedidos', 'to' => 'detalle']],
+            'answer_key' => [
+                'tables' => [
+                    ['name' => 'pedidos', 'columns' => ['ID'], 'pk' => 'ID', 'fks' => []],
+                    ['name' => 'detalle', 'columns' => ['ID_Pedido', 'ID_Articulo'], 'pk' => null, 'fks' => ['ID_Pedido', 'ID_Articulo']],
                 ],
-                [
-                    'name' => 'VENTAS',
-                    'columns' => [
-                        ['type' => 'PK', 'name' => 'ID'],
-                        ['type' => '', 'name' => 'Fecha'],
-                        ['type' => 'FK', 'name' => 'ID_Cliente'],
-                        ['type' => '', 'name' => 'Total'],
-                    ],
-                ],
-            ],
-            'relations' => [
-                ['from' => 'CLIENTES', 'to' => 'VENTAS', 'type' => '1:N'],
+                'relations' => [['clave' => 'p_d', 'type' => '1:N']],
             ],
         ];
+
+        $answer = [
+            'tables' => $this->tables([
+                'pedidos' => [['PK', 'ID']],
+                'detalle' => [['FK', 'ID_Pedido'], ['FK', 'ID_Articulo']],
+            ]),
+            'relations' => [['clave' => 'p_d', 'type' => '1:N']],
+        ];
+
+        $result = EvaluationContent::gradeTableDesignDetailed($block, $answer, 10.0);
+
+        $this->assertSame(10.0, $result['score']);
+        $this->assertNull($result['per_table']['detalle']['pk'], 'No pk is expected for the junction table.');
+    }
+
+    #[Test]
+    public function an_answer_key_without_column_detail_defers_to_manual_grading(): void
+    {
+        $legacy = [
+            'id' => 'td', 'type' => 'table_design', 'points' => 10,
+            'answer_key' => [
+                'tables' => [['name' => 'clientes'], ['name' => 'ventas']],
+                'relations' => [['clave' => 'c_v', 'type' => '1:N']],
+            ],
+        ];
+
+        $result = EvaluationContent::gradeTableDesignDetailed($legacy, [
+            'tables' => [['name' => 'clientes', 'columns' => []]],
+            'relations' => [],
+        ], 10.0);
+
+        $this->assertTrue(
+            $result['requires_manual'],
+            'A legacy answer key must not be auto-marked off table names alone.'
+        );
+    }
+
+    #[Test]
+    public function free_origin_destination_relations_still_grade(): void
+    {
+        // Content saved before connectors were declared.
+        $legacy = [
+            'id' => 'td', 'type' => 'table_design', 'points' => 4,
+            'answer_key' => [
+                'tables' => [['name' => 'ventas', 'columns' => ['ID'], 'pk' => 'ID', 'fks' => []]],
+                'relations' => [['from' => 'ventas', 'to' => 'detalle', 'type' => '1:N']],
+            ],
+        ];
+
+        $result = EvaluationContent::gradeTableDesignDetailed($legacy, [
+            'tables' => [['name' => 'ventas', 'columns' => [['type' => 'PK', 'name' => 'ID']]]],
+            'relations' => [['from' => 'ventas', 'to' => 'detalle', 'type' => '1:N']],
+        ], 4.0);
+
+        $this->assertSame(4.0, $result['score']);
+        $this->assertFalse($result['requires_manual']);
+    }
+
+    #[Test]
+    public function grade_block_keeps_the_flat_contract_for_the_grader(): void
+    {
+        $block = $this->salesBlock();
+
+        $result = EvaluationContent::gradeBlock($block, $this->perfectAnswer());
+
+        $this->assertSame(['score', 'requires_manual'], array_keys($result));
+        $this->assertSame(10.0, $result['score']);
     }
 }
