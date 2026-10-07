@@ -8,10 +8,11 @@ use App\Services\Evaluations\FinalGradeResolver;
 use App\Services\Evaluations\GradeSyncPreview;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
+use Livewire\WithPagination;
 use Mary\Traits\Toast;
 
 new class extends Component {
-    use Toast;
+    use Toast, WithPagination;
 
     public ?OnlineEvaluation $evaluation = null;
     public $isTeacher = false;
@@ -94,16 +95,27 @@ public function mount($id)
         ];
     }
 
+public function attemptHeaders(): array
+    {
+        return [
+            ['key' => 'user_id', 'label' => 'Estudiante'],
+            ['key' => 'attempt_number', 'label' => 'Intento'],
+            ['key' => 'status', 'label' => 'Estado'],
+            ['key' => 'submitted_at', 'label' => 'Entrega'],
+            ['key' => 'score', 'label' => 'Calificación'],
+        ];
+    }
+
     #[Computed]
     public function attempts()
     {
-        if (!$this->isTeacher) return collect();
+        if (! $this->isTeacher) return collect();
 
         return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
             ->with('user')
             ->orderBy('user_id')
             ->orderByDesc('attempt_number')
-            ->get();
+            ->paginate(20);
     }
 
     #[Computed]
@@ -480,50 +492,54 @@ public function mount($id)
             </div>
 
             <x-card title="Detalle de Intentos por Estudiante">
-                <div class="overflow-x-auto">
-                    <table class="table table-zebra w-full">
-                        <thead>
-                            <tr>
-                                <th>Estudiante</th>
-                                <th>Intento</th>
-                                <th>Estado</th>
-                                <th>Entrega</th>
-                                <th>Calificación</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($this->attempts as $attempt)
-                                <tr>
-                                    <td class="font-bold">{{ $attempt->user->fullname }}</td>
-                                    <td>{{ $attempt->attempt_number }}</td>
-                                    <td>
-                                        <div class="badge {{ $attempt->status_badge }}">{{ $attempt->status_label }}</div>
-                                    </td>
-                                    <td>{{ $attempt->submitted_at ? $attempt->submitted_at->format('d/m H:i') : '-' }}</td>
-                                    <td>
-                                        @if($attempt->isFinished())
-                                            <span class="font-bold text-lg {{ $attempt->score >= $evaluation->passing_score ? 'text-success' : 'text-error' }}">
-                                                {{ $attempt->score }}
-                                            </span>
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($attempt->isFinished())
-                                            <x-button icon="o-pencil-square" class="btn-sm btn-ghost" wire:click="openGrading({{ $attempt->id }})" tooltip="Corregir" />
-                                        @endif
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="text-center py-4">No hay intentos registrados.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                <x-table :headers="$this->attemptHeaders()" :rows="$this->attempts" with-pagination>
+                    @scope('cell_user_id', $attempt)
+                        <span class="font-bold">{{ $attempt->user->fullname }}</span>
+                    @endscope
+
+                    @scope('cell_attempt_number', $attempt)
+                        {{ $attempt->attempt_number }}
+                    @endscope
+
+                    @scope('cell_status', $attempt)
+                        <div class="badge {{ $attempt->status_badge }}">{{ $attempt->status_label }}</div>
+                    @endscope
+
+                    @scope('cell_submitted_at', $attempt)
+                        {{ $attempt->submitted_at ? $attempt->submitted_at->format('d/m H:i') : '—' }}
+                    @endscope
+
+                    @scope('cell_score', $attempt)
+                        @if($attempt->isFinished())
+                            <span class="font-bold text-lg {{ $attempt->score >= $this->evaluation->passing_score ? 'text-success' : 'text-error' }}">
+                                {{ number_format((float) $attempt->score, 2) }}
+                            </span>
+                        @else
+                            <span class="text-base-content/50">—</span>
+                        @endif
+                    @endscope
+
+                    @scope('actions', $attempt)
+                        @if($attempt->isFinished())
+                            <x-button
+                                icon="o-pencil-square"
+                                class="btn-sm btn-ghost"
+                                wire:click="openGrading({{ $attempt->id }})"
+                                tooltip="Corregir"
+                            />
+                        @endif
+                    @endscope
+
+                    <x-slot:empty>
+                        <div class="text-center py-8">
+                            <x-icon name="o-inbox" class="w-12 h-12 mx-auto text-base-300 mb-3" />
+                            <p class="font-semibold">Todavía no hay intentos</p>
+                            <p class="text-sm text-base-content/70 mt-1">
+                                Los intentos de los alumnos van a aparecer acá apenas entregaren.
+                            </p>
+                        </div>
+                    </x-slot:empty>
+                </x-table>
             </x-card>
         @endif
     @else
@@ -557,7 +573,7 @@ public function mount($id)
 
                 @if($evaluation->max_attempts > 0 && $attempts->count() < $evaluation->max_attempts)
                     <div class="mb-8">
-                        <x-button label="Realizar nuevo intento" icon="o-play" link="{{ route('evaluations.take', ['id' => $evaluation->id]) }}" class="btn-primary w-full" />
+                        <x-button label="Realizar nuevo intento" icon="o-play" link="{{ route('evaluations.take', $evaluation->id) }}" class="btn-primary w-full" />
                         <p class="text-xs text-center mt-2 text-base-content/70">Intentos disponibles: {{ $evaluation->max_attempts - $attempts->count() }}</p>
                     </div>
                 @endif
@@ -577,7 +593,7 @@ public function mount($id)
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($attempts as $attempt)
+                                @forelse($attempts as $attempt)
                                     <tr>
                                         <td class="font-bold">{{ $attempt->attempt_number }}</td>
                                         <td>{{ $attempt->submitted_at ? $attempt->submitted_at->format('d/m/Y H:i') : '-' }}</td>
@@ -612,7 +628,13 @@ public function mount($id)
                                             @endif
                                         </td>
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center py-8 text-base-content/60">
+                                            Todavía no entregaste esta evaluación.
+                                        </td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>

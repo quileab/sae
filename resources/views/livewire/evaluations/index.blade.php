@@ -25,6 +25,8 @@ new class extends Component {
 
     public $showFilters = false;
 
+    public array $sortBy = ['column' => 'created_at', 'direction' => 'desc'];
+
     public function mount()
     {
         $user = auth()->user();
@@ -63,6 +65,17 @@ new class extends Component {
         $this->resetPage();
     }
 
+    public function sort(string $column): void
+    {
+        $direction = ($this->sortBy['column'] ?? null) === $column && $this->sortBy['direction'] === 'asc'
+            ? 'desc'
+            : 'asc';
+
+        $this->sortBy = ['column' => $column, 'direction' => $direction];
+
+        $this->resetPage();
+    }
+
     #[Computed]
     public function evaluations()
     {
@@ -77,8 +90,19 @@ new class extends Component {
         return OnlineEvaluation::where('subject_id', $this->subject_id)
             ->manageableBy(auth()->user())
             ->with(['teacher', 'classSession'])
-            ->orderByDesc('created_at')
-            ->get();
+            ->orderBy($this->sortBy['column'] ?? 'created_at', $this->sortBy['direction'] ?? 'desc')
+            ->paginate(15);
+    }
+
+    public function headers(): array
+    {
+        return [
+            ['key' => 'title', 'label' => 'Título', 'sortable' => true],
+            ['key' => 'status', 'label' => 'Estado'],
+            ['key' => 'ends_at', 'label' => 'Fecha Límite', 'sortable' => true],
+            ['key' => 'class_session_id', 'label' => 'Clase (Libro)'],
+            ['key' => 'duration_minutes', 'label' => 'Duración', 'sortable' => true],
+        ];
     }
 
     /**
@@ -301,57 +325,59 @@ new class extends Component {
                         <x-button icon="o-plus" label="Crear la primera evaluación" link="{{ route('evaluations.create', ['subject_id' => $subject_id]) }}" class="btn-primary mt-4" />
                     </div>
                 @else
-                    <div class="overflow-x-auto">
-                        <table class="table table-zebra w-full">
-                            <thead>
-                                <tr>
-                                    <th>Título</th>
-                                    <th>Estado</th>
-                                    <th>Fecha Límite</th>
-                                    <th>Clase (Libro)</th>
-                                    <th>Duración</th>
-                                    <th class="text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($this->evaluations as $eval)
-                                    <tr wire:key="eval-row-{{ $eval->id }}">
-                                        <td>
-                                            <div class="font-bold">{{ $eval->title }}</div>
-                                            <div class="text-xs opacity-70">Creada por {{ $eval->teacher->fullname }}</div>
-                                        </td>
-                                        <td>
-                                            <div class="badge {{ $eval->status_badge }}">{{ $eval->status_label }}</div>
-                                        </td>
-                                        <td>
-                                            @if($eval->ends_at)
-                                                {{ $eval->ends_at->format('d/m/Y H:i') }}
-                                                @if($eval->ends_at->isPast())
-                                                    <div class="text-xs opacity-60">vencida</div>
-                                                @endif
-                                            @else
-                                                <span class="text-base-content/50">Sin límite</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            @if($eval->classSession)
-                                                <span class="text-sm">Clase #{{ $eval->classSession->class_number }} ({{ $eval->classSession->date->format('d/m/Y') }})</span>
-                                            @else
-                                                <span class="text-base-content/50 italic">No vinculada</span>
-                                            @endif
-                                        </td>
-                                        <td>{{ $eval->duration_minutes }} min</td>
-                                        <td class="text-right">
-                                            <x-button icon="o-eye" link="{{ route('evaluations.take', $eval->id) }}" class="btn-sm btn-ghost text-info" tooltip="Vista Previa" />
-                                            <x-button icon="o-chart-bar" link="{{ route('evaluations.results', $eval->id) }}" class="btn-sm btn-ghost text-success" tooltip="Ver Resultados" />
-                                            <x-button icon="o-pencil" link="{{ route('evaluations.edit', $eval->id) }}" class="btn-sm btn-ghost" tooltip="Editar" />
-                                            <x-button icon="o-trash" wire:click="deleteEvaluation({{ $eval->id }})" wire:confirm="¿Eliminar esta evaluación?" class="btn-sm btn-ghost text-error" tooltip="Eliminar" />
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    <x-table
+                        :headers="$this->headers()"
+                        :rows="$this->evaluations"
+                        :sort-by="$sortBy"
+                        with-pagination
+                    >
+                        @scope('cell_title', $eval)
+                            <div class="font-bold">{{ $eval->title }}</div>
+                            <div class="text-xs opacity-70">Creada por {{ $eval->teacher->fullname }}</div>
+                        @endscope
+
+                        @scope('cell_status', $eval)
+                            <div class="badge {{ $eval->status_badge }}">{{ $eval->status_label }}</div>
+                        @endscope
+
+                        @scope('cell_ends_at', $eval)
+                            @if($eval->ends_at)
+                                <div>{{ $eval->ends_at->format('d/m/Y H:i') }}</div>
+                                @if($eval->ends_at->isPast())
+                                    <div class="text-xs text-error">vencida</div>
+                                @endif
+                            @else
+                                <span class="text-base-content/50">Sin límite</span>
+                            @endif
+                        @endscope
+
+                        @scope('cell_class_session_id', $eval)
+                            @if($eval->classSession)
+                                <span class="text-sm">Clase #{{ $eval->classSession->class_number }} ({{ $eval->classSession->date->format('d/m/Y') }})</span>
+                            @else
+                                <span class="text-base-content/50 italic">No vinculada</span>
+                            @endif
+                        @endscope
+
+                        @scope('cell_duration_minutes', $eval)
+                            {{ $eval->duration_minutes }} min
+                        @endscope
+
+                        @scope('actions', $eval)
+                            <div class="flex gap-1 justify-end">
+                                <x-button icon="o-eye" link="{{ route('evaluations.take', $eval->id) }}" class="btn-sm btn-ghost text-info" tooltip="Vista previa" />
+                                <x-button icon="o-chart-bar" link="{{ route('evaluations.results', $eval->id) }}" class="btn-sm btn-ghost text-success" tooltip="Resultados" />
+                                <x-button icon="o-pencil" link="{{ route('evaluations.edit', $eval->id) }}" class="btn-sm btn-ghost" tooltip="Editar" />
+                                <x-button
+                                    icon="o-trash"
+                                    wire:click="deleteEvaluation({{ $eval->id }})"
+                                    wire:confirm="¿Eliminar esta evaluación? No se puede deshacer."
+                                    class="btn-sm btn-ghost text-error"
+                                    tooltip="Eliminar"
+                                />
+                            </div>
+                        @endscope
+                    </x-table>
                 @endif
             </x-card>
         @endif
