@@ -190,6 +190,10 @@ final class Rubric
                 $levels[(string) $score] = trim((string) $description);
             }
 
+            // A JSON column does not preserve key order, so levels come back from
+            // the database shuffled. Sort by score to keep them readable.
+            uksort($levels, fn (string $a, string $b) => (float) $a <=> (float) $b ?: strcmp($a, $b));
+
             $criteria[] = [
                 'key' => $key,
                 'label' => trim((string) $criterion['label']),
