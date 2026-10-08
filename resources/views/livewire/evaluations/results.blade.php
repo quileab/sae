@@ -875,23 +875,23 @@ public function attemptHeaders(): array
                 <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="closeAssist" />
             </x-slot:menu>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {{-- Panel A: generate --}}
-                <div class="space-y-4">
+            <div class="space-y-6">
+                {{-- Row 1: generate --}}
+                <section class="space-y-4">
                     <h4 class="font-bold flex items-center gap-2">
                         <span class="badge badge-primary badge-sm">1</span>
                         Generá el archivo
                     </h4>
 
-                    <x-select
-                        label="Pregunta"
-                        wire:model.live="assistBlockId"
-                        :options="$this->assistBlockOptions()"
-                        option-value="id"
-                        option-label="name"
-                    />
-
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <x-select
+                            label="Pregunta"
+                            wire:model.live="assistBlockId"
+                            :options="$this->assistBlockOptions()"
+                            option-value="id"
+                            option-label="name"
+                            class="w-full sm:w-96"
+                        />
                         <x-select
                             label="Qué pedirle al asistente"
                             wire:model.live="assistMode"
@@ -901,22 +901,24 @@ public function attemptHeaders(): array
                             ]"
                             option-value="id"
                             option-label="alias"
+                            class="w-full sm:w-72"
                         />
-                        <label class="label cursor-pointer justify-start gap-3 mt-6">
+                        <label class="label cursor-pointer justify-start gap-2 pb-1">
                             <input type="checkbox" wire:model.live="assistAnonymize" class="checkbox checkbox-sm checkbox-primary" />
                             <span class="label-text text-sm">Anonimizar</span>
+                            @if($assistAnonymize)
+                                <x-notice
+                                    variant="info"
+                                    text="Los nombres quedan fuera del archivo: vas a ver un código en lugar de quién es cada alumno."
+                                />
+                            @else
+                                <x-notice
+                                    variant="danger"
+                                    text="El archivo sale de la aplicación hacia un modelo externo con los nombres de los alumnos. Si eso no está permitido, activá anonimizar."
+                                />
+                            @endif
                         </label>
                     </div>
-
-                    @if($assistAnonymize)
-                        <x-alert icon="o-eye-slash" class="alert-info py-2 text-xs">
-                            Los nombres quedan fuera del archivo. Vas a ver <code>{{ str_pad((string) $this->assistPendingCount(), 5, '0', STR_PAD_LEFT) }}</code> en lugar de quién es cada alumno.
-                        </x-alert>
-                    @else
-                        <x-alert icon="o-exclamation-triangle" class="alert-warning py-2 text-xs">
-                            El archivo sale de la aplicación y va a un modelo externo, <strong>con los nombres de los alumnos</strong>. Si eso no está permitido, activá anonimizar.
-                        </x-alert>
-                    @endif
 
                     <x-button
                         label="Generar"
@@ -927,26 +929,38 @@ public function attemptHeaders(): array
                     />
 
                     @if($assistMarkdown !== null)
-                        <div class="stats stats-vertical sm:stats-horizontal bg-base-200 w-full">
-                            <div class="stat py-2">
-                                <div class="stat-title text-xs">Intentos</div>
-                                <div class="stat-value text-lg">{{ $assistSummary['attempts'] }}</div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="stats stats-horizontal bg-base-200">
+                                <div class="stat py-2 px-4">
+                                    <div class="stat-title text-xs">Intentos</div>
+                                    <div class="stat-value text-lg">{{ $assistSummary['attempts'] }}</div>
+                                </div>
+                                <div class="stat py-2 px-4">
+                                    <div class="stat-title text-xs">Preguntas</div>
+                                    <div class="stat-value text-lg">{{ $assistSummary['blocks'] }}</div>
+                                </div>
+                                <div class="stat py-2 px-4">
+                                    <div class="stat-title text-xs">Tamaño</div>
+                                    <div class="stat-value text-lg">{{ $assistSummary['kb'] }}<span class="text-xs ml-1">KB</span></div>
+                                </div>
                             </div>
-                            <div class="stat py-2">
-                                <div class="stat-title text-xs">Preguntas</div>
-                                <div class="stat-value text-lg">{{ $assistSummary['blocks'] }}</div>
-                            </div>
-                            <div class="stat py-2">
-                                <div class="stat-title text-xs">Tamaño</div>
-                                <div class="stat-value text-lg">{{ $assistSummary['kb'] }}<span class="text-xs ml-1">KB</span></div>
-                            </div>
-                        </div>
 
-                        @unless($assistSummary['has_rubric'])
-                            <x-alert icon="o-light-bulb" class="alert-warning py-2 text-xs">
-                                La pregunta elegida no tiene rúbrica. Conviene pedirla primero en modo <em>Solo redactar la rúbrica</em>.
-                            </x-alert>
-                        @endunless
+                            @unless($assistSummary['has_rubric'])
+                                <x-notice
+                                    variant="warning"
+                                    text="La pregunta elegida todavía no tiene rúbrica. Conviene pedirla primero en modo «Solo redactar la rúbrica»."
+                                />
+                            @endunless
+
+                            <details class="text-xs">
+                                <summary class="cursor-pointer text-base-content/70">Cómo usarlo</summary>
+                                <ol class="list-decimal list-inside space-y-1 mt-2 text-base-content/70">
+                                    <li>Copiá el markdown y pegalo en tu asistente.</li>
+                                    <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown.</li>
+                                    <li>Volvé a la sección 2 y pegá la respuesta.</li>
+                                </ol>
+                            </details>
+                        </div>
 
                         {{-- Not bound with wire:model on purpose: copying happens in
                              the browser and the payload is large. --}}
@@ -981,28 +995,21 @@ public function attemptHeaders(): array
                                 wire:click="downloadAssistMarkdown"
                             />
                         </div>
-
-                        <details class="text-xs">
-                            <summary class="cursor-pointer text-base-content/70">Cómo usarlo</summary>
-                            <ol class="list-decimal list-inside space-y-1 mt-2 text-base-content/70">
-                                <li>Copiá el markdown y pegalo en tu asistente.</li>
-                                <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque <code>```markdown</code>.</li>
-                                <li>Volvé acá, pegá la respuesta en el panel 2 y revisá.</li>
-                            </ol>
-                        </details>
                     @endif
-                </div>
+                </section>
 
-                {{-- Panel B: paste and review --}}
-                <div class="space-y-4">
+                <div class="border-t border-base-300"></div>
+
+                {{-- Row 2: paste and review --}}
+                <section class="space-y-4">
                     <h4 class="font-bold flex items-center gap-2">
                         <span class="badge badge-primary badge-sm">2</span>
                         Pegá y revisá
+                        <x-notice
+                            variant="info"
+                            text="Nada se guarda todavía: esto solo te muestra qué se leería. Las notas las aprobás vos, una por una."
+                        />
                     </h4>
-
-                    <x-alert icon="o-information-circle" class="alert-info py-2 text-xs">
-                        Nada se guarda todavía: esto solo te muestra qué se leería. Las notas las aprobás vos, una por una.
-                    </x-alert>
 
                     <x-textarea
                         wire:model="assistPasted"
@@ -1012,7 +1019,7 @@ public function attemptHeaders(): array
                         class="font-mono text-xs"
                     />
 
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <x-button
                             label="Revisar"
                             icon="o-magnifying-glass"
@@ -1029,6 +1036,10 @@ public function attemptHeaders(): array
                                 wire:click="applyPastedRubric"
                                 spinner="applyPastedRubric"
                             />
+                            <x-notice
+                                variant="warning"
+                                text="La rúbrica pasa a ser la referencia de toda la evaluación. Guardala solo si la leíste y te sirve: después todas las correcciones se miden contra ella."
+                            />
                         @endif
 
                         @if($assistMarkRows > 0)
@@ -1041,12 +1052,6 @@ public function attemptHeaders(): array
                             />
                         @endif
                     </div>
-
-                    @if($assistRubricRows > 0)
-                        <x-alert icon="o-light-bulb" class="alert-warning py-2 text-xs">
-                            La rúbrica pasa a ser la referencia de toda la evaluación. Guardala solo si la leíste y te sirve: después todas las correcciones se miden contra ella.
-                        </x-alert>
-                    @endif
 
                     @if($assistErrors !== [])
                         <div class="alert alert-error py-2 text-xs">
@@ -1136,10 +1141,8 @@ public function attemptHeaders(): array
                             {{ $broken }} con problemas
                         </div>
                     @endif
-                </div>
+                </section>
             </div>
-
-
         </x-card>
     @endif
 
