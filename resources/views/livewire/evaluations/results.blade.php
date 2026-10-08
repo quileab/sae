@@ -877,12 +877,7 @@ public function attemptHeaders(): array
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {{-- Panel A: generate --}}
-                <div
-                    class="space-y-4"
-                    x-data="{ copied: false, copyFailed: false }"
-                    x-on:assist-copied-ok="copied = true; copyFailed = false; setTimeout(() => copied = false, 2500)"
-                    x-on:assist-copy-failed="copyFailed = true; copied = false"
-                >
+                <div class="space-y-4">
                     <h4 class="font-bold flex items-center gap-2">
                         <span class="badge badge-primary badge-sm">1</span>
                         Generá el archivo
@@ -964,14 +959,19 @@ public function attemptHeaders(): array
                         >{{ $assistMarkdown }}</textarea>
 
                         <div class="flex flex-wrap items-center gap-2">
+                            {{-- data-assist-copy is handled by resources/js/assist-grading.js
+                                 through event delegation, so it works on first paint
+                                 and survives any re-render. --}}
                             <x-button
                                 label="Copiar"
                                 icon="o-clipboard-document"
                                 class="btn-sm btn-primary"
-                                x-on:click="copyAssistMarkdown($el)"
+                                data-assist-copy
                             />
-                            <span x-show="copied" x-cloak class="text-success text-xs font-semibold">¡Copiado!</span>
-                            <span x-show="copyFailed" x-cloak class="text-error text-xs">
+                            <span data-assist-feedback="copied" class="hidden text-success text-xs font-semibold">
+                                ¡Copiado!
+                            </span>
+                            <span data-assist-feedback="failed" class="hidden text-error text-xs">
                                 No se pudo copiar: el texto quedó seleccionado, copialo con Ctrl+C.
                             </span>
                             <x-button
@@ -1139,41 +1139,7 @@ public function attemptHeaders(): array
                 </div>
             </div>
 
-            <script>
-                // Copying never goes through Livewire: a full cohort runs to
-                // hundreds of kilobytes and the confirmation is local anyway.
-                window.copyAssistMarkdown = (trigger) => {
-                    const field = document.getElementById('assist-markdown');
-                    if (!field) return;
 
-                    field.removeAttribute('readonly');
-                    field.select();
-                    field.setSelectionRange(0, field.value.length);
-
-                    const signal = (name) => trigger.dispatchEvent(
-                        new CustomEvent(name, { bubbles: true })
-                    );
-
-                    if (navigator.clipboard && window.isSecureContext) {
-                        navigator.clipboard.writeText(field.value)
-                            .then(() => signal('assist-copied-ok'))
-                            .catch(() => legacyCopy(field, signal));
-                    } else {
-                        legacyCopy(field, signal);
-                    }
-                };
-
-                const legacyCopy = (field, signal) => {
-                    try {
-                        document.execCommand('copy');
-                        signal('assist-copied-ok');
-                    } catch (error) {
-                        // Nothing left to try. The text is selected and the
-                        // textarea is editable so it can be copied by hand.
-                        signal('assist-copy-failed');
-                    }
-                };
-            </script>
         </x-card>
     @endif
 
