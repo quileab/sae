@@ -6,6 +6,10 @@ use App\Models\Grade;
 use App\Services\Evaluations\AttemptGrader;
 use App\Services\Evaluations\FinalGradeResolver;
 use App\Services\Evaluations\GradeSyncPreview;
+use App\Services\Evaluations\GradingFileBuilder;
+use App\Services\Evaluations\GradingFileParser;
+use App\Services\Evaluations\Rubric;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
@@ -27,6 +31,19 @@ new class extends Component {
     public $showSyncModal = false;
     public $syncPreview = [];
     public $syncUserIds = [];
+
+    // Assisted grading state. The markdown is never bound with wire:model: a
+    // full cohort runs to hundreds of kilobytes.
+    public $showAssistModal = false;
+    public $assistMode = 'grading';
+    public $assistAnonymize = false;
+    public $assistBlockId = null;
+    public $assistMarkdown = null;
+    public $assistSummary = [];
+    public $assistPasted = null;
+    public $assistPreview = [];
+    public $assistErrors = [];
+    public $assistWarnings = [];
 
 public function mount($id)
     {
@@ -216,6 +233,284 @@ public function attemptHeaders(): array
         $this->showSyncModal = true;
     }
 
+    /**
+     * Open the assisted grading dialog.
+     *
+     * The markdown is deliberately not built here: with a full cohort the file
+     * runs to hundreds of kilobytes and most teachers never open the dialog.
+     */
+    public function openAssist()
+    {
+        $this->authorize('exportGrading', $this->evaluation);
+
+        $this->assistMode = GradingFileBuilder::MODE_GRADING;
+        $this->assistAnonymize = false;
+        $this->assistBlockId = $this->firstBlockWithoutRubric();
+        $this->reset(['assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview', 'assistErrors', 'assistWarnings']);
+        $this->showAssistModal = true;
+    }
+
+    public function buildAssistMarkdown()
+    {
+        $this->authorize('exportGrading', $this->evaluation);
+
+        $attempts = $this->assistAttempts();
+
+        if ($attempts->isEmpty()) {
+            $this->error('No hay intentos esperando corrección.');
+
+            return;
+        }
+
+        $builder = new GradingFileBuilder(
+            evaluation: $this->evaluation,
+            attempts: $attempts,
+            mode: $this->assistMode,
+            anonymize: (bool) $this->assistAnonymize,
+            blockId: $this->assistBlockId ?: null,
+        );
+
+        $markdown = $builder->build();
+
+        $this->assistMarkdown = $markdown;
+        $this->assistSummary = [
+            'attempts' => $attempts->count(),
+            // Counted by the builder itself, so the summary can never claim a
+            // question the file does not carry.
+            'blocks' => count($builder->gradableBlocks()),
+            'kb' => round(strlen($markdown) / 1024, 1),
+            'has_rubric' => $this->assistHasRubric(),
+        ];
+
+        // Anything already pasted referred to a different file.
+        if ($this->assistPasted !== null) {
+            $this->assistPasted = null;
+            $this->assistPreview = [];
+        }
+    }
+
+    public function downloadAssistMarkdown()
+    {
+        $this->authorize('exportGrading', $this->evaluation);
+
+        if ($this->assistMarkdown === null) {
+            $this->error('Primero generá el archivo.');
+
+            return;
+        }
+
+        $markdown = $this->assistMarkdown;
+
+        return response()->streamDownload(function () use ($markdown) {
+            echo $markdown;
+        }, GradingFileBuilder::filename($this->evaluation), ['Content-Type' => 'text/markdown; charset=utf-8']);
+    }
+
+    /**
+     * Parse what was pasted and check it against the cohort. Writes nothing: the
+     * rows only become suggestions once a teacher accepts them.
+     */
+    public function reviewPasted()
+    {
+        $this->authorize('exportGrading', $this->evaluation);
+
+        $parsed = GradingFileParser::parse((string) $this->assistPasted);
+        $messages = $parsed->errorMessages();
+
+        if ($parsed->evaluationId() !== null && $parsed->evaluationId() !== $this->evaluation->id) {
+            $messages[] = sprintf(
+                'El archivo dice ser de la evaluación %d, no de la %d.',
+                $parsed->evaluationId(),
+                $this->evaluation->id,
+            );
+        }
+
+        $attempts = $this->assistAttempts()->keyBy('id');
+        $rows = [];
+
+        foreach ($parsed->markRows as $index => $mark) {
+            $attempt = $attempts->get((int) $mark['ref']);
+            $blockPoints = (float) ($this->assistBlock($mark['block'])['points'] ?? 0);
+
+            $status = 'ok';
+            $detail = '';
+
+            if ($attempt === null) {
+                $status = 'desconocido';
+                $detail = 'No hay ningún intento con ese ref en esta evaluación.';
+            } elseif (! array_key_exists($mark['block'], $this->assistBlocks())) {
+                $status = 'error';
+                $detail = 'La pregunta no existe.';
+            } elseif ($mark['points'] < 0 || $mark['points'] > $blockPoints) {
+                $status = 'error';
+                $detail = sprintf('Fuera de rango: la pregunta vale %.2f.', $blockPoints);
+            } elseif ($this->alreadyMarked($attempt, $mark['block'])) {
+                $status = 'sobrescribe';
+                $detail = 'Ya tiene una nota cargada a mano.';
+            }
+
+            $rows[] = [
+                'line' => $index + 1,
+                'ref' => $mark['ref'],
+                'student' => $attempt?->user?->fullname ?? '—',
+                'block' => $mark['block'],
+                'key' => $mark['key'] ?? '—',
+                'points' => $mark['points'],
+                'max' => $blockPoints,
+                'flags' => array_map(fn ($flag) => $flag->value, $mark['flags']),
+                'justification' => $mark['justification'],
+                'status' => $status,
+                'detail' => $detail,
+            ];
+        }
+
+        $this->assistErrors = $messages;
+        $this->assistWarnings = array_column($parsed->warnings, 'message');
+        $this->assistPreview = $rows;
+
+        if ($rows === []) {
+            $this->warning('No se encontró ninguna nota para revisar.');
+        }
+    }
+
+    /**
+     * Editing after a review invalidates it: the rows on screen describe an older
+     * text.
+     */
+    public function updatedAssistPasted()
+    {
+        if ($this->assistPreview !== [] || $this->assistErrors !== []) {
+            $this->assistPreview = [];
+            $this->assistErrors = [];
+        }
+    }
+
+    public function closeAssist()
+    {
+        $this->reset([
+            'showAssistModal', 'assistMarkdown', 'assistSummary', 'assistPasted',
+            'assistPreview', 'assistErrors', 'assistWarnings', 'assistBlockId',
+        ]);
+    }
+
+    #[Computed]
+    public function assistBlockOptions(): array
+    {
+        $rubrics = Rubric::snapshotFor($this->assistContent());
+
+        // MaryUI reads `id` / `name` out of each option, so this has to be a
+        // list of rows rather than a keyed array.
+        return collect($this->assistBlocks())
+            ->map(fn (array $block, string $id) => [
+                'id' => $id,
+                'name' => sprintf(
+                    '%s — %s pts%s',
+                    $id,
+                    rtrim(rtrim(number_format((float) ($block['points'] ?? 0), 2, ',', ''), '0'), ',') ?: '0',
+                    array_key_exists($id, $rubrics) ? '' : ' — sin rúbrica',
+                ),
+            ])
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
+    public function assistPendingCount(): int
+    {
+        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+            ->count();
+    }
+
+    /**
+ * Whether a block already carries a mark a teacher entered.
+ *
+ * A stored zero is not treated as a mark: every open_text block is stored as zero
+ * by the auto-grader, so only a positive score, or a finished attempt, means there
+ * is something real to overwrite.
+ */
+    private function alreadyMarked(EvaluationAttempt $attempt, string $block): bool
+    {
+        if ($attempt->status !== \App\Enums\AttemptStatus::Submitted) {
+            return true;
+        }
+
+        return (float) ($attempt->block_scores[$block] ?? 0) > 0;
+    }
+
+    private function assistAttempts()
+    {
+        return EvaluationAttempt::with('user')
+            ->where('online_evaluation_id', $this->evaluation->id)
+            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function assistBlocks(): array
+    {
+        return GradingFileBuilder::gradableBlocksIn($this->assistContent());
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function assistBlock(string $id): ?array
+    {
+        return $this->assistBlocks()[$id] ?? null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function assistContent(): array
+    {
+        return $this->assistSourceSnapshot() ?? $this->evaluation->content ?? [];
+    }
+
+    /**
+     * The export describes the questions students were served, not the current
+     * content, so it reads the snapshot of the cohort it will send.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function assistSourceSnapshot(): ?array
+    {
+        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+            ->whereNotNull('content_snapshot')
+            ->orderBy('id')
+            ->value('content_snapshot');
+    }
+
+    private function assistHasRubric(): bool
+    {
+        $blocks = $this->assistBlockId ? [$this->assistBlockId => true] : $this->assistBlocks();
+        $rubrics = Rubric::snapshotFor($this->assistContent());
+
+        return array_intersect_key($rubrics, $blocks) !== [];
+    }
+
+    /**
+     * Drafting the rubric for a question that has none is the next thing worth
+     * doing, so that is what the dialog opens on.
+     */
+    private function firstBlockWithoutRubric(): ?string
+    {
+        $rubrics = Rubric::snapshotFor($this->assistContent());
+
+        foreach ($this->assistBlocks() as $id => $block) {
+            if (! array_key_exists($id, $rubrics)) {
+                return $id;
+            }
+        }
+
+        return array_key_first($this->assistBlocks());
+    }
+
     public function closeSyncPreview()
     {
         $this->reset(['syncPreview', 'syncUserIds', 'showSyncModal']);
@@ -306,6 +601,15 @@ public function attemptHeaders(): array
         <div class="flex flex-wrap gap-2">
             @if($this->isTeacher)
                 <x-button label="Volver a la Clase" icon="o-arrow-left" link="/class-sessions" class="btn-ghost" />
+                @if($this->assistPendingCount() > 0)
+                    <x-button
+                        label="Corrección asistida · {{ $this->assistPendingCount() }}"
+                        icon="o-cursor-arrow-rays"
+                        class="btn-secondary"
+                        wire:click="openAssist"
+                        spinner="openAssist"
+                    />
+                @endif
                 @if($evaluation->class_session_id)
                     <x-button
                         label="Sincronizar Notas"
@@ -320,6 +624,286 @@ public function attemptHeaders(): array
             @endif
         </div>
     </div>
+
+    @if($showAssistModal)
+        <x-card title="Corrección asistida" class="mb-8 border-primary">
+            <x-slot:menu>
+                <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="closeAssist" />
+            </x-slot:menu>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {{-- Panel A: generate --}}
+                <div
+                    class="space-y-4"
+                    x-data="{ copied: false, copyFailed: false }"
+                    x-on:assist-copied-ok="copied = true; copyFailed = false; setTimeout(() => copied = false, 2500)"
+                    x-on:assist-copy-failed="copyFailed = true; copied = false"
+                >
+                    <h4 class="font-bold flex items-center gap-2">
+                        <span class="badge badge-primary badge-sm">1</span>
+                        Generá el archivo
+                    </h4>
+
+                    <x-select
+                        label="Pregunta"
+                        wire:model.live="assistBlockId"
+                        :options="$this->assistBlockOptions()"
+                        option-value="id"
+                        option-label="name"
+                    />
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <x-select
+                            label="Qué pedirle al asistente"
+                            wire:model.live="assistMode"
+                            :options="[
+                                ['id' => 'grading', 'alias' => 'Rúbrica vigente + notas'],
+                                ['id' => 'rubric', 'alias' => 'Solo redactar la rúbrica'],
+                            ]"
+                            option-value="id"
+                            option-label="alias"
+                        />
+                        <label class="label cursor-pointer justify-start gap-3 mt-6">
+                            <input type="checkbox" wire:model.live="assistAnonymize" class="checkbox checkbox-sm checkbox-primary" />
+                            <span class="label-text text-sm">Anonimizar</span>
+                        </label>
+                    </div>
+
+                    @if($assistAnonymize)
+                        <x-alert icon="o-eye-slash" class="alert-info py-2 text-xs">
+                            Los nombres quedan fuera del archivo. Vas a ver <code>{{ str_pad((string) $this->assistPendingCount(), 5, '0', STR_PAD_LEFT) }}</code> en lugar de quién es cada alumno.
+                        </x-alert>
+                    @else
+                        <x-alert icon="o-exclamation-triangle" class="alert-warning py-2 text-xs">
+                            El archivo sale de la aplicación y va a un modelo externo, <strong>con los nombres de los alumnos</strong>. Si eso no está permitido, activá anonimizar.
+                        </x-alert>
+                    @endif
+
+                    <x-button
+                        label="Generar"
+                        icon="o-bolt"
+                        class="btn-primary btn-sm"
+                        wire:click="buildAssistMarkdown"
+                        spinner="buildAssistMarkdown"
+                    />
+
+                    @if($assistMarkdown !== null)
+                        <div class="stats stats-vertical sm:stats-horizontal bg-base-200 w-full">
+                            <div class="stat py-2">
+                                <div class="stat-title text-xs">Intentos</div>
+                                <div class="stat-value text-lg">{{ $assistSummary['attempts'] }}</div>
+                            </div>
+                            <div class="stat py-2">
+                                <div class="stat-title text-xs">Preguntas</div>
+                                <div class="stat-value text-lg">{{ $assistSummary['blocks'] }}</div>
+                            </div>
+                            <div class="stat py-2">
+                                <div class="stat-title text-xs">Tamaño</div>
+                                <div class="stat-value text-lg">{{ $assistSummary['kb'] }}<span class="text-xs ml-1">KB</span></div>
+                            </div>
+                        </div>
+
+                        @unless($assistSummary['has_rubric'])
+                            <x-alert icon="o-light-bulb" class="alert-warning py-2 text-xs">
+                                La pregunta elegida no tiene rúbrica. Conviene pedirla primero en modo <em>Solo redactar la rúbrica</em>.
+                            </x-alert>
+                        @endunless
+
+                        {{-- Not bound with wire:model on purpose: copying happens in
+                             the browser and the payload is large. --}}
+                        <textarea
+                            id="assist-markdown"
+                            readonly
+                            rows="10"
+                            class="textarea textarea-bordered w-full font-mono text-xs"
+                            style="white-space: pre; overflow-x: auto;"
+                        >{{ $assistMarkdown }}</textarea>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <x-button
+                                label="Copiar"
+                                icon="o-clipboard-document"
+                                class="btn-sm btn-primary"
+                                x-on:click="copyAssistMarkdown($el)"
+                            />
+                            <span x-show="copied" x-cloak class="text-success text-xs font-semibold">¡Copiado!</span>
+                            <span x-show="copyFailed" x-cloak class="text-error text-xs">
+                                No se pudo copiar: el texto quedó seleccionado, copialo con Ctrl+C.
+                            </span>
+                            <x-button
+                                label="Descargar .md"
+                                icon="o-arrow-down-tray"
+                                class="btn-sm btn-ghost"
+                                wire:click="downloadAssistMarkdown"
+                            />
+                        </div>
+
+                        <details class="text-xs">
+                            <summary class="cursor-pointer text-base-content/70">Cómo usarlo</summary>
+                            <ol class="list-decimal list-inside space-y-1 mt-2 text-base-content/70">
+                                <li>Copiá el markdown y pegalo en tu asistente.</li>
+                                <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque <code>```markdown</code>.</li>
+                                <li>Volvé acá, pegá la respuesta en el panel 2 y revisá.</li>
+                            </ol>
+                        </details>
+                    @endif
+                </div>
+
+                {{-- Panel B: paste and review --}}
+                <div class="space-y-4">
+                    <h4 class="font-bold flex items-center gap-2">
+                        <span class="badge badge-primary badge-sm">2</span>
+                        Pegá y revisá
+                    </h4>
+
+                    <x-alert icon="o-information-circle" class="alert-info py-2 text-xs">
+                        Nada se guarda todavía: esto solo te muestra qué se leería. Las notas las aprobás vos, una por una.
+                    </x-alert>
+
+                    <x-textarea
+                        wire:model="assistPasted"
+                        label="Respuesta del asistente"
+                        rows="10"
+                        placeholder="Pegá acá el bloque markdown que devolvió..."
+                        class="font-mono text-xs"
+                    />
+
+                    <x-button
+                        label="Revisar"
+                        icon="o-magnifying-glass"
+                        class="btn-sm btn-secondary"
+                        wire:click="reviewPasted"
+                        spinner="reviewPasted"
+                    />
+
+                    @if($assistErrors !== [])
+                        <div class="alert alert-error py-2 text-xs">
+                            <ul class="list-disc list-inside space-y-0.5">
+                                @foreach($assistErrors as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if($assistWarnings !== [])
+                        <div class="alert alert-warning py-2 text-xs">
+                            <ul class="list-disc list-inside space-y-0.5">
+                                @foreach($assistWarnings as $warning)
+                                    <li>{{ $warning }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if($assistPreview !== [])
+                        <div class="overflow-x-auto">
+                            <table class="table table-xs table-zebra">
+                                <thead>
+                                    <tr>
+                                        <th>Alumno</th>
+                                        <th>Pregunta</th>
+                                        <th>Criterio</th>
+                                        <th>Justificación</th>
+                                        <th class="text-right">Ptos</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($assistPreview as $row)
+                                        @php
+                                            $badge = match ($row['status']) {
+                                                'ok' => 'badge-success',
+                                                'sobrescribe' => 'badge-warning',
+                                                default => 'badge-error',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                {{ $row['student'] }}
+                                                <div class="text-xs text-base-content/50">ref {{ $row['ref'] }}</div>
+                                            </td>
+                                            <td class="font-mono text-xs">{{ $row['block'] }}</td>
+                                            <td class="font-mono text-xs">{{ $row['key'] }}</td>
+                                            <td class="max-w-64">
+                                                <div class="text-xs" title="{{ $row['justification'] }}">
+                                                    {{ \Illuminate\Support\Str::limit($row['justification'], 90) }}
+                                                </div>
+                                            </td>
+                                            <td class="text-right font-semibold whitespace-nowrap">
+                                                {{ rtrim(rtrim(number_format($row['points'], 2, ',', ''), '0'), ',') }}
+                                                <span class="text-xs font-normal text-base-content/50">/ {{ $row['max'] }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-xs {{ $badge }}">{{ $row['status'] }}</span>
+                                                @if($row['detail'])
+                                                    <div class="text-xs text-base-content/60">{{ $row['detail'] }}</div>
+                                                @endif
+                                                @if($row['flags'] !== [])
+                                                    <div class="mt-0.5">
+                                                        @foreach($row['flags'] as $flag)
+                                                            <span class="badge badge-outline badge-xs">{{ $flag }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @php
+                            $readable = collect($assistPreview)->where('status', 'ok')->count();
+                            $overwrites = collect($assistPreview)->where('status', 'sobrescribe')->count();
+                            $broken = collect($assistPreview)->whereIn('status', ['error', 'desconocido'])->count();
+                        @endphp
+                        <div class="text-xs text-base-content/60">
+                            {{ $readable }} {{ $readable === 1 ? 'legible' : 'legibles' }} ·
+                            {{ $overwrites }} {{ $overwrites === 1 ? 'pisa' : 'pisan' }} una nota final ·
+                            {{ $broken }} con problemas
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <script>
+                // Copying never goes through Livewire: a full cohort runs to
+                // hundreds of kilobytes and the confirmation is local anyway.
+                window.copyAssistMarkdown = (trigger) => {
+                    const field = document.getElementById('assist-markdown');
+                    if (!field) return;
+
+                    field.removeAttribute('readonly');
+                    field.select();
+                    field.setSelectionRange(0, field.value.length);
+
+                    const signal = (name) => trigger.dispatchEvent(
+                        new CustomEvent(name, { bubbles: true })
+                    );
+
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(field.value)
+                            .then(() => signal('assist-copied-ok'))
+                            .catch(() => legacyCopy(field, signal));
+                    } else {
+                        legacyCopy(field, signal);
+                    }
+                };
+
+                const legacyCopy = (field, signal) => {
+                    try {
+                        document.execCommand('copy');
+                        signal('assist-copied-ok');
+                    } catch (error) {
+                        // Nothing left to try. The text is selected and the
+                        // textarea is editable so it can be copied by hand.
+                        signal('assist-copy-failed');
+                    }
+                };
+            </script>
+        </x-card>
+    @endif
 
     @if($showSyncModal)
         @php

@@ -7,6 +7,7 @@ use App\Enums\GradingFlag;
 use App\Models\EvaluationAttempt;
 use App\Models\OnlineEvaluation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Renders one markdown file an assistant grader can consume and fill in.
@@ -30,13 +31,37 @@ final class GradingFileBuilder
 
     /**
      * @param  Collection<int, EvaluationAttempt>  $attempts  already loaded with user
+     * @param  string|null  $blockId  export a single question instead of the whole exam
      */
     public function __construct(
         private readonly OnlineEvaluation $evaluation,
         private readonly Collection $attempts,
         private readonly string $mode = self::MODE_GRADING,
         private readonly bool $anonymize = false,
+        private readonly ?string $blockId = null,
     ) {}
+
+    /**
+     * Every open_text block in a content payload, keyed by id. Static and content
+     * driven so callers can validate a block id before building anything.
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, array<string, mixed>>
+     */
+    public static function gradableBlocksIn(array $content): array
+    {
+        $blocks = [];
+
+        foreach ($content['sections'] ?? [] as $section) {
+            foreach ($section['blocks'] ?? [] as $block) {
+                if (($block['type'] ?? null) === 'open_text' && ! empty($block['id'])) {
+                    $blocks[$block['id']] = $block;
+                }
+            }
+        }
+
+        return $blocks;
+    }
 
     /**
      * Blocks an assistant can be asked to mark: the open_text ones only, since
@@ -46,14 +71,10 @@ final class GradingFileBuilder
      */
     public function gradableBlocks(): array
     {
-        $blocks = [];
+        $blocks = self::gradableBlocksIn($this->content());
 
-        foreach ($this->content()['sections'] ?? [] as $section) {
-            foreach ($section['blocks'] ?? [] as $block) {
-                if (($block['type'] ?? null) === 'open_text' && ! empty($block['id'])) {
-                    $blocks[$block['id']] = $block;
-                }
-            }
+        if ($this->blockId !== null) {
+            $blocks = array_intersect_key($blocks, [$this->blockId => true]);
         }
 
         return $blocks;
@@ -73,6 +94,19 @@ final class GradingFileBuilder
     }
 
     /**
+     * Download name for the generated file. Shared by the command and the dialog
+     * so both hand the teacher the same thing.
+     */
+    public static function filename(OnlineEvaluation $evaluation): string
+    {
+        return sprintf(
+            'correccion-%s-%s.md',
+            Str::slug($evaluation->title),
+            now()->format('Ymd-Hi'),
+        );
+    }
+
+    /**
      * Five digits, so refs sort correctly and read as opaque tokens rather than
      * as database ids.
      */
@@ -88,8 +122,10 @@ final class GradingFileBuilder
 
     private function rubrics(): array
     {
-        return $this->attempts->first()?->rubric_snapshot
+        $rubrics = $this->attempts->first()?->rubric_snapshot
             ?? Rubric::snapshotFor($this->content());
+
+        return array_intersect_key($rubrics, $this->gradableBlocks());
     }
 
     private function header(): string
@@ -100,10 +136,11 @@ final class GradingFileBuilder
             '# Corrección asistida — '.$this->evaluation->title,
             '',
             sprintf(
-                '<!-- %s id=%d modo=%s exportado=%s intentos=%d -->',
+                '<!-- %s id=%d modo=%s bloques=%s exportado=%s intentos=%d -->',
                 self::RULE_PREFIX,
                 $this->evaluation->id,
                 $this->mode,
+                $this->blockId ?? 'todos',
                 now()->toIso8601String(),
                 $this->attempts->count(),
             ),
@@ -301,7 +338,7 @@ final class GradingFileBuilder
             foreach ($this->rubrics() as $blockId => $rubric) {
                 foreach (Rubric::make($rubric)->criteria as $criterion) {
                     $rows[] = sprintf(
-                        '| `%s` | — | `%s` | %s | %s | %s |',
+                        '| %s | — | %s | %s | %s | %s |',
                         $blockId,
                         $criterion['key'],
                         $this->cell($criterion['label']),
@@ -316,14 +353,15 @@ final class GradingFileBuilder
         $lines[] = '| bloque | variante | clave | criterio | puntaje_max | niveles |';
         $lines[] = '| --- | --- | --- | --- | --- | --- |';
         $lines = [...$lines, ...$rows];
-
-        if ($this->mode === self::MODE_GRADING && $rows === []) {
-            $lines[] = '';
-            $lines[] = '_No hay rúbrica definida. Usá `--mode=rubric` para redactar una._';
-        }
-
         $lines[] = sprintf('<!-- %s:RUBRICA:FIN -->', self::RULE_PREFIX);
         $lines[] = '';
+
+        if ($this->mode === self::MODE_GRADING && $rows === []) {
+            // Outside the markers: anything else inside them is read as a table
+            // row and would be rejected.
+            $lines[] = '_La pregunta elegida todavía no tiene rúbrica. Redactala con `--mode=rubric`._';
+            $lines[] = '';
+        }
 
         return implode("\n", $lines);
     }

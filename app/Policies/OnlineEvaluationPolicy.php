@@ -67,6 +67,17 @@ class OnlineEvaluationPolicy
     }
 
     /**
+     * Export student answers to an external assistant grader.
+     *
+     * Kept apart from `grade` on purpose: exporting means student work leaves the
+     * application, which is a different promise from marking it.
+     */
+    public function exportGrading(User $user, OnlineEvaluation $evaluation): bool
+    {
+        return $this->manage($user, $evaluation);
+    }
+
+    /**
      * Sync final grades into the subject gradebook.
      */
     public function syncGrades(User $user, OnlineEvaluation $evaluation): bool

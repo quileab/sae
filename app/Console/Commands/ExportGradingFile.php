@@ -21,6 +21,7 @@ class ExportGradingFile extends Command
         {evaluation : Evaluation id}
         {--out= : Destination file; defaults to storage/app/evaluaciones}
         {--mode=grading : grading to fill the rubric and the marks, rubric to only draft rubrics}
+        {--block= : Export a single open_text question instead of the whole exam}
         {--anonymize : Omit student names from the file}
         {--status=submitted : Attempt status to export}
         {--preview : Print the file instead of writing it}';
@@ -59,6 +60,19 @@ class ExportGradingFile extends Command
             ->orderBy('id')
             ->get();
 
+        $block = $this->option('block');
+        $available = GradingFileBuilder::gradableBlocksIn($evaluation->content);
+
+        if ($block !== null && ! in_array($block, array_keys($available), true)) {
+            $this->error(sprintf(
+                'El bloque "%s" no es una pregunta de desarrollo de esta evaluación. Disponibles: %s.',
+                (string) $block,
+                implode(', ', array_keys($available)) ?: 'ninguno',
+            ));
+
+            return self::FAILURE;
+        }
+
         if ($attempts->isEmpty()) {
             $this->warn('No hay intentos en estado "'.$status.'". No hay nada que exportar.');
 
@@ -70,6 +84,7 @@ class ExportGradingFile extends Command
             attempts: $attempts,
             mode: $mode,
             anonymize: (bool) $this->option('anonymize'),
+            blockId: $block,
         ))->build();
 
         if ($this->option('preview')) {
@@ -88,7 +103,13 @@ class ExportGradingFile extends Command
 
         $this->info('Archivo de corrección generado.');
         $this->line('  '.$path);
-        $this->line(sprintf('  %d intentos · modo %s%s', $attempts->count(), $mode, $this->option('anonymize') ? ' · anonimizado' : ''));
+        $this->line(sprintf(
+            '  %d intentos · modo %s%s%s',
+            $attempts->count(),
+            $mode,
+            $block !== null ? ' · bloque '.$block : '',
+            $this->option('anonymize') ? ' · anonimizado' : '',
+        ));
         $this->newLine();
         $this->line('  1. Abrí el archivo con tu asistente y pegale las secciones 4 y 5.');
         $this->line('  2. Volvé a la aplicación y usá "Pegar correcciones" para revisarlo.');
