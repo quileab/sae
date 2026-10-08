@@ -7,7 +7,10 @@ use App\Services\Evaluations\AttemptGrader;
 use App\Services\Evaluations\FinalGradeResolver;
 use App\Services\Evaluations\GradeSyncPreview;
 use App\Services\Evaluations\GradingFileBuilder;
+use App\Enums\GradingSuggestionState;
 use App\Services\Evaluations\GradingFileParser;
+use App\Services\Evaluations\GradingSuggestionImporter;
+use App\Services\Evaluations\ParsedGradingFile;
 use App\Services\Evaluations\Rubric;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -26,6 +29,7 @@ new class extends Component {
     public ?EvaluationAttempt $gradingAttempt = null;
     public $manualScores = [];
     public $feedback = '';
+    public $suggestionRejectionReason = null;
 
     // Grade sync state
     public $showSyncModal = false;
@@ -42,8 +46,13 @@ new class extends Component {
     public $assistSummary = [];
     public $assistPasted = null;
     public $assistPreview = [];
+    public $assistRubricRows = 0;
+    public $assistMarkRows = 0;
     public $assistErrors = [];
     public $assistWarnings = [];
+    public $assistApplied = [];
+    public $assistRubricApplied = [];
+
 
 public function mount($id)
     {
@@ -130,6 +139,10 @@ public function attemptHeaders(): array
 
         return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
             ->with('user')
+            // One grouped count for the whole page instead of a query per row.
+            ->withCount([
+                'gradingSuggestions as pending_suggestions_count' => fn ($query) => $query->pending(),
+            ])
             ->orderBy('user_id')
             ->orderByDesc('attempt_number')
             ->paginate(20);
@@ -155,14 +168,138 @@ public function attemptHeaders(): array
         abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
 
         $this->gradingAttemptId = $attempt->id;
-        $this->gradingAttempt = $attempt->load('user');
+        $this->gradingAttempt = $attempt->load(['user', 'gradingSuggestions']);
         $this->manualScores = $attempt->block_scores ?? [];
         $this->feedback = $attempt->feedback ?? '';
     }
 
+    /**
+ * Accept every pending proposal of the attempt being graded.
+ *
+ * applyManualMarks replaces the whole block_scores array on purpose, so this
+ * rebuilds the complete map from the current values plus the proposals. That is
+ * also why the unit here is the attempt: a single block cannot be accepted alone.
+ */
+    public function acceptSuggestions()
+    {
+        $this->authorize('grade', $this->evaluation);
+
+        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
+
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        $pending = $attempt->gradingSuggestions()->pending()->get();
+
+        if ($pending->isEmpty()) {
+            $this->info('No hay propuestas pendientes para este intento.');
+
+            return;
+        }
+
+        $scores = $attempt->block_scores ?? [];
+
+        foreach ($pending as $suggestion) {
+            $scores[$suggestion->block_id] = (float) $suggestion->total_points;
+        }
+
+        $graded = app(AttemptGrader::class)->applyManualMarks($attempt, $scores, $attempt->feedback);
+
+        foreach ($pending as $suggestion) {
+            $suggestion->update([
+                'state' => GradingSuggestionState::Accepted->value,
+                'final_points' => (float) $suggestion->total_points,
+                'accepted_at' => now(),
+                'accepted_by' => auth()->id(),
+            ]);
+        }
+
+        $this->manualScores = $graded->block_scores;
+        $this->gradingAttempt = $graded->fresh(['user', 'gradingSuggestions']);
+        $this->suggestionRejectionReason = null;
+
+        $this->success(sprintf(
+            '%d propuesta%s aceptada%s. La nota del intento quedó en %s.',
+            $pending->count(),
+            $pending->count() === 1 ? '' : 's',
+            $pending->count() === 1 ? '' : 's',
+            number_format((float) $graded->score, 2),
+        ));
+    }
+
+    /**
+     * Copy the proposal into the inputs and let the teacher finish the job. The
+     * numbers are editable on purpose: adjusting is the normal case, not an
+     * exception.
+     */
+    public function prefillSuggestions()
+    {
+        $this->authorize('grade', $this->evaluation);
+
+        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
+
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        $suggestions = $attempt->gradingSuggestions()->pending()->get()
+            ->keyBy('block_id');
+
+        if ($suggestions->isEmpty()) {
+            $this->info('No hay propuestas pendientes para este intento.');
+
+            return;
+        }
+
+        $scores = $this->manualScores;
+
+        foreach ($suggestions as $blockId => $suggestion) {
+            $scores[$blockId] = (float) $suggestion->total_points;
+        }
+
+        $this->manualScores = $scores;
+
+        $this->info('Notas sugeridas cargadas. Revisalas, ajustá lo que quieras y guardá.');
+    }
+
+    public function rejectSuggestions()
+    {
+        $this->authorize('grade', $this->evaluation);
+
+        $reason = (string) ($this->suggestionRejectionReason ?: '');
+
+        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
+
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        $pending = $attempt->gradingSuggestions()->pending()->get();
+
+        if ($pending->isEmpty()) {
+            $this->info('No hay propuestas pendientes para este intento.');
+
+            return;
+        }
+
+        foreach ($pending as $suggestion) {
+            $suggestion->update([
+                'state' => GradingSuggestionState::Rejected->value,
+                'disagreement_reason' => $reason !== '' ? $reason : null,
+                'accepted_at' => null,
+                'accepted_by' => null,
+            ]);
+        }
+
+        $this->gradingAttempt = $attempt->fresh(['user', 'gradingSuggestions']);
+        $this->suggestionRejectionReason = null;
+
+        $this->info(sprintf(
+            '%d propuesta%s rechazada%s. El intento sigue esperando tu corrección.',
+            $pending->count(),
+            $pending->count() === 1 ? '' : 's',
+            $pending->count() === 1 ? '' : 's',
+        ));
+    }
+
     public function closeGrading()
     {
-        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback']);
+        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason']);
     }
 
     public function saveGrading()
@@ -246,7 +383,11 @@ public function attemptHeaders(): array
         $this->assistMode = GradingFileBuilder::MODE_GRADING;
         $this->assistAnonymize = false;
         $this->assistBlockId = $this->firstBlockWithoutRubric();
-        $this->reset(['assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview', 'assistErrors', 'assistWarnings']);
+        $this->reset([
+            'assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview',
+            'assistErrors', 'assistWarnings', 'assistApplied', 'assistRubricApplied',
+            'assistRubricRows', 'assistMarkRows',
+        ]);
         $this->showAssistModal = true;
     }
 
@@ -379,10 +520,111 @@ public function attemptHeaders(): array
      */
     public function updatedAssistPasted()
     {
+        // Cheap structural read, not a review: it only decides which save buttons
+        // are worth offering. The rows on screen still describe an older text.
+        $parsed = GradingFileParser::parse((string) $this->assistPasted);
+
+        $this->assistRubricRows = count($parsed->rubricRows);
+        $this->assistMarkRows = count($parsed->markRows);
+
         if ($this->assistPreview !== [] || $this->assistErrors !== []) {
             $this->assistPreview = [];
             $this->assistErrors = [];
         }
+    }
+
+    /**
+ * Turn the reviewed rows into proposals.
+ *
+ * Only proposals: no attempt is marked here. The teacher still has to accept each
+ * one, and that is the step that goes through AttemptGrader.
+ */
+    public function applyPastedSuggestions()
+    {
+        $this->authorize('exportGrading', $this->evaluation);
+
+        $parsed = $this->parsePasted();
+
+        if ($parsed === null) {
+            return;
+        }
+
+        $report = app(GradingSuggestionImporter::class)->import($this->evaluation, $parsed);
+
+        $this->assistErrors = array_merge($this->assistErrors, $report['rejected']);
+        $this->assistApplied = $report;
+        $this->assistPreview = [];
+
+        if ($report['created'] > 0 || $report['updated'] > 0) {
+            $this->success(sprintf(
+                '%d propuesta%s guardada%s. Ahora las revisás una por una.',
+                $report['created'] + $report['updated'],
+                ($report['created'] + $report['updated']) === 1 ? '' : 's',
+                ($report['created'] + $report['updated']) === 1 ? '' : 's',
+            ));
+        } elseif ($report['unchanged'] > 0) {
+            $this->info('Las propuestas ya estaban guardadas. No cambió nada.');
+        } else {
+            $this->warning('No se encontró ninguna nota para guardar.');
+        }
+    }
+
+    /**
+     * Adopt a drafted rubric.
+     *
+     * Deliberately a separate action from importing marks: a rubric becomes the
+     * promise every later mark is measured against, so the teacher has to choose
+     * it deliberately rather than inherit it from the paste.
+     */
+    public function applyPastedRubric()
+    {
+        $this->authorize('update', $this->evaluation);
+
+        $parsed = $this->parsePasted();
+
+        if ($parsed === null) {
+            return;
+        }
+
+        $report = app(GradingSuggestionImporter::class)->applyRubric($this->evaluation, $parsed);
+
+        $this->assistErrors = array_merge($this->assistErrors, $report['rejected']);
+        $this->assistRubricApplied = $report;
+
+        if ($report['created'] > 0) {
+            $this->success('Rúbrica guardada en la evaluación.');
+        } elseif ($report['unchanged'] > 0) {
+            $this->info('La rúbrica ya era la misma.');
+        } else {
+            $this->warning('No se encontró ninguna rúbrica para guardar.');
+        }
+    }
+
+    /**
+     * Re-read the pasted text, refusing when it no longer parses.
+     */
+    private function parsePasted(): ?ParsedGradingFile
+    {
+        $parsed = GradingFileParser::parse((string) $this->assistPasted);
+
+        if (! $parsed->isValid()) {
+            $this->assistErrors = $parsed->errorMessages();
+            $this->error('El texto pegado tiene errores. Revisá la lista antes de continuar.');
+
+            return null;
+        }
+
+        if ($parsed->evaluationId() !== null && $parsed->evaluationId() !== $this->evaluation->id) {
+            $this->assistErrors = [sprintf(
+                'El archivo dice ser de la evaluación %d, no de la %d.',
+                $parsed->evaluationId(),
+                $this->evaluation->id,
+            )];
+
+            return null;
+        }
+
+        return $parsed;
     }
 
     public function closeAssist()
@@ -390,6 +632,8 @@ public function attemptHeaders(): array
         $this->reset([
             'showAssistModal', 'assistMarkdown', 'assistSummary', 'assistPasted',
             'assistPreview', 'assistErrors', 'assistWarnings', 'assistBlockId',
+'assistApplied', 'assistRubricApplied',
+            'assistRubricRows', 'assistMarkRows',
         ]);
     }
 
@@ -768,13 +1012,41 @@ public function attemptHeaders(): array
                         class="font-mono text-xs"
                     />
 
-                    <x-button
-                        label="Revisar"
-                        icon="o-magnifying-glass"
-                        class="btn-sm btn-secondary"
-                        wire:click="reviewPasted"
-                        spinner="reviewPasted"
-                    />
+                    <div class="flex flex-wrap gap-2">
+                        <x-button
+                            label="Revisar"
+                            icon="o-magnifying-glass"
+                            class="btn-sm btn-secondary"
+                            wire:click="reviewPasted"
+                            spinner="reviewPasted"
+                        />
+
+                        @if($assistRubricRows > 0)
+                            <x-button
+                                label="Guardar rúbrica ({{ $assistRubricRows }})"
+                                icon="o-list-bullet"
+                                class="btn-sm btn-ghost"
+                                wire:click="applyPastedRubric"
+                                spinner="applyPastedRubric"
+                            />
+                        @endif
+
+                        @if($assistMarkRows > 0)
+                            <x-button
+                                label="Guardar propuestas ({{ $assistMarkRows }})"
+                                icon="o-inbox-arrow-down"
+                                class="btn-sm btn-primary"
+                                wire:click="applyPastedSuggestions"
+                                spinner="applyPastedSuggestions"
+                            />
+                        @endif
+                    </div>
+
+                    @if($assistRubricRows > 0)
+                        <x-alert icon="o-light-bulb" class="alert-warning py-2 text-xs">
+                            La rúbrica pasa a ser la referencia de toda la evaluación. Guardala solo si la leíste y te sirve: después todas las correcciones se miden contra ella.
+                        </x-alert>
+                    @endif
 
                     @if($assistErrors !== [])
                         <div class="alert alert-error py-2 text-xs">
@@ -1012,6 +1284,8 @@ public function attemptHeaders(): array
                                     $rubric = isset($rubrics[$bId])
                                         ? App\Services\Evaluations\Rubric::make($rubrics[$bId])
                                         : App\Services\Evaluations\Rubric::fromBlock($block);
+                                    $suggestion = $attemptToGrade->gradingSuggestions
+                                        ->firstWhere('block_id', $bId);
                                 @endphp
                                 <div class="bg-base-200 p-4 rounded-lg">
                                     <div class="flex justify-between items-start gap-4 mb-2">
@@ -1039,6 +1313,55 @@ public function attemptHeaders(): array
                                     <div class="bg-base-100 p-3 rounded text-sm border border-base-300">
                                         <x-evaluation-answer :block="$block" :answer="$studentAnswer" />
                                     </div>
+
+                                    @if($suggestion)
+                                        @php $settled = ! $suggestion->isPending(); @endphp
+                                        <div class="mt-3 rounded border {{ $settled ? 'border-base-300' : 'border-primary' }} bg-base-100 p-3 text-sm">
+                                            <div class="mb-2 flex flex-wrap items-center gap-2">
+                                                <span class="font-semibold">Propuesta del asistente</span>
+                                                <span class="badge {{ $suggestion->state_badge }} badge-sm">{{ $suggestion->state_label }}</span>
+                                                @if($suggestion->revision > 1)
+                                                    <span class="badge badge-ghost badge-xs">rev {{ $suggestion->revision }}</span>
+                                                @endif
+                                                @foreach($suggestion->flagList() as $flag)
+                                                    <span class="badge {{ $flag->badgeClass() }} badge-xs">{{ $flag->label() }}</span>
+                                                @endforeach
+                                            </div>
+
+                                            <table class="table table-xs">
+                                                <tbody>
+                                                    @foreach($suggestion->criteria as $criterion)
+                                                        <tr>
+                                                            <td class="align-top">
+                                                                {{ $criterion['label'] ?? $criterion['key'] }}
+                                                                @if(! empty($criterion['justification']))
+                                                                    <div class="mt-0.5 text-xs text-base-content/60">{{ $criterion['justification'] }}</div>
+                                                                @endif
+                                                            </td>
+                                                            <td class="w-20 text-right align-top font-semibold whitespace-nowrap">
+                                                                {{ rtrim(rtrim(number_format((float) $criterion['points_awarded'], 2, ',', ''), '0'), ',') }}
+                                                                @if(! empty($criterion['points_max']))
+                                                                    <span class="text-xs font-normal text-base-content/50">/ {{ rtrim(rtrim(number_format((float) $criterion['points_max'], 2, ',', ''), '0'), ',') }}</span>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr>
+                                                        <td class="text-right font-semibold">Total</td>
+                                                        <td class="text-right font-semibold whitespace-nowrap">{{ rtrim(rtrim(number_format((float) $suggestion->total_points, 2, ',', ''), '0'), ',') }}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+
+                                            @if($settled && $suggestion->disagreement_reason)
+                                                <div class="mt-2 text-xs text-base-content/60">
+                                                    Motivo del rechazo: {{ $suggestion->disagreement_reason }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
 
                                     @if($rubric)
                                         @php $rubricProblems = $rubric->problems((float) ($block['points'] ?? 1)); @endphp
@@ -1079,6 +1402,35 @@ public function attemptHeaders(): array
                             @endforeach
                         </div>
                     @endforeach
+
+                    @php $pendingSuggestions = $attemptToGrade->gradingSuggestions->filter->isPending(); @endphp
+
+                    @if($pendingSuggestions->isNotEmpty())
+                        <div class="rounded-lg border border-primary bg-base-100 p-4 space-y-3">
+                            <div class="text-sm">
+                                <strong>{{ $pendingSuggestions->count() }}</strong> propuesta{{ $pendingSuggestions->count() === 1 ? '' : 's' }} del asistente
+                                para este alumno. Aceptarlas writes la nota final; ajustarlas te deja corregir los números a mano.
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <x-button label="Aceptar y finalizar" icon="o-check" class="btn-sm btn-primary" wire:click="acceptSuggestions" spinner="acceptSuggestions" />
+                                <x-button label="Cargar para ajustar" icon="o-pencil-square" class="btn-sm btn-ghost" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
+                                <x-button label="Rechazar" icon="o-x-circle" class="btn-sm btn-ghost text-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" />
+                            </div>
+                            <x-select
+                                label="Motivo del rechazo (opcional, sirve para mejorar el prompt)"
+                                wire:model="suggestionRejectionReason"
+                                :options="[
+                                    ['id' => '', 'alias' => 'Sin motivo'],
+                                    ['id' => 'criterio_mal_aplicado', 'alias' => 'Criterio mal aplicado'],
+                                    ['id' => 'respuesta_ambigua', 'alias' => 'Respuesta ambigua'],
+                                    ['id' => 'el_modelo_se_equivoco', 'alias' => 'El modelo se equivocó'],
+                                    ['id' => 'rubrica_inadecuada', 'alias' => 'La rúbrica no sirve'],
+                                ]"
+                                option-value="id"
+                                option-label="alias"
+                            />
+                        </div>
+                    @endif
 
                     <x-textarea wire:model="feedback" label="Feedback General" rows="3" />
 
@@ -1148,12 +1500,19 @@ public function attemptHeaders(): array
 
                     @scope('actions', $attempt)
                         @if($attempt->isFinished())
-                            <x-button
-                                icon="o-pencil-square"
-                                class="btn-sm btn-ghost"
-                                wire:click="openGrading({{ $attempt->id }})"
-                                tooltip="Corregir"
-                            />
+                            <div class="flex items-center justify-end gap-2">
+                                @if(($attempt->pending_suggestions_count ?? 0) > 0)
+                                    <div class="tooltip tooltip-left lg:tooltip-right" data-tip="Propuestas del asistente esperando revisión">
+                                        <span class="badge badge-primary badge-sm">{{ $attempt->pending_suggestions_count }}</span>
+                                    </div>
+                                @endif
+                                <x-button
+                                    icon="o-pencil-square"
+                                    class="btn-sm btn-ghost"
+                                    wire:click="openGrading({{ $attempt->id }})"
+                                    tooltip="Corregir"
+                                />
+                            </div>
                         @endif
                     @endscope
 
