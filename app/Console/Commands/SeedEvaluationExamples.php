@@ -187,6 +187,44 @@ class SeedEvaluationExamples extends Command
                                 'type' => 'open_text',
                                 'prompt' => 'Explique la diferencia entre un dato en bruto y la información útil para la alta gerencia, y brinde un ejemplo de cómo un volumen de transacciones diarias puede procesarse para apoyar la toma de decisiones en Ventas y Marketing.',
                                 'points' => 1.5,
+                                // Worked example of a criterion rubric: the rest of the
+                                // seeds are left bare so `evaluations:export-grading
+                                // --mode=rubric` has a clean surface to fill.
+                                'rubric' => [
+                                    'source' => 'agent',
+                                    'criteria' => [
+                                        [
+                                            'key' => 'dato_vs_informacion',
+                                            'label' => 'Distingue el dato en bruto de la información útil',
+                                            'points' => 0.5,
+                                            'levels' => [
+                                                '0' => 'No diferencia ambos conceptos.',
+                                                '0.25' => 'Menciona la diferencia sin desarrollarla.',
+                                                '0.5' => 'Define ambos y explica por qué el procesamiento genera el salto.',
+                                            ],
+                                        ],
+                                        [
+                                            'key' => 'proceso_transformacion',
+                                            'label' => 'Describe al menos una transformación concreta (filtro, cálculo o agrupamiento)',
+                                            'points' => 0.5,
+                                            'levels' => [
+                                                '0' => 'No describe ningún proceso.',
+                                                '0.25' => 'Alude a procesar los datos sin concretarlo.',
+                                                '0.5' => 'Nombra y explica al menos una transformación aplicable.',
+                                            ],
+                                        ],
+                                        [
+                                            'key' => 'ejemplo_aplicado',
+                                            'label' => 'Aplica el proceso a un ejemplo de decisión de Ventas o Marketing',
+                                            'points' => 0.5,
+                                            'levels' => [
+                                                '0' => 'No incluye ejemplo.',
+                                                '0.25' => 'Ejemplo genérico o desconectado del proceso descrito.',
+                                                '0.5' => 'Ejemplo coherente donde la información procesada sustenta una decisión.',
+                                            ],
+                                        ],
+                                    ],
+                                ],
                             ],
                             [
                                 'id' => 'g1_2',

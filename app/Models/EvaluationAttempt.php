@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EvaluationAttempt extends Model
 {
@@ -23,6 +24,7 @@ class EvaluationAttempt extends Model
         'answers',
         'block_scores',
         'content_snapshot',
+        'rubric_snapshot',
         'feedback',
     ];
 
@@ -36,7 +38,13 @@ class EvaluationAttempt extends Model
             'answers' => 'array',
             'block_scores' => 'array',
             'content_snapshot' => 'array',
+            'rubric_snapshot' => 'array',
         ];
+    }
+
+    public function gradingSuggestions(): HasMany
+    {
+        return $this->hasMany(GradingSuggestion::class, 'evaluation_attempt_id');
     }
 
     public function evaluation(): BelongsTo

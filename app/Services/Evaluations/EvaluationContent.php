@@ -103,6 +103,13 @@ class EvaluationContent
         }
 
         switch ($block['type']) {
+            case 'open_text':
+                // A rubric that cannot be marked is dropped rather than kept half
+                // usable: the assistant grader would silently misaward against it.
+                if (isset($block['rubric'])) {
+                    $block['rubric'] = Rubric::fromBlock($block)?->toArray();
+                }
+                break;
             case 'multiple_choice':
                 if (! isset($block['options']) || ! is_array($block['options'])) {
                     $block['options'] = [];

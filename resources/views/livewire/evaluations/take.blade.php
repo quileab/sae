@@ -6,6 +6,7 @@ use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
 use App\Services\Evaluations\AttemptGrader;
 use App\Services\Evaluations\EvaluationContent;
+use App\Services\Evaluations\Rubric;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -71,6 +72,9 @@ new #[Layout('layouts.app')] class extends Component {
                 'started_at' => now(),
                 'answers' => [],
                 'content_snapshot' => $this->evaluation->content,
+                // Frozen for the same reason as the content: a rubric edited after
+                // submission must not reinterpret suggestions made against it.
+                'rubric_snapshot' => Rubric::snapshotFor($this->evaluation->content),
             ]);
         }
 

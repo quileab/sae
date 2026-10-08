@@ -406,7 +406,9 @@ public function attemptHeaders(): array
         @if($gradingAttemptId && $gradingAttempt)
             @php
                 $attemptToGrade = $gradingAttempt;
-                $sections = ($attemptToGrade->content_snapshot ?? $evaluation->content)['sections'] ?? [];
+                $snapshotContent = $attemptToGrade->content_snapshot ?? $evaluation->content;
+                $sections = $snapshotContent['sections'] ?? [];
+                $rubrics = $attemptToGrade->rubric_snapshot ?? App\Services\Evaluations\Rubric::snapshotFor($snapshotContent);
             @endphp
             <x-card title="Corrigiendo: {{ $attemptToGrade->user->fullname }} (Intento {{ $attemptToGrade->attempt_number }})">
                 <x-slot:menu>
@@ -421,6 +423,11 @@ public function attemptHeaders(): array
                                 @php 
                                     $bId = $block['id']; 
                                     $studentAnswer = $attemptToGrade->answers[$bId] ?? null;
+                                    // Snapshot first: the teacher must mark against the criteria
+                                    // the student was actually served, not a later revision.
+                                    $rubric = isset($rubrics[$bId])
+                                        ? App\Services\Evaluations\Rubric::make($rubrics[$bId])
+                                        : App\Services\Evaluations\Rubric::fromBlock($block);
                                 @endphp
                                 <div class="bg-base-200 p-4 rounded-lg">
                                     <div class="flex justify-between items-start gap-4 mb-2">
@@ -448,6 +455,42 @@ public function attemptHeaders(): array
                                     <div class="bg-base-100 p-3 rounded text-sm border border-base-300">
                                         <x-evaluation-answer :block="$block" :answer="$studentAnswer" />
                                     </div>
+
+                                    @if($rubric)
+                                        @php $rubricProblems = $rubric->problems((float) ($block['points'] ?? 1)); @endphp
+                                        <div class="mt-3 rounded border border-base-300 bg-base-100 p-3 text-sm">
+                                            <div class="mb-2 flex items-center gap-2">
+                                                <span class="font-semibold">Rúbrica</span>
+                                                <span class="badge badge-ghost badge-xs">v{{ $rubric->version }}</span>
+                                                <span class="badge badge-ghost badge-xs">{{ $rubric->source === App\Services\Evaluations\Rubric::SOURCE_AGENT ? 'propuesta por agente' : 'definida por el docente' }}</span>
+                                            </div>
+                                            <table class="table table-xs">
+                                                <tbody>
+                                                    @foreach($rubric->criteria as $criterion)
+                                                        <tr>
+                                                            <td class="w-8 font-mono text-xs align-top">{{ $criterion['key'] }}</td>
+                                                            <td class="align-top">
+                                                                {{ $criterion['label'] }}
+                                                                @foreach($criterion['levels'] as $score => $description)
+                                                                    <div class="mt-1 text-xs text-base-content/60">{{ $score }} → {{ $description }}</div>
+                                                                @endforeach
+                                                            </td>
+                                                            <td class="w-16 text-right align-top font-semibold whitespace-nowrap">{{ number_format($criterion['points'], 2) }}</td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr>
+                                                        <td colspan="2" class="text-right font-semibold">Total</td>
+                                                        <td class="text-right font-semibold whitespace-nowrap">{{ number_format($rubric->maxPoints(), 2) }}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                            @foreach($rubricProblems as $problem)
+                                                <div class="mt-2 text-xs text-error">{{ $problem }}</div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
