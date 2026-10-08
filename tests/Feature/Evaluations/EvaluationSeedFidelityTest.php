@@ -302,6 +302,56 @@ class EvaluationSeedFidelityTest extends TestCase
         $this->assertSame(['caso', 'conceptual'], array_column($withVariants['variants'], 'key'));
     }
 
+#[Test]
+    public function the_recuperatorio_keeps_both_parts_of_the_source_exam(): void
+    {
+        $this->seedExamples();
+
+        $sections = OnlineEvaluation::where('title', 'Recuperatorio 3 SIPGO (Tema B)')
+            ->firstOrFail()
+            ->content['sections'];
+
+        $this->assertCount(2, $sections, 'The source ships a Part 1 of written questions plus the Part 2 exercise.');
+        $this->assertSame('sec_r1', $sections[0]['id']);
+        $this->assertSame('sec_r2', $sections[1]['id']);
+
+        $written = collect($sections[0]['blocks']);
+        $this->assertCount(4, $written);
+        $this->assertSame(['open_text'], $written->pluck('type')->unique()->values()->all());
+        $this->assertSame(6.0, (float) $written->sum('points'));
+        $this->assertSame(['r1_1', 'r1_2', 'r1_3', 'r1_4'], $written->pluck('id')->all());
+
+        $this->assertSame(['table_design'], array_column($sections[1]['blocks'], 'type'));
+        $this->assertSame('r2_1', $sections[1]['blocks'][0]['id']);
+        $this->assertSame(16.0, (float) collect($sections)->flatMap(fn (array $s) => $s['blocks'])->sum('points'));
+    }
+
+    #[Test]
+    public function the_recuperatorio_questions_keep_their_source_subject_matter(): void
+    {
+        $this->seedExamples();
+
+        $blocks = $this->blocks(OnlineEvaluation::where('title', 'Recuperatorio 3 SIPGO (Tema B)')->firstOrFail());
+
+        $prompts = collect($blocks)->pluck('prompt')->implode(' ');
+
+        // Terms that pin each question to the scenario shipped in
+        // eval-rec-3SIPGO/Evaluacion.md, so the seeds cannot silently drift.
+        $expected = [
+            'remitos' => 'Question 1 turns on daily inbound remitos.',
+            'proveedor' => 'Questions 1 and 2 are about what a provider is owed.',
+            'normalización' => 'Question 2 asks about normalisation and unique identifiers.',
+            'integridad referencial' => 'Question 3 is about referential integrity.',
+            'catálogo maestro' => 'Question 3 names the master catalogue.',
+            'consulta puntual' => 'Question 4 contrasts an ad-hoc query with a report.',
+            'reporte gerencial' => 'Question 4 contrasts an ad-hoc query with a report.',
+        ];
+
+        foreach ($expected as $term => $why) {
+            $this->assertStringContainsStringIgnoringCase($term, $prompts, $why);
+        }
+    }
+
     #[Test]
     public function seeding_twice_does_not_duplicate_the_examples(): void
     {

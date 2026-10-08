@@ -301,65 +301,98 @@ class SeedEvaluationExamples extends Command
      */
     private function recuperatorioSections(): array
     {
-        return [[
-            'id' => 'sec_r1',
-            'title' => 'Diseño Relacional - Tema B',
-            'intro' => 'Arme el modelo de datos del Sistema de Gestión de Compras y Abastecimiento.',
-            'blocks' => [
-                $this->schemaBlock(
-                    id: 'r1_1',
-                    prompt: 'Diseñe el modelo de datos (Proveedores, Artículos, Compras, Detalle de Compras).',
-                    points: 10,
-                    // Pool exactly as shipped: four "ID" (one primary key per table).
-                    attributes: [
-                        'ID', 'ID', 'ID', 'ID',
-                        'ID_Artículo', 'ID_Compra', 'ID_Proveedor',
-                        'Cantidad_Pedida', 'Categoría', 'Descripción_Artículo', 'Estado_Orden',
-                        'Fecha_Emisión', 'Precio_Pactado', 'Razón_Social', 'Stock_Mínimo',
-                        'Subtotal_Línea', 'Teléfono_Contacto', 'Unidad_Medida',
+        return [
+            [
+                'id' => 'sec_r1',
+                'title' => 'Parte 1: Preguntas de Análisis y Diagnóstico Teórico',
+                'intro' => 'Eje: El Ciclo del Dato y la Generación de Valor en las Organizaciones. Respondé las cuatro preguntas de desarrollo.',
+                'blocks' => [
+                    [
+                        'id' => 'r1_1',
+                        'type' => 'open_text',
+                        'prompt' => 'En un depósito se registra diariamente la entrada de mercadería mediante remitos (número de remito, fecha, proveedor y código de artículo). Explique por qué esta lista de transacciones operativas representa solo datos en bruto y describa qué proceso de transformación (filtros, cálculos, agrupamientos) debe realizar el sistema para convertirla en información útil que le permita al área de Finanzas saber cuánto dinero se le adeuda a cada proveedor este mes.',
+                        'points' => 1.5,
                     ],
-                    tables: [
-                        'proveedores' => 3,
-                        'articulos' => 5,
-                        'compras' => 4,
-                        'detalle_compras' => 6,
+                    [
+                        'id' => 'r1_2',
+                        'type' => 'open_text',
+                        'prompt' => 'Si una empresa permite que distintos empleados registren al mismo proveedor de formas diferentes (por ejemplo: "Tech Solutions S.A.", "TechSolutions" o "TS S.A."), ¿qué problemas se presentan al momento de consultar el historial de compras o evaluar el desempeño de los proveedores? Explique por qué la normalización y la definición de identificadores únicos son cruciales para evitar decisiones erróneas.',
+                        'points' => 1.5,
                     ],
-                    schema: [
-                        'proveedores' => [
-                            'columns' => ['ID', 'Razón_Social', 'Teléfono_Contacto'],
-                            'pk' => 'ID',
-                            'fks' => [],
-                        ],
-                        'articulos' => [
-                            'columns' => ['ID', 'Descripción_Artículo', 'Categoría', 'Stock_Mínimo', 'Unidad_Medida'],
-                            'pk' => 'ID',
-                            'fks' => [],
-                        ],
-                        'compras' => [
-                            'columns' => ['ID', 'Fecha_Emisión', 'Estado_Orden', 'ID_Proveedor'],
-                            'pk' => 'ID',
-                            'fks' => ['ID_Proveedor'],
-                        ],
-                        'detalle_compras' => [
-                            'columns' => ['ID', 'ID_Compra', 'ID_Artículo', 'Cantidad_Pedida', 'Precio_Pactado', 'Subtotal_Línea'],
-                            'pk' => 'ID',
-                            'fks' => ['ID_Compra', 'ID_Artículo'],
-                        ],
+                    [
+                        'id' => 'r1_3',
+                        'type' => 'open_text',
+                        'prompt' => 'En una base de datos relacional, la tabla que registra el detalle de los ítems recibidos utiliza llaves foráneas (FK) para apuntar al proveedor y al artículo. ¿Qué riesgo operacional o de inventario existiría si el sistema permitiese cargar un registro de compra con un código de artículo que no existe en el catálogo maestro? Justifique relacionando el concepto de integridad referencial.',
+                        'points' => 1.5,
                     ],
-                    layout: [['proveedores', 'articulos'], ['compras'], ['detalle_compras']],
-                    relationPairs: [
-                        ['clave' => 'proveedor_compras', 'from' => 'proveedores', 'to' => 'compras'],
-                        ['clave' => 'compras_detalle', 'from' => 'compras', 'to' => 'detalle_compras'],
-                        ['clave' => 'articulo_detalle', 'from' => 'articulos', 'to' => 'detalle_compras'],
+                    [
+                        'id' => 'r1_4',
+                        'type' => 'open_text',
+                        'prompt' => 'Diferencie una consulta puntual y operativa (por ejemplo: ¿llegó el pedido Nº 1045 hoy?) de un reporte gerencial o consolidado (por ejemplo: ¿cuáles fueron los tres insumos más comprados y qué variación de precio tuvieron en el último semestre?). ¿Por qué los niveles directivos dependen de la consolidación de datos históricos y no de la lectura de comprobantes individuales para planificar las compras futuras?',
+                        'points' => 1.5,
                     ],
-                    relationTypes: [
-                        ['clave' => 'proveedor_compras', 'type' => '1:N'],
-                        ['clave' => 'compras_detalle', 'type' => '1:N'],
-                        ['clave' => 'articulo_detalle', 'type' => '1:N'],
-                    ],
-                ),
+                ],
             ],
-        ]];
+            [
+                'id' => 'sec_r2',
+                'title' => 'Parte 2: Ejercicio Práctico de Diseño Relacional',
+                'intro' => 'Arme el modelo de datos del Sistema de Gestión de Compras y Abastecimiento.',
+                'blocks' => [
+                    $this->schemaBlock(
+                        id: 'r2_1',
+                        prompt: 'Diseñe el modelo de datos (Proveedores, Artículos, Compras, Detalle de Compras).',
+                        points: 10,
+                        // Pool exactly as shipped: four "ID" (one primary key per table).
+                        attributes: [
+                            'ID', 'ID', 'ID', 'ID',
+                            'ID_Artículo', 'ID_Compra', 'ID_Proveedor',
+                            'Cantidad_Pedida', 'Categoría', 'Descripción_Artículo', 'Estado_Orden',
+                            'Fecha_Emisión', 'Precio_Pactado', 'Razón_Social', 'Stock_Mínimo',
+                            'Subtotal_Línea', 'Teléfono_Contacto', 'Unidad_Medida',
+                        ],
+                        tables: [
+                            'proveedores' => 3,
+                            'articulos' => 5,
+                            'compras' => 4,
+                            'detalle_compras' => 6,
+                        ],
+                        schema: [
+                            'proveedores' => [
+                                'columns' => ['ID', 'Razón_Social', 'Teléfono_Contacto'],
+                                'pk' => 'ID',
+                                'fks' => [],
+                            ],
+                            'articulos' => [
+                                'columns' => ['ID', 'Descripción_Artículo', 'Categoría', 'Stock_Mínimo', 'Unidad_Medida'],
+                                'pk' => 'ID',
+                                'fks' => [],
+                            ],
+                            'compras' => [
+                                'columns' => ['ID', 'Fecha_Emisión', 'Estado_Orden', 'ID_Proveedor'],
+                                'pk' => 'ID',
+                                'fks' => ['ID_Proveedor'],
+                            ],
+                            'detalle_compras' => [
+                                'columns' => ['ID', 'ID_Compra', 'ID_Artículo', 'Cantidad_Pedida', 'Precio_Pactado', 'Subtotal_Línea'],
+                                'pk' => 'ID',
+                                'fks' => ['ID_Compra', 'ID_Artículo'],
+                            ],
+                        ],
+                        layout: [['proveedores', 'articulos'], ['compras'], ['detalle_compras']],
+                        relationPairs: [
+                            ['clave' => 'proveedor_compras', 'from' => 'proveedores', 'to' => 'compras'],
+                            ['clave' => 'compras_detalle', 'from' => 'compras', 'to' => 'detalle_compras'],
+                            ['clave' => 'articulo_detalle', 'from' => 'articulos', 'to' => 'detalle_compras'],
+                        ],
+                        relationTypes: [
+                            ['clave' => 'proveedor_compras', 'type' => '1:N'],
+                            ['clave' => 'compras_detalle', 'type' => '1:N'],
+                            ['clave' => 'articulo_detalle', 'type' => '1:N'],
+                        ],
+                    ),
+                ],
+            ],
+        ];
     }
 
     /**
