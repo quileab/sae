@@ -169,6 +169,24 @@ class AssistClipboardContractTest extends TestCase
     }
 
     #[Test]
+    public function the_mode_selector_carries_its_own_explainer(): void
+    {
+        $html = $this->renderDialog();
+
+        // The decision happens at the select, so the help lives next to it — not
+        // only in the "Cómo usarlo" details further down.
+        $this->assertMatchesRegularExpression(
+            '/<div class="fieldset-legend[^>]*>\s*Qué pedirle al asistente\s*<span[^>]*data-notice/s',
+            $html,
+            'the explainer must sit beside the mode selector label',
+        );
+        $this->assertStringContainsString('Qué le pido en cada modo', $html);
+        $this->assertStringContainsString('no puede cambiar los criterios', $html);
+        $this->assertStringContainsString('tienen que sumar lo que vale la pregunta', $html);
+        $this->assertStringContainsString('primero la rúbrica y después las notas', $html);
+    }
+
+    #[Test]
     public function the_help_explains_what_each_mode_actually_does(): void
     {
         $html = $this->renderDialog();

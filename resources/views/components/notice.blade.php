@@ -66,7 +66,7 @@
                     <x-mary-icon :name="$icon" class="w-5 h-5 {{ $color }}" />
                     {{ $title }}
                 </h3>
-                <div class="py-4 text-sm">{{ $text }}</div>
+                <div class="py-4 text-sm whitespace-pre-line">{{ $text }}</div>
                 <div class="modal-action">
                     <button type="button" class="btn btn-sm" x-ref="close" x-on:click="open = false">
                         Entendido

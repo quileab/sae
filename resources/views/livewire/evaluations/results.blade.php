@@ -892,17 +892,29 @@ public function attemptHeaders(): array
                             option-label="name"
                             class="w-full sm:w-96"
                         />
-                        <x-select
-                            label="Qué pedirle al asistente"
-                            wire:model.live="assistMode"
-                            :options="[
-                                ['id' => 'grading', 'alias' => 'Rúbrica vigente + notas'],
-                                ['id' => 'rubric', 'alias' => 'Solo redactar la rúbrica'],
-                            ]"
-                            option-value="id"
-                            option-label="alias"
-                            class="w-full sm:w-72"
-                        />
+                        <div class="w-full sm:w-72">
+                            <div class="fieldset-legend mb-0.5 flex items-center gap-1">
+                                Qué pedirle al asistente
+                                <x-notice
+                                    variant="info"
+                                    title="Qué le pido en cada modo"
+                                    text="«Rúbrica vigente + notas»: el archivo sale con la rúbrica ya cargada y las respuestas de todos los alumnos. El modelo no puede cambiar los criterios; solo dice cuántos puntos le da a cada criterio de cada respuesta. Usalo cuando la rúbrica ya está revisada.
+
+«Solo redactar la rúbrica»: el archivo sale con las consignas pero sin rúbrica. El modelo propone los criterios y sus puntajes, que tienen que sumar lo que vale la pregunta. Usalo primero, cuando la pregunta todavía no tiene rúbrica.
+
+El orden que funciona es primero la rúbrica y después las notas: sin criterios escritos por vos, las correcciones salen de medir contra una vara que nadie revisó."
+                                />
+                            </div>
+                            <x-select
+                                wire:model.live="assistMode"
+                                :options="[
+                                    ['id' => 'grading', 'alias' => 'Rúbrica vigente + notas'],
+                                    ['id' => 'rubric', 'alias' => 'Solo redactar la rúbrica'],
+                                ]"
+                                option-value="id"
+                                option-label="alias"
+                            />
+                        </div>
                         <label class="label cursor-pointer justify-start gap-2 pb-1">
                             <input type="checkbox" wire:model.live="assistAnonymize" class="checkbox checkbox-sm checkbox-primary" />
                             <span class="label-text text-sm">Anonimizar</span>
