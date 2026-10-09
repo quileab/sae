@@ -52,6 +52,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 ## Frontend Bundling
 
 - If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- New Tailwind utilities written in Blade take effect only after a rebuild: verify the class exists in the compiled bundle (e.g. `grep` in `public/build/assets/*.css`) before chasing other causes. Note that `truncate` without a width cap makes overflow worse, not better.
 
 ## Documentation Files
 
@@ -107,7 +108,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Always use curly braces for control structures, even for single-line bodies.
 - Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
 - Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
+- Follow existing application Enum naming conventions.
 - Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
 - Use array shape type definitions in PHPDoc blocks.
 
@@ -191,6 +192,8 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
 - You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
 - Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
+- For a native `<dialog>` inside a component: keep the node always rendered (conditional content inside), drive `showModal()`/`close()` imperatively via dispatched browser events handled in `resources/js`, and never rely on Alpine `x-init` running again after a morph. Sync Escape back to Livewire (`cancel.prevent` + close action) so server state and the visible dialog agree. Backdrop click-to-close stays off for forms with unsaved input.
+- A DaisyUI modal trapped off-screen by a transformed ancestor must be teleported to `<body>` (`x-teleport`); verify centering on screen, not on the container.
 
 === volt/core rules ===
 
