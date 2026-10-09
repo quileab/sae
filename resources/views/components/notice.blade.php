@@ -70,7 +70,7 @@
             aria-modal="true"
             aria-label="{{ $title }}"
         >
-            <div class="modal-box max-w-md">
+            <div class="modal-box max-w-lg">
                 <h3 class="flex items-center gap-2 font-bold text-lg">
                     <x-mary-icon :name="$icon" class="w-5 h-5 {{ $color }}" />
                     {{ $title }}
