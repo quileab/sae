@@ -129,12 +129,16 @@ public function mount($id)
 
 public function attemptHeaders(): array
     {
+        // Compact horizontal padding: header['class'] reaches both th and td,
+        // and at md widths the six default-padded columns overflow the card by
+        // a few pixels. px-3 wins over the DaisyUI cell padding because the
+        // utilities layer comes last in the bundle.
         return [
-            ['key' => 'user_id', 'label' => 'Estudiante'],
-            ['key' => 'attempt_number', 'label' => 'Intento'],
-            ['key' => 'status', 'label' => 'Estado'],
-            ['key' => 'submitted_at', 'label' => 'Entrega'],
-            ['key' => 'score', 'label' => 'Calificación'],
+            ['key' => 'user_id', 'label' => 'Estudiante', 'class' => 'px-3'],
+            ['key' => 'attempt_number', 'label' => 'Intento', 'class' => 'px-3'],
+            ['key' => 'status', 'label' => 'Estado', 'class' => 'px-3'],
+            ['key' => 'submitted_at', 'label' => 'Entrega', 'class' => 'px-3'],
+            ['key' => 'score', 'label' => 'Calificación', 'class' => 'px-3'],
         ];
     }
 
@@ -1559,7 +1563,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         {{-- Inline max-width on purpose: it must hold even if the
                             CSS bundle predates this markup (max-w-* utilities only
                             exist after a rebuild). --}}
-                        <span class="font-bold block truncate" style="max-width:13rem" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
+                        <span class="font-bold block truncate" style="max-width:11rem" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
                     @endscope
 
                     @scope('cell_attempt_number', $attempt)
@@ -1567,7 +1571,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                     @endscope
 
                     @scope('cell_status', $attempt)
-                        <div class="badge {{ $attempt->status_badge }}">{{ $attempt->status_label }}</div>
+                        <div class="badge whitespace-nowrap {{ $attempt->status_badge }}">{{ $attempt->status_label }}</div>
                     @endscope
 
                     @scope('cell_submitted_at', $attempt)
