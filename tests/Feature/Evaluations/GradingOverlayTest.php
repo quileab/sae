@@ -75,6 +75,7 @@ class GradingOverlayTest extends TestCase
             ->assertSet('gradingTotal', 3)
             ->assertSet('gradingPrevId', $first->id)
             ->assertSet('gradingNextId', $third->id)
+            ->assertDispatched('grading-dialog-open')
             ->assertSee('2 de 3');
     }
 
@@ -135,7 +136,19 @@ class GradingOverlayTest extends TestCase
             ->assertSet('gradingPrevId', null)
             ->assertSet('gradingNextId', null)
             ->assertSet('gradingPosition', null)
-            ->assertSet('gradingTotal', null);
+            ->assertSet('gradingTotal', null)
+            ->assertDispatched('grading-dialog-close');
+    }
+
+    #[Test]
+    public function the_dialog_node_is_always_rendered_so_morphs_keep_it_stable(): void
+    {
+        $this->actingAs($this->teacher);
+
+        // Without grading open: the node exists but carries no content.
+        Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->assertSee('grading-dialog', false)
+            ->assertDontSee('Corrigiendo:');
     }
 
     #[Test]

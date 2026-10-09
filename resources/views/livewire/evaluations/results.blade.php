@@ -193,6 +193,10 @@ public function attemptHeaders(): array
         $this->gradingPosition = $index === false ? null : $index + 1;
         $this->gradingPrevId = ($index !== false && $index > 0) ? $orderedIds[$index - 1] : null;
         $this->gradingNextId = ($index !== false && $index < $orderedIds->count() - 1) ? $orderedIds[$index + 1] : null;
+
+        // The dialog node is stable across morphs, so visibility is driven
+        // imperatively. The event fires after the DOM update.
+        $this->dispatch('grading-dialog-open');
     }
 
     /**
@@ -322,6 +326,7 @@ public function attemptHeaders(): array
     public function closeGrading()
     {
         $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason', 'gradingPrevId', 'gradingNextId', 'gradingPosition', 'gradingTotal']);
+        $this->dispatch('grading-dialog-close');
     }
 
     public function saveGrading()
@@ -1304,6 +1309,20 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
     @endif
 
     @if($this->isTeacher)
+        {{-- Native <dialog> renders in the top layer, so no transformed ancestor
+            can trap it off-screen. The element itself is always rendered and
+            never removed: only its content is conditional. That keeps the node
+            stable across Livewire morphs, so open/close is driven imperatively
+            by browser events (see resources/js/grading-dialog.js) instead of
+            relying on Alpine init timing, which broke prev/next navigation.
+            Escape closes immediately for feedback and then syncs Livewire, so
+            server state and the visible dialog never disagree. --}}
+        <dialog
+            id="grading-dialog"
+            class="modal"
+            wire:key="grading-dialog"
+            x-on:cancel.prevent="$el.close(); $wire.closeGrading()"
+        >
         @if($gradingAttemptId && $gradingAttempt)
             @php
                 $attemptToGrade = $gradingAttempt;
@@ -1311,19 +1330,6 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                 $sections = $snapshotContent['sections'] ?? [];
                 $rubrics = $attemptToGrade->rubric_snapshot ?? App\Services\Evaluations\Rubric::snapshotFor($snapshotContent);
             @endphp
-            {{-- Native <dialog> renders in the top layer, so no transformed ancestor
-                can trap it off-screen. x-init opens it on first render; later
-                morphs (prev/next) keep the same element, so Alpine never
-                re-runs init and the dialog stays open. Escape is synced back to
-                Livewire instead of closing natively, otherwise the server state
-                and the visible dialog would disagree. --}}
-            <dialog
-                class="modal"
-                wire:key="grading-dialog"
-                x-data
-                x-init="$el.showModal()"
-                x-on:cancel.prevent="$wire.closeGrading()"
-            >
                 <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
                     <div class="flex items-center gap-2 mb-4">
                         @if($gradingPrevId)
