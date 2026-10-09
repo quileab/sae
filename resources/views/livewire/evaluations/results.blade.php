@@ -129,10 +129,8 @@ public function mount($id)
 
 public function attemptHeaders(): array
     {
-        // Compact horizontal padding: header['class'] reaches both th and td,
-        // and at md widths the six default-padded columns overflow the card by
-        // a few pixels. px-3 wins over the DaisyUI cell padding because the
-        // utilities layer comes last in the bundle.
+        // Compact cell padding (header['class'] reaches th and td): the six
+        // default-padded columns overflow the card by a few pixels at md widths.
         return [
             ['key' => 'user_id', 'label' => 'Estudiante', 'class' => 'px-3'],
             ['key' => 'attempt_number', 'label' => 'Intento', 'class' => 'px-3'],
@@ -1560,18 +1558,12 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
             <x-card title="Detalle de Intentos por Estudiante">
                 <x-table :headers="$this->attemptHeaders()" :rows="$this->attempts" with-pagination>
                     @scope('cell_user_id', $attempt)
-                        {{-- Inline max-width on purpose: it must hold even if the
-                            CSS bundle predates this markup (max-w-* utilities only
-                            exist after a rebuild). --}}
+                        {{-- Inline max-width: holds even if the CSS bundle predates this markup. --}}
                         <span class="font-bold block truncate" style="max-width:11rem" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
                     @endscope
 
-                    @scope('cell_attempt_number', $attempt)
-                        {{ $attempt->attempt_number }}
-                    @endscope
-
                     @scope('cell_status', $attempt)
-                        <div class="badge whitespace-nowrap {{ $attempt->status_badge }}">{{ $attempt->status_label }}</div>
+                        <span class="badge whitespace-nowrap {{ $attempt->status_badge }}">{{ $attempt->status_label }}</span>
                     @endscope
 
                     @scope('cell_submitted_at', $attempt)
@@ -1592,9 +1584,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         @if($attempt->isFinished())
                             <div class="flex items-center justify-end gap-2">
                                 @if(($attempt->pending_suggestions_count ?? 0) > 0)
-                                    <div class="tooltip tooltip-left lg:tooltip-right" data-tip="Propuestas del asistente esperando revisión">
-                                        <span class="badge badge-primary badge-sm">{{ $attempt->pending_suggestions_count }}</span>
-                                    </div>
+                                    <span class="badge badge-primary badge-sm tooltip tooltip-left lg:tooltip-right" data-tip="Propuestas del asistente esperando revisión">{{ $attempt->pending_suggestions_count }}</span>
                                 @endif
                                 <x-button
                                     icon="o-pencil-square"
