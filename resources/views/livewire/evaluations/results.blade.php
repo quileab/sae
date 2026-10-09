@@ -909,12 +909,14 @@ public function attemptHeaders(): array
                             @if($assistAnonymize)
                                 <x-notice
                                     variant="info"
-                                    text="Los nombres quedan fuera del archivo: vas a ver un código en lugar de quién es cada alumno."
+                                    title="Anonimizado"
+                                    text="Los nombres quedan fuera del archivo: vas a ver un código en lugar de quién es cada alumno. Vas a tener que reconocer vos a quién corresponde cada respuesta al leerlas."
                                 />
                             @else
                                 <x-notice
                                     variant="danger"
-                                    text="El archivo sale de la aplicación hacia un modelo externo con los nombres de los alumnos. Si eso no está permitido, activá anonimizar."
+                                    title="Los nombres salen de la aplicación"
+                                    text="El archivo se envía a un modelo externo con los nombres y apellidos de los alumnos. Si tu institución no lo permite, o si preferís no hacerlo, activá Anonimizar."
                                 />
                             @endif
                         </label>
@@ -948,17 +950,55 @@ public function attemptHeaders(): array
                             @unless($assistSummary['has_rubric'])
                                 <x-notice
                                     variant="warning"
-                                    text="La pregunta elegida todavía no tiene rúbrica. Conviene pedirla primero en modo «Solo redactar la rúbrica»."
+                                    title="Esta pregunta no tiene rúbrica"
+                                    text="Sin criterios, el asistente tendría que inventar la vara de cada corrección y los resultados no serían comparables entre alumnos. Conviene pedirle primero una rúbrica en modo «Solo redactar la rúbrica», revisarla, y recién después pedir las notas."
                                 />
                             @endunless
 
                             <details class="text-xs">
-                                <summary class="cursor-pointer text-base-content/70">Cómo usarlo</summary>
-                                <ol class="list-decimal list-inside space-y-1 mt-2 text-base-content/70">
-                                    <li>Copiá el markdown y pegalo en tu asistente.</li>
-                                    <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown.</li>
-                                    <li>Volvé a la sección 2 y pegá la respuesta.</li>
-                                </ol>
+                                <summary class="cursor-pointer text-base-content/70">Cómo funciona y qué le pido en cada modo</summary>
+
+                                <div class="mt-3 space-y-3 text-base-content/70">
+                                    <p class="font-semibold">El circuito</p>
+                                    <ol class="list-decimal list-inside space-y-1">
+                                        <li>Elegí la pregunta y generá el archivo.</li>
+                                        <li>Copiá el markdown y pegalo en tu asistente.</li>
+                                        <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown para que se copie literal.</li>
+                                        <li>Volvé a la sección 2, pegá lo que devolvió y revisá la tabla.</li>
+                                        <li>Guardá las propuestas y después aceptá o ajustá alumno por alumno desde la corrección.</li>
+                                    </ol>
+
+                                    <p class="font-semibold pt-1">Los dos modos no son equivalentes</p>
+
+                                    <div class="space-y-2">
+                                        <div class="rounded border border-base-300 p-2">
+                                            <div class="font-semibold">Solo redactar la rúbrica</div>
+                                            <p class="mt-1">
+                                                El archivo sale con las consignas pero <strong>sin rúbrica</strong>. Dejás al modelo la barra con la que después se mide a cada alumno:
+                                                te devuelve los criterios y los puntajes de cada uno.
+                                            </p>
+                                            <p class="mt-1 text-base-content/60">
+                                                Sirve para <strong>preparar</strong> la corrección. No toca notas: solo escribe la rúbrica de la pregunta.
+                                            </p>
+                                        </div>
+
+                                        <div class="rounded border border-base-300 p-2">
+                                            <div class="font-semibold">Rúbrica vigente + notas</div>
+                                            <p class="mt-1">
+                                                El archivo sale <strong>con la rúbrica ya cargada</strong> y con las respuestas de todos los alumnos.
+                                                El modelo no puede cambiar los criterios: solo tiene que decir cuántos puntos le da a cada criterio de cada respuesta.
+                                            </p>
+                                            <p class="mt-1 text-base-content/60">
+                                                Sirve para <strong>corriger</strong>. Guarda propuestas que después aprobás o ajustás vos.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <p class="pt-1">
+                                        El orden que funciona es <strong>primero la rúbrica, después las notas</strong>:
+                                        sin criterios escritos por vos, las correcciones salen de medir contra una vara que nadie revisó.
+                                    </p>
+                                </div>
                             </details>
                         </div>
 
@@ -1007,7 +1047,8 @@ public function attemptHeaders(): array
                         Pegá y revisá
                         <x-notice
                             variant="info"
-                            text="Nada se guarda todavía: esto solo te muestra qué se leería. Las notas las aprobás vos, una por una."
+                            title="Esto todavía no guarda nada"
+                            text="Pegar y revisar solo te muestra qué se leería al archivo, con los errores que tuviera y cuántas propuestas quedarían pendientes. Las notas no se escriben acá: las aprobás vos, una por una, desde la corrección de cada alumno."
                         />
                     </h4>
 
@@ -1038,7 +1079,8 @@ public function attemptHeaders(): array
                             />
                             <x-notice
                                 variant="warning"
-                                text="La rúbrica pasa a ser la referencia de toda la evaluación. Guardala solo si la leíste y te sirve: después todas las correcciones se miden contra ella."
+                                title="Guardar la rúbrica cambia cómo se corrige"
+                                text="La rúbrica pasa a ser la referencia de la pregunta para siempre, y de ahí en adelante todas las correcciones se miden contra ella, no contra tu criterio libre. Guardala solo si la leíste y te sirve; si algo no te cierra, cambiala en el editor antes de usarla."
                             />
                         @endif
 

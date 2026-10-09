@@ -121,40 +121,65 @@ class AssistClipboardContractTest extends TestCase
     }
 
     #[Test]
-    public function the_advisories_are_popups_that_still_carry_their_message(): void
+    public function the_advisories_open_a_modal_with_the_whole_message(): void
     {
         // A paste carrying rubric rows is what reveals the last notice, so this
         // renders with one rather than asserting on the empty dialog.
         $html = $this->renderDialog(pasted: $this->pasteWithRubricRows());
 
-        // Rendered as a tooltip trigger, not as an inline alert block.
+        // Rendered as a modal trigger, not as an inline alert block.
         $this->assertStringNotContainsString('alert-warning py-2 text-xs', $html);
         $this->assertStringNotContainsString('alert-info py-2 text-xs', $html);
 
         $notices = [
-            'modelo externo con los nombres de los alumnos' => 'tooltip-danger',
-            'todavía no tiene rúbrica' => 'tooltip-warning',
-            'Nada se guarda todavía' => 'tooltip-info',
-            'referencia de toda la evaluación' => 'tooltip-warning',
+            'modelo externo con los nombres y apellidos' => 'text-error',
+            'todavía no tiene rúbrica' => 'text-warning',
+            'todavía no guarda nada' => 'text-info',
+            'cambia cómo se corrige' => 'text-warning',
         ];
 
-        foreach ($notices as $text => $classes) {
+        foreach ($notices as $text => $color) {
             $this->assertStringContainsString(
-                'data-tip="'.$this->tipFor($html, $text).'"',
+                $text,
                 $html,
-                sprintf('the "%s" notice must keep its message', $classes),
+                sprintf('the "%s" notice must keep its message', $color),
             );
         }
 
-        // Every notice is a focusable trigger with an accessible name: DaisyUI only
-        // reveals a tooltip on :hover, .tooltip-open or :has(:focus-visible), so
-        // without focus the message would be unreachable by keyboard.
+        // The modal is teleported to <body> so no transformed ancestor can trap
+        // it: without that, `position: fixed` centers it on the container
+        // instead of the screen. The state lives on the trigger's scope, so the
+        // button keeps working after a re-render.
+        $this->assertStringContainsString('x-teleport="body"', $html);
         $this->assertMatchesRegularExpression(
-            '/<button[^>]*aria-label="El archivo sale/',
+            '/<template[^>]*x-teleport="body"[^>]*>\s*<div[^>]*class="modal"/',
             $html,
-            'the notice trigger must be a focusable button carrying the message as its name',
+            'the teleported node must be the modal itself',
         );
-        $this->assertStringContainsString("classList.toggle('tooltip-open')", $html, 'click must reveal it too');
+        $this->assertStringContainsString('modal-open', $html);
+
+        // A focusable trigger with an accessible name, so the message is announced
+        // and reachable by keyboard rather than hover-only.
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]*aria-label="Los nombres salen de la aplicación[^"]*"[^>]*>/',
+            $html,
+            'the trigger must announce which note it opens',
+        );
+        $this->assertStringContainsString('x-on:keydown.escape.window="open = false"', $html);
+    }
+
+    #[Test]
+    public function the_help_explains_what_each_mode_actually_does(): void
+    {
+        $html = $this->renderDialog();
+
+        // The two modes are the thing a teacher actually gets wrong, so the help
+        // has to say what each one writes and in which order to use them.
+        $this->assertStringContainsString('Solo redactar la rúbrica', $html);
+        $this->assertStringContainsString('Rúbrica vigente + notas', $html);
+        $this->assertStringContainsString('sin rúbrica', $html);
+        $this->assertStringContainsString('no puede cambiar los criterios', $html);
+        $this->assertStringContainsString('primero la rúbrica, después las notas', $html);
     }
 
     #[Test]
@@ -189,18 +214,6 @@ class AssistClipboardContractTest extends TestCase
     }
 
     private int $evaluationId = 0;
-
-    /**
-     * Reads the notice text back out of the rendered tooltip attribute.
-     */
-    private function tipFor(string $html, string $fragment): string
-    {
-        preg_match('/data-tip="([^"]*'.preg_quote($fragment, '/').'[^"]*)"/', $html, $matches);
-
-        $this->assertNotEmpty($matches, sprintf('no notice contains "%s"', $fragment));
-
-        return html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
-    }
 
     private function renderDialog(?string $pasted = null): string
     {

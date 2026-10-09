@@ -1,14 +1,21 @@
 @props([
     'variant' => 'info',
     'text' => '',
-    'position' => 'right',
+    'title' => '',
 ])
 
 {{--
-    An advisory reduced to an icon: the message shows on hover and on keyboard
-    focus through the DaisyUI tooltip, and on click for touch. Use it for the
-    "good to know" notes; anything the teacher has to read in full (parse errors,
-    a rubric that does not add up) belongs in the page body.
+    An advisory reduced to an icon that opens a modal with the whole message.
+
+    A tooltip was not enough: these notes decide whether a teacher sends student
+    names to an external model, and truncating them into a hover bubble is the
+    wrong trade.
+
+    The modal is teleported to <body> on purpose. DaisyUI positions .modal with
+    `position: fixed`, but any ancestor with a transform/filter becomes the
+    containing block and the modal ends up centered on that container instead of
+    the screen. Teleporting escapes those ancestors, and since the source stays
+    in place the trigger keeps its position and its Alpine scope.
 --}}
 @php
     $icons = [
@@ -24,18 +31,48 @@
         'danger' => 'text-error',
         'success' => 'text-success',
     ];
+
+    $icon = $icons[$variant] ?? $icons['info'];
+    $color = $colors[$variant] ?? $colors['info'];
 @endphp
 
 <span
-    class="tooltip tooltip-{{ $position }} tooltip-{{ $variant }} inline-flex align-middle"
-    data-tip="{{ $text }}"
+    class="inline-flex align-middle"
+    data-notice
+    x-data="{ open: false }"
+    x-on:keydown.escape.window="open = false"
 >
     <button
         type="button"
-        aria-label="{{ $text }}"
-        class="{{ $colors[$variant] ?? $colors['info'] }} cursor-help rounded-full focus-visible:ring-2 focus-visible:ring-current"
-        x-on:click="$el.closest('.tooltip').classList.toggle('tooltip-open')"
+        aria-label="{{ $title }}: más información"
+        aria-haspopup="dialog"
+        class="{{ $color }} cursor-pointer rounded-full focus-visible:ring-2 focus-visible:ring-current"
+        x-on:click="open = true; $nextTick(() => { if ($refs.close) { $refs.close.focus(); } })"
     >
-        <x-mary-icon :name="$icons[$variant] ?? $icons['info']" class="w-4 h-4" />
+        <x-mary-icon :name="$icon" class="w-4 h-4" />
     </button>
+
+    <template x-teleport="body">
+        <div
+            class="modal"
+            x-bind:class="{ 'modal-open': open }"
+            x-on:click.self="open = false"
+            role="dialog"
+            aria-modal="true"
+            aria-label="{{ $title }}"
+        >
+            <div class="modal-box max-w-md">
+                <h3 class="flex items-center gap-2 font-bold text-lg">
+                    <x-mary-icon :name="$icon" class="w-5 h-5 {{ $color }}" />
+                    {{ $title }}
+                </h3>
+                <div class="py-4 text-sm">{{ $text }}</div>
+                <div class="modal-action">
+                    <button type="button" class="btn btn-sm" x-ref="close" x-on:click="open = false">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
 </span>
