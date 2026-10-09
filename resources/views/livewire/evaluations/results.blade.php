@@ -896,6 +896,38 @@ public function attemptHeaders(): array
         </div>
     </div>
 
+    @if($this->isTeacher)
+            <!-- KPIs Docente -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <x-stat
+                    title="Alumnos corregidos"
+                    value="{{ $this->stats['total'] }}"
+                    description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' pendientes') : 'todos corregidos' }}"
+                    icon="o-users"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
+                <x-stat
+                    title="Promedio General"
+                    value="{{ $this->stats['average'] }}"
+                    icon="o-chart-bar"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
+                <x-stat
+                    title="Tasa de Aprobación"
+                    value="{{ $this->stats['passRate'] ?? 0 }}%"
+                    description="{{ $this->stats['approved'] }} de {{ $this->stats['total'] }} aprobados"
+                    icon="o-check-badge"
+                    class="bg-base-100 shadow-sm border border-base-200 text-success"
+                />
+                <x-stat
+                    title="Rango de Notas"
+                    value="{{ $this->stats['min'] }} – {{ $this->stats['max'] }}"
+                    icon="o-arrows-up-down"
+                    class="bg-base-100 shadow-sm border border-base-200"
+                />
+            </div>
+    @endif
+
     @if($showAssistModal)
         <x-card title="Corrección asistida" class="mb-8 border-primary">
             <x-slot:menu>
@@ -1521,36 +1553,6 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
             </div>
     @endif
         </dialog>
-            <!-- KPIs Docente -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <x-stat
-                    title="Alumnos corregidos"
-                    value="{{ $this->stats['total'] }}"
-                    description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' pendientes') : 'todos corregidos' }}"
-                    icon="o-users"
-                    class="bg-base-100 shadow-sm border border-base-200"
-                />
-                <x-stat
-                    title="Promedio General"
-                    value="{{ $this->stats['average'] }}"
-                    icon="o-chart-bar"
-                    class="bg-base-100 shadow-sm border border-base-200"
-                />
-                <x-stat
-                    title="Tasa de Aprobación"
-                    value="{{ $this->stats['passRate'] ?? 0 }}%"
-                    description="{{ $this->stats['approved'] }} de {{ $this->stats['total'] }} aprobados"
-                    icon="o-check-badge"
-                    class="bg-base-100 shadow-sm border border-base-200 text-success"
-                />
-                <x-stat
-                    title="Rango de Notas"
-                    value="{{ $this->stats['min'] }} – {{ $this->stats['max'] }}"
-                    icon="o-arrows-up-down"
-                    class="bg-base-100 shadow-sm border border-base-200"
-                />
-            </div>
-
             <x-card title="Detalle de Intentos por Estudiante">
                 <x-table :headers="$this->attemptHeaders()" :rows="$this->attempts" with-pagination>
                     @scope('cell_user_id', $attempt)

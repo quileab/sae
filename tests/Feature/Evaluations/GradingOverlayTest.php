@@ -162,22 +162,42 @@ class GradingOverlayTest extends TestCase
     }
 
     #[Test]
-    public function the_dialog_closes_before_the_kpis_so_the_page_is_never_swallowed(): void
+    public function the_dialog_closes_before_the_table_so_the_page_is_never_swallowed(): void
     {
         // Regression: the opening <dialog> once rendered unconditionally while
         // its closing tag stayed inside the grading conditional. With no grading
-        // open the dialog never closed and the HTML parser folded the KPIs and
-        // the whole table into it, leaving only the page title visible.
+        // open the dialog never closed and the HTML parser folded the KPIs, the
+        // attempts table and the rest of the page into it, leaving only the page
+        // title visible.
         $this->actingAs($this->teacher);
 
         $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])->html();
 
         $close = strpos($html, '</dialog>');
-        $kpis = strpos($html, 'KPIs Docente');
+        $table = strpos($html, 'Detalle de Intentos');
 
         $this->assertNotFalse($close, 'the dialog must always be closed in the markup');
+        $this->assertNotFalse($table, 'the attempts table must render');
+        $this->assertLessThan($table, $close, 'the dialog must close before the table starts');
+    }
+
+    #[Test]
+    public function the_kpis_render_above_the_assisted_grading_panel(): void
+    {
+        $this->actingAs($this->teacher);
+
+        // 'Generá el archivo' only exists inside the assist panel card, unlike
+        // the header button which shares the panel's title.
+        $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openAssist')
+            ->html();
+
+        $kpis = strpos($html, 'Alumnos corregidos');
+        $panel = strpos($html, 'Generá el archivo');
+
         $this->assertNotFalse($kpis, 'the KPIs must render');
-        $this->assertLessThan($kpis, $close, 'the dialog must close before the KPIs start');
+        $this->assertNotFalse($panel, 'the assist panel must render');
+        $this->assertLessThan($panel, $kpis, 'the KPIs must come before the assisted grading panel');
     }
 
     /**
