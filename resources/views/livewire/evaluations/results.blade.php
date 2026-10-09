@@ -30,6 +30,12 @@ new class extends Component {
     public $manualScores = [];
     public $feedback = '';
     public $suggestionRejectionReason = null;
+    // Position of the graded attempt within the finished attempts of the
+    // evaluation, in table order. Drives the prev/next navigation.
+    public $gradingPrevId = null;
+    public $gradingNextId = null;
+    public $gradingPosition = null;
+    public $gradingTotal = null;
 
     // Grade sync state
     public $showSyncModal = false;
@@ -162,6 +168,10 @@ public function attemptHeaders(): array
 
     public function openGrading($attemptId)
     {
+        if (blank($attemptId)) {
+            return;
+        }
+
         $attempt = EvaluationAttempt::findOrFail($attemptId);
 
         $this->authorize('grade', $this->evaluation);
@@ -171,6 +181,18 @@ public function attemptHeaders(): array
         $this->gradingAttempt = $attempt->load(['user', 'gradingSuggestions']);
         $this->manualScores = $attempt->block_scores ?? [];
         $this->feedback = $attempt->feedback ?? '';
+
+        // Neighbors in table order, so prev/next never loses the teacher's place.
+        $orderedIds = EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+            ->finished()
+            ->orderBy('user_id')
+            ->orderByDesc('attempt_number')
+            ->pluck('id');
+        $this->gradingTotal = $orderedIds->count();
+        $index = $orderedIds->search($attempt->id);
+        $this->gradingPosition = $index === false ? null : $index + 1;
+        $this->gradingPrevId = ($index !== false && $index > 0) ? $orderedIds[$index - 1] : null;
+        $this->gradingNextId = ($index !== false && $index < $orderedIds->count() - 1) ? $orderedIds[$index + 1] : null;
     }
 
     /**
@@ -299,7 +321,7 @@ public function attemptHeaders(): array
 
     public function closeGrading()
     {
-        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason']);
+        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason', 'gradingPrevId', 'gradingNextId', 'gradingPosition', 'gradingTotal']);
     }
 
     public function saveGrading()
@@ -1289,12 +1311,41 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                 $sections = $snapshotContent['sections'] ?? [];
                 $rubrics = $attemptToGrade->rubric_snapshot ?? App\Services\Evaluations\Rubric::snapshotFor($snapshotContent);
             @endphp
-            <x-card title="Corrigiendo: {{ $attemptToGrade->user->fullname }} (Intento {{ $attemptToGrade->attempt_number }})">
-                <x-slot:menu>
-                    <x-button icon="o-x-mark" class="btn-ghost btn-sm" wire:click="closeGrading" />
-                </x-slot:menu>
+            {{-- Native <dialog> renders in the top layer, so no transformed ancestor
+                can trap it off-screen. x-init opens it on first render; later
+                morphs (prev/next) keep the same element, so Alpine never
+                re-runs init and the dialog stays open. Escape is synced back to
+                Livewire instead of closing natively, otherwise the server state
+                and the visible dialog would disagree. --}}
+            <dialog
+                class="modal"
+                wire:key="grading-dialog"
+                x-data
+                x-init="$el.showModal()"
+                x-on:cancel.prevent="$wire.closeGrading()"
+            >
+                <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center gap-2 mb-4">
+                        @if($gradingPrevId)
+                            <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" />
+                        @else
+                            <x-button icon="o-chevron-left" class="btn-ghost btn-sm" disabled />
+                        @endif
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-bold text-lg truncate">Corrigiendo: {{ $attemptToGrade->user->fullname }} (Intento {{ $attemptToGrade->attempt_number }})</h3>
+                            @if($gradingPosition && $gradingTotal)
+                                <div class="text-sm text-base-content/60">{{ $gradingPosition }} de {{ $gradingTotal }}</div>
+                            @endif
+                        </div>
+                        @if($gradingNextId)
+                            <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" />
+                        @else
+                            <x-button icon="o-chevron-right" class="btn-ghost btn-sm" disabled />
+                        @endif
+                        <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" />
+                    </div>
 
-                <div class="space-y-8">
+                    <div class="space-y-8">
                     @foreach($sections as $sIndex => $section)
                         <div class="space-y-4">
                             <h3 class="font-bold text-lg border-b pb-2">{{ $section['title'] ?? 'Sección' }}</h3>
@@ -1461,12 +1512,13 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         <x-button label="Guardar Corrección" icon="o-check" class="btn-primary" wire:click="saveGrading" />
                     </div>
                 </div>
-            </x-card>
-        @else
+            </div>
+        </dialog>
+    @endif
             <!-- KPIs Docente -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <x-stat
-                    title="Alumnos corrijidos"
+                    title="Alumnos corregidos"
                     value="{{ $this->stats['total'] }}"
                     description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' pendientes') : 'todos corregidos' }}"
                     icon="o-users"
@@ -1550,7 +1602,6 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                     </x-slot:empty>
                 </x-table>
             </x-card>
-        @endif
     @else
         <!-- Vista Estudiante (Historial y Nota Final) -->
         @php
