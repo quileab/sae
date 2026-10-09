@@ -201,6 +201,18 @@ class AssistClipboardContractTest extends TestCase
     }
 
     #[Test]
+    public function the_mode_help_opens_as_a_modal_not_an_inline_details(): void
+    {
+        $html = $this->renderDialog();
+
+        // The help lives behind a labeled trigger that opens the teleported
+        // modal, instead of an inline <details> that pushes the whole panel down.
+        $this->assertStringNotContainsString('<details', $html);
+        $this->assertStringContainsString('Cómo funciona y qué le pido en cada modo', $html);
+        $this->assertStringContainsString('x-teleport="body"', $html);
+    }
+
+    #[Test]
     public function parse_errors_stay_in_the_body_and_do_not_become_popups(): void
     {
         // A parser error is the result the teacher has to act on, so it must not

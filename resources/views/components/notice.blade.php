@@ -2,6 +2,7 @@
     'variant' => 'info',
     'text' => '',
     'title' => '',
+    'label' => null,
 ])
 
 {{--
@@ -16,6 +17,10 @@
     containing block and the modal ends up centered on that container instead of
     the screen. Teleporting escapes those ancestors, and since the source stays
     in place the trigger keeps its position and its Alpine scope.
+
+    Pass `label` to render a visible text trigger next to the icon (keeps the
+    affordance discoverable). Pass rich HTML as the slot for long-form help; the
+    plain `text` prop stays for one-paragraph notes.
 --}}
 @php
     $icons = [
@@ -34,6 +39,7 @@
 
     $icon = $icons[$variant] ?? $icons['info'];
     $color = $colors[$variant] ?? $colors['info'];
+    $richContent = trim($slot->toHtml());
 @endphp
 
 <span
@@ -46,10 +52,13 @@
         type="button"
         aria-label="{{ $title }}: más información"
         aria-haspopup="dialog"
-        class="{{ $color }} cursor-pointer rounded-full focus-visible:ring-2 focus-visible:ring-current"
+        class="{{ $color }} cursor-pointer focus-visible:ring-2 focus-visible:ring-current {{ $label ? 'btn btn-xs btn-ghost gap-1 normal-case font-normal' : 'rounded-full' }}"
         x-on:click="open = true; $nextTick(() => { if ($refs.close) { $refs.close.focus(); } })"
     >
         <x-mary-icon :name="$icon" class="w-4 h-4" />
+        @if($label)
+            <span class="text-xs">{{ $label }}</span>
+        @endif
     </button>
 
     <template x-teleport="body">
@@ -66,7 +75,13 @@
                     <x-mary-icon :name="$icon" class="w-5 h-5 {{ $color }}" />
                     {{ $title }}
                 </h3>
-                <div class="py-4 text-sm whitespace-pre-line">{{ $text }}</div>
+                <div class="py-4 text-sm {{ $richContent === '' ? 'whitespace-pre-line' : '' }}">
+                    @if($richContent === '')
+                        {{ $text }}
+                    @else
+                        {!! $richContent !!}
+                    @endif
+                </div>
                 <div class="modal-action">
                     <button type="button" class="btn btn-sm" x-ref="close" x-on:click="open = false">
                         Entendido

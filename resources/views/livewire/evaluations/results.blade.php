@@ -132,11 +132,11 @@ public function attemptHeaders(): array
         // Compact cell padding (header['class'] reaches th and td): the six
         // default-padded columns overflow the card by a few pixels at md widths.
         return [
-            ['key' => 'user_id', 'label' => 'Estudiante', 'class' => 'px-3'],
-            ['key' => 'attempt_number', 'label' => 'Intento', 'class' => 'px-3'],
-            ['key' => 'status', 'label' => 'Estado', 'class' => 'px-3'],
-            ['key' => 'submitted_at', 'label' => 'Entrega', 'class' => 'px-3'],
-            ['key' => 'score', 'label' => 'Calificación', 'class' => 'px-3'],
+            ['key' => 'user_id', 'label' => 'Estudiante', 'class' => 'px-2'],
+            ['key' => 'attempt_number', 'label' => 'Intento', 'class' => 'px-2'],
+            ['key' => 'status', 'label' => 'Estado', 'class' => 'px-2'],
+            ['key' => 'submitted_at', 'label' => 'Entrega', 'class' => 'px-2'],
+            ['key' => 'score', 'label' => 'Calificación', 'class' => 'px-2'],
         ];
     }
 
@@ -1048,51 +1048,51 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                 />
                             @endunless
 
-                            <details class="text-xs">
-                                <summary class="cursor-pointer text-base-content/70">Cómo funciona y qué le pido en cada modo</summary>
+                            <x-notice
+                                variant="info"
+                                title="Cómo funciona y qué le pido en cada modo"
+                                label="Cómo funciona y qué le pido en cada modo"
+                            >
+                                <p class="font-semibold">El circuito</p>
+                                <ol class="list-decimal list-inside space-y-1 mt-2">
+                                    <li>Elegí la pregunta y generá el archivo.</li>
+                                    <li>Copiá el markdown y pegalo en tu asistente.</li>
+                                    <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown para que se copie literal.</li>
+                                    <li>Volvé a la sección 2, pegá lo que devolvió y revisá la tabla.</li>
+                                    <li>Guardá las propuestas y después aceptá o ajustá alumno por alumno desde la corrección.</li>
+                                </ol>
 
-                                <div class="mt-3 space-y-3 text-base-content/70">
-                                    <p class="font-semibold">El circuito</p>
-                                    <ol class="list-decimal list-inside space-y-1">
-                                        <li>Elegí la pregunta y generá el archivo.</li>
-                                        <li>Copiá el markdown y pegalo en tu asistente.</li>
-                                        <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown para que se copie literal.</li>
-                                        <li>Volvé a la sección 2, pegá lo que devolvió y revisá la tabla.</li>
-                                        <li>Guardá las propuestas y después aceptá o ajustá alumno por alumno desde la corrección.</li>
-                                    </ol>
+                                <p class="font-semibold pt-3">Los dos modos no son equivalentes</p>
 
-                                    <p class="font-semibold pt-1">Los dos modos no son equivalentes</p>
-
-                                    <div class="space-y-2">
-                                        <div class="rounded border border-base-300 p-2">
-                                            <div class="font-semibold">Solo redactar la rúbrica</div>
-                                            <p class="mt-1">
-                                                El archivo sale con las consignas pero <strong>sin rúbrica</strong>. Dejás al modelo la barra con la que después se mide a cada alumno:
-                                                te devuelve los criterios y los puntajes de cada uno.
-                                            </p>
-                                            <p class="mt-1 text-base-content/60">
-                                                Sirve para <strong>preparar</strong> la corrección. No toca notas: solo escribe la rúbrica de la pregunta.
-                                            </p>
-                                        </div>
-
-                                        <div class="rounded border border-base-300 p-2">
-                                            <div class="font-semibold">Rúbrica vigente + notas</div>
-                                            <p class="mt-1">
-                                                El archivo sale <strong>con la rúbrica ya cargada</strong> y con las respuestas de todos los alumnos.
-                                                El modelo no puede cambiar los criterios: solo tiene que decir cuántos puntos le da a cada criterio de cada respuesta.
-                                            </p>
-                                            <p class="mt-1 text-base-content/60">
-                                                Sirve para <strong>corriger</strong>. Guarda propuestas que después aprobás o ajustás vos.
-                                            </p>
-                                        </div>
+                                <div class="space-y-2 mt-2">
+                                    <div class="rounded border border-base-300 p-2">
+                                        <div class="font-semibold">Solo redactar la rúbrica</div>
+                                        <p class="mt-1">
+                                            El archivo sale con las consignas pero <strong>sin rúbrica</strong>. Dejás al modelo la barra con la que después se mide a cada alumno:
+                                            te devuelve los criterios y los puntajes de cada uno.
+                                        </p>
+                                        <p class="mt-1 text-base-content/60">
+                                            Sirve para <strong>preparar</strong> la corrección. No toca notas: solo escribe la rúbrica de la pregunta.
+                                        </p>
                                     </div>
 
-                                    <p class="pt-1">
-                                        El orden que funciona es <strong>primero la rúbrica, después las notas</strong>:
-                                        sin criterios escritos por vos, las correcciones salen de medir contra una vara que nadie revisó.
-                                    </p>
+                                    <div class="rounded border border-base-300 p-2">
+                                        <div class="font-semibold">Rúbrica vigente + notas</div>
+                                        <p class="mt-1">
+                                            El archivo sale <strong>con la rúbrica ya cargada</strong> y con las respuestas de todos los alumnos.
+                                            El modelo no puede cambiar los criterios: solo tiene que decir cuántos puntos le da a cada criterio de cada respuesta.
+                                        </p>
+                                        <p class="mt-1 text-base-content/60">
+                                            Sirve para <strong>corriger</strong>. Guarda propuestas que después aprobás o ajustás vos.
+                                        </p>
+                                    </div>
                                 </div>
-                            </details>
+
+                                <p class="pt-3">
+                                    El orden que funciona es <strong>primero la rúbrica, después las notas</strong>:
+                                    sin criterios escritos por vos, las correcciones salen de medir contra una vara que nadie revisó.
+                                </p>
+                            </x-notice>
                         </div>
 
                         {{-- Not bound with wire:model on purpose: copying happens in
