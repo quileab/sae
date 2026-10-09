@@ -29,6 +29,9 @@ auditado que ya existe (`AttemptGrader::applyManualMarks()`).
    **Aceptar y finalizar** / **Cargar para ajustar** / **Rechazar** (con motivo
    opcional que alimenta la mejora de rúbricas).
 7. **Sincronizar Notas** al libro como siempre (dry-run + confirmación).
+8. **Medir**: `evaluations:calibrate` compara propuestas contra notas finales
+   una vez que la cursada está corregida. Guardar desde el modal liquida las
+   propuestas pendientes (igual = aceptada, distinto = con ajustes).
 
 Por defecto el flujo es en dos fases (`--mode=rubric` → el docente aprueba →
 `--mode=grading`), para que el agente no se auto-califique. Una sola pasada queda
@@ -96,6 +99,13 @@ diálogo de corrección (overlay) → tabla de intentos.
   [--block=] [--anonymize] [--status=submitted] [--preview]`
 - `evaluations:seed-examples` (eval3gestion / evalIA / eval-rec-3SIPGO, Parte 1
   teórica + Parte 2 relacional; `--markdown-dir`, `--replace`).
+- `evaluations:calibrate {evaluation} [--agent=] [--block=] [--min=10] [--json]`:
+  mide el acuerdo entre propuestas y notas finales del docente (tasa de
+  aceptación, error medio absoluto en puntos y en % de la pregunta, sesgo,
+  aperturas por pregunta y por fuente, banderas con su tasa de rechazo y
+  motivos de desacuerdo). Solo entran sugerencias liquidadas con nota final;
+  las pendientes se listan para terminar de revisar primero. Debajo de `--min`
+  liquidadas imprime una advertencia de muestra chica en vez de concluir nada.
 
 El import vive solo en la UI (botones Guardar del panel 2).
 
@@ -114,9 +124,6 @@ Suite verde salvo 3 fallos preexistentes y ajenos (`DeployZipTest` ×2,
 
 ## Pendiente / trabajo futuro
 
-- `evaluations:calibrate`: acuerdo modelo-vs-docente (MAE por criterio,
-  distribución de flags por fuente) para decidir si se confía en una fuente.
-  Necesita datos reales de una cursada; no calcularlo sobre intentos de demo.
 - Atajos de teclado en el modal (anterior/siguiente, aceptar, rechazar).
 - Solo `g1_1` trae rúbrica de ejemplo; el resto se redacta con `--mode=rubric`.
 - `ref` expone ids internos de intento; si preocupa, pasar a token opaco con

@@ -358,6 +358,26 @@ public function attemptHeaders(): array
 
         $grader->applyManualMarks($attempt, $this->manualScores, $this->feedback);
 
+        // Settle the pending proposals against what the teacher actually saved:
+        // identical numbers count as accepted, anything else as edited. A block
+        // the teacher left empty stays undecided on purpose, since there is no
+        // final mark to compare the proposal against.
+        foreach ($attempt->gradingSuggestions()->pending()->get() as $suggestion) {
+            if (! array_key_exists($suggestion->block_id, $this->manualScores) || $this->manualScores[$suggestion->block_id] === null) {
+                continue;
+            }
+
+            $saved = (float) $this->manualScores[$suggestion->block_id];
+            $same = abs($saved - (float) $suggestion->total_points) < 0.005;
+
+            $suggestion->update([
+                'state' => $same ? GradingSuggestionState::Accepted->value : GradingSuggestionState::Edited->value,
+                'final_points' => $saved,
+                'accepted_at' => now(),
+                'accepted_by' => auth()->id(),
+            ]);
+        }
+
         unset($this->attempts, $this->stats);
 
         $this->success('Corrección guardada.');
