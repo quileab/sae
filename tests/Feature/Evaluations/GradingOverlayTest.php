@@ -161,6 +161,25 @@ class GradingOverlayTest extends TestCase
             ->assertSet('gradingAttemptId', null);
     }
 
+    #[Test]
+    public function the_dialog_closes_before_the_kpis_so_the_page_is_never_swallowed(): void
+    {
+        // Regression: the opening <dialog> once rendered unconditionally while
+        // its closing tag stayed inside the grading conditional. With no grading
+        // open the dialog never closed and the HTML parser folded the KPIs and
+        // the whole table into it, leaving only the page title visible.
+        $this->actingAs($this->teacher);
+
+        $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])->html();
+
+        $close = strpos($html, '</dialog>');
+        $kpis = strpos($html, 'KPIs Docente');
+
+        $this->assertNotFalse($close, 'the dialog must always be closed in the markup');
+        $this->assertNotFalse($kpis, 'the KPIs must render');
+        $this->assertLessThan($kpis, $close, 'the dialog must close before the KPIs start');
+    }
+
     /**
      * @return array<string, mixed>
      */

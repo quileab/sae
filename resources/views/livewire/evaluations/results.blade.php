@@ -1519,8 +1519,8 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                     </div>
                 </div>
             </div>
-        </dialog>
     @endif
+        </dialog>
             <!-- KPIs Docente -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <x-stat
