@@ -1556,7 +1556,10 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
             <x-card title="Detalle de Intentos por Estudiante">
                 <x-table :headers="$this->attemptHeaders()" :rows="$this->attempts" with-pagination>
                     @scope('cell_user_id', $attempt)
-                        <span class="font-bold block max-w-52 truncate" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
+                        {{-- Inline max-width on purpose: it must hold even if the
+                            CSS bundle predates this markup (max-w-* utilities only
+                            exist after a rebuild). --}}
+                        <span class="font-bold block truncate" style="max-width:13rem" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
                     @endscope
 
                     @scope('cell_attempt_number', $attempt)
