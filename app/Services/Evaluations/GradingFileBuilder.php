@@ -30,6 +30,13 @@ final class GradingFileBuilder
     public const RULE_PREFIX = 'SAE';
 
     /**
+     * Memoised poolBlocks(), see the method for why it is cached.
+     *
+     * @var array<string, array<string, mixed>>|null
+     */
+    private ?array $poolBlocks = null;
+
+    /**
      * @param  Collection<int, EvaluationAttempt>  $attempts  already loaded with user
      * @param  string|null  $blockId  export a single question instead of the whole exam
      */
@@ -131,10 +138,17 @@ final class GradingFileBuilder
      * union of what the attempts froze, and each student's answers section
      * carries only the questions they received.
      *
+     * Memoised because the answers section asks for it once per student, and
+     * rebuilding it walks every attempt each time.
+     *
      * @return array<string, array<string, mixed>>
      */
     private function poolBlocks(): array
     {
+        if ($this->poolBlocks !== null) {
+            return $this->poolBlocks;
+        }
+
         $blocks = [];
 
         foreach ($this->attempts as $attempt) {
@@ -159,7 +173,7 @@ final class GradingFileBuilder
             }
         }
 
-        return $blocks;
+        return $this->poolBlocks = $blocks;
     }
 
     /**
@@ -377,6 +391,7 @@ final class GradingFileBuilder
             '**Cómo llenar cada columna**',
             '',
             '- `puntaje_max`: el puntaje del criterio. Solo completalo si redactás la rúbrica (sección 4).',
+            '- `niveles`: qué corresponde a cada puntaje parcial, como `0: no lo menciona / 0.5: lo menciona sin explicar`. Separá los niveles con ` / ` y no uses esa secuencia dentro de una descripción.',
             '- `clave`: la clave del criterio de la sección 4 para el mismo bloque; `—` si el bloque no tiene rúbrica.',
             '- `puntaje`: puntos crudos de ese criterio. La suma de un mismo `ref` y `bloque` no puede superar los puntos de la consigna.',
             '- `flags`: valores separados por `;`, o vacío si no hay nada que señalar.',
@@ -589,9 +604,7 @@ final class GradingFileBuilder
      */
     private function levels(array $levels): string
     {
-        return collect($levels)
-            ->map(fn (string $description, string $score) => $score.': '.$description)
-            ->implode(' / ');
+        return Rubric::formatLevels($levels);
     }
 
     private function number(mixed $value): string

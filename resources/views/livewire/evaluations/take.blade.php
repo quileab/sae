@@ -35,14 +35,26 @@ new #[Layout('layouts.app')] class extends Component {
      */
     public $previewBlockId = '';
 
-    /**
+/**
      * Discard the preview and draw again, so the teacher can see that the
      * combinations really do vary.
      */
-    public function previewAgain(): void
+public function previewAgain(): void
     {
         $this->previewBlockId = '';
         $this->content = $this->previewContent();
+    }
+
+    /**
+     * content is state rather than a computed property, because the student path
+     * writes to it while answering, so the alternative being previewed has to be
+     * applied to it explicitly.
+     */
+public function updatedPreviewBlockId(): void
+    {
+        if ($this->isPreview) {
+            $this->content = $this->previewContent();
+        }
     }
 
     public function mount($id)
@@ -180,32 +192,38 @@ new #[Layout('layouts.app')] class extends Component {
  *
  * @return array<int, array{block: array, section: string, intro: string, number: int, block_id: string, answered: bool}>
  */
-#[Computed]
+/**
+ * The form the preview shows: a real draw, with the chosen alternative swapped in.
+ *
+ * The swap is made by group, not by looking for the chosen id: after the draw the
+ * chosen question is not in the form at all (that is the point of the feature), so
+ * the slot it belongs to is the one its group was given.
+ */
 public function previewContent(): array
 {
-    $content = AttemptContent::draw($this->evaluation->content ?? []);
+    $authored = $this->evaluation->content ?? [];
+    $content = AttemptContent::draw($authored);
 
     if ($this->previewBlockId === '') {
         return $content;
     }
 
-    // Swapping the drawn question for the one the teacher picked keeps the
-    // surrounding groups untouched, so the preview still shows a real form with
-    // one alternative swapped in.
+    $alternative = $this->previewBlock();
+    $group = AttemptContent::groupOf($authored, $this->previewBlockId);
+
+    if ($alternative === null || $group === null) {
+        return $content;
+    }
+
     foreach ($content['sections'] as $sIndex => $section) {
-        foreach ($section['blocks'] ?? [] as $bIndex => $block) {
-            if (($block['id'] ?? null) !== $this->previewBlockId) {
-                continue;
-            }
-
-            $alternative = $this->previewBlock();
-
-            if ($alternative !== null) {
-                $content['sections'][$sIndex]['blocks'][$bIndex] = $alternative;
-            }
-
-            return $content;
+        if ((string) ($section['id'] ?? '') !== $group) {
+            continue;
         }
+
+        // Keeps the group in place and the form readable in group order.
+        $content['sections'][$sIndex]['blocks'][0] = $alternative;
+
+        break;
     }
 
     return $content;
@@ -216,7 +234,6 @@ public function previewContent(): array
  *
  * @return array<string, string>
  */
-#[Computed]
 public function previewOptions(): array
 {
     $options = [];
@@ -243,7 +260,6 @@ public function previewOptions(): array
  * The authored question behind the preview selection, with the group it came
  * from so the swap keeps that group's heading.
  */
-#[Computed]
 public function previewBlock(): ?array
 {
     foreach (AttemptContent::variantGroups($this->evaluation->content ?? []) as $group) {
@@ -418,7 +434,7 @@ public function saveProgress()
             </div>
         </div>
 
-        @if($isPreview && $this->previewOptions)
+        @if($isPreview && $this->previewOptions())
             <div class="max-w-7xl mx-auto mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <x-alert icon="o-swatch" class="alert-info py-2">
                     Esta es la <strong>combinación real</strong> que recibiría un alumno: a cada grupo
@@ -427,7 +443,7 @@ public function saveProgress()
                 <div class="flex items-center gap-2">
                     <x-select
                         wire:model.live="previewBlockId"
-                        :options="$this->previewOptions"
+                        :options="$this->previewOptions()"
                         placeholder="Ver otra alternativa del grupo…"
                         class="select-sm min-w-64"
                     />

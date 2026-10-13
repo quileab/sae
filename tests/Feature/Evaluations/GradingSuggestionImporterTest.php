@@ -11,6 +11,7 @@ use App\Models\GradingSuggestion;
 use App\Models\OnlineEvaluation;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\Evaluations\GradingFileBuilder;
 use App\Services\Evaluations\GradingFileParser;
 use App\Services\Evaluations\GradingSuggestionImporter;
 use App\Services\Evaluations\Rubric;
@@ -268,6 +269,108 @@ class GradingSuggestionImporterTest extends TestCase
     }
 
     #[Test]
+    public function the_performance_levels_of_a_drafted_rubric_are_stored(): void
+    {
+        $draft = implode("\n", [
+            sprintf('<!-- SAE id=%d modo=rubric -->', $this->evaluation->id),
+            '',
+            '<!-- SAE:RUBRICA:INICIO -->',
+            '| bloque | variante | clave | criterio | puntaje_max | niveles |',
+            '| --- | --- | --- | --- | --- | --- |',
+            '| q2 | — | concepto | Explica. | 1.0 | 0: nada / 0.5: lo alude / 1: lo explica |',
+            '<!-- SAE:RUBRICA:FIN -->',
+            '',
+            '<!-- SAE:NOTAS:INICIO -->',
+            '| ref | bloque | clave | puntaje | flags | justificacion |',
+            '| --- | --- | --- | --- | --- | --- |',
+            '<!-- SAE:NOTAS:FIN -->',
+            '',
+        ]);
+
+        $report = app(GradingSuggestionImporter::class)->applyRubric($this->evaluation, GradingFileParser::parse($draft));
+
+        $this->assertSame(1, $report['created']);
+
+        $levels = $this->evaluation->fresh()->content['sections'][0]['blocks'][1]['rubric']['criteria'][0]['levels'];
+
+        $this->assertEquals([
+            '0' => 'nada',
+            '0.5' => 'lo alude',
+            '1' => 'lo explica',
+        ], $levels);
+    }
+
+    #[Test]
+    public function a_description_containing_a_slash_stays_a_single_level(): void
+    {
+        // "aplica/rechaza" is ordinary prose; splitting on every slash would
+        // invent a level called "rechaza".
+        $this->assertSame(
+            ['0' => 'nada', '0.5' => 'Aplica/rechaza'],
+            Rubric::parseLevels('0: nada / 0.5: Aplica/rechaza'),
+        );
+    }
+
+    #[Test]
+    public function re_saving_an_untouched_export_does_not_wipe_the_levels(): void
+    {
+        $this->evaluation->update(['content' => $this->contentWithLevels()]);
+
+        // A grading-mode export ships the current rubric, levels included, and the
+        // teacher pastes it straight back. That must be a no-op, not a rewrite.
+        $exported = app(GradingFileBuilder::class, [
+            'evaluation' => $this->evaluation->fresh(),
+            'attempts' => collect(),
+        ])->build();
+
+        $report = app(GradingSuggestionImporter::class)->applyRubric(
+            $this->evaluation,
+            GradingFileParser::parse($exported),
+        );
+
+        $this->assertSame(2, $report['unchanged'], 'An untouched export must not rewrite the rubric.');
+        $this->assertSame(0, $report['created']);
+
+        $this->assertEquals(
+            ['0' => 'No lo menciona.', '0.5' => 'Lo alude.'],
+            $this->evaluation->fresh()->content['sections'][0]['blocks'][1]['rubric']['criteria'][0]['levels'],
+        );
+    }
+
+    #[Test]
+    public function flags_on_a_question_without_a_rubric_are_kept(): void
+    {
+        // A question with no rubric comes back as one keyless row, which used to
+        // skip the flag merge entirely: the worst answers looked the cleanest.
+        $report = $this->import($this->marks([
+            ['q2', null, 0, 'No responde la consigna.', [GradingFlag::OffTopic]],
+        ]));
+
+        $this->assertSame(1, $report['created']);
+        $this->assertSame(
+            [GradingFlag::OffTopic->value],
+            GradingSuggestion::where('block_id', 'q2')->firstOrFail()->flags,
+        );
+    }
+
+    #[Test]
+    public function a_proposal_survives_a_question_being_deleted_from_the_evaluation(): void
+    {
+        // The teacher graded a question the student really answered; deleting it
+        // from the evaluation afterwards must not make the paste fail.
+        $content = $this->content();
+        $content['sections'][0]['blocks'] = [$content['sections'][0]['blocks'][0]];
+        $this->evaluation->update(['content' => $content]);
+
+        $report = $this->import($this->marks([
+            ['q2', null, 0.5, 'Parcial.', []],
+        ]));
+
+        $this->assertSame(1, $report['created']);
+        $this->assertSame([], $report['rejected']);
+    }
+
+    #[Test]
     public function a_rubric_for_a_question_that_does_not_exist_is_refused(): void
     {
         $report = app(GradingSuggestionImporter::class)->applyRubric($this->evaluation, GradingFileParser::parse($this->rubricDraft([
@@ -355,6 +458,25 @@ class GradingSuggestionImporterTest extends TestCase
             '<!-- SAE:NOTAS:FIN -->',
             '',
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contentWithLevels(): array
+    {
+        $content = $this->content();
+        $content['sections'][0]['blocks'][1]['rubric'] = [
+            'source' => 'agent',
+            'criteria' => [[
+                'key' => 'concepto',
+                'label' => 'Explica.',
+                'points' => 1.0,
+                'levels' => ['0' => 'No lo menciona.', '0.5' => 'Lo alude.'],
+            ]],
+        ];
+
+        return $content;
     }
 
     /**

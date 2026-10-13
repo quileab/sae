@@ -79,7 +79,7 @@ final class AttemptContent
      * Groups holding a single question are left out: there is nothing to pick
      * between, so the teacher does not need a selector for them.
      *
-     * @return array<int, array{title: string, blocks: array<int, array<string, mixed>>}>
+     * @return array<int, array{id: string|null, title: string, blocks: array<int, array<string, mixed>>}>
      */
     public static function variantGroups(array $content): array
     {
@@ -93,12 +93,29 @@ final class AttemptContent
             }
 
             $groups[] = [
+                'id' => isset($section['id']) ? (string) $section['id'] : null,
                 'title' => (string) ($section['title'] ?? 'Grupo '.($index + 1)),
                 'blocks' => $blocks,
             ];
         }
 
         return $groups;
+    }
+
+    /**
+     * Which group a question belongs to, among the ones that hand out alternatives.
+     */
+    public static function groupOf(array $content, string $blockId): ?string
+    {
+        foreach (self::variantGroups($content) as $group) {
+            foreach ($group['blocks'] as $block) {
+                if (($block['id'] ?? null) === $blockId) {
+                    return $group['id'] ?? $group['title'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

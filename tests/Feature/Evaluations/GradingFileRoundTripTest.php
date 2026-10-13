@@ -11,6 +11,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Services\Evaluations\GradingFileBuilder;
 use App\Services\Evaluations\GradingFileParser;
+use App\Services\Evaluations\GradingSuggestionImporter;
 use App\Services\Evaluations\Rubric;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -166,6 +167,67 @@ class GradingFileRoundTripTest extends TestCase
         $this->assertTrue($parsed->isValid(), implode(' / ', $parsed->errorMessages()));
         $this->assertCount(2, $parsed->rubricRows);
         $this->assertSame(1.5, (float) array_sum(array_column($parsed->rubricRows, 'points')), 'criteria add up to the question.');
+    }
+
+    #[Test]
+    public function the_performance_levels_survive_the_whole_cycle(): void
+    {
+        // The levels live in one flattened cell, so they are the easiest part of
+        // the contract to lose on the way out or the way back in. The description
+        // with a slash is there because "aplica/rechaza" is ordinary prose and
+        // splitting on every slash turns it into a phantom level.
+        $this->evaluation->update(['content' => $this->contentWithLevels()]);
+
+        $exported = $this->export();
+        $this->assertStringContainsString('1.5: Aplica/rechaza según el caso', $exported);
+
+        $parsed = GradingFileParser::parse($exported);
+        $this->assertSame([], $parsed->errors, 'The exported file must parse back clean.');
+
+        $levels = collect($parsed->rubricRows)
+            ->firstWhere('block', 'g1_2')['levels'];
+
+        $this->assertEquals(
+            ['0' => 'No lo menciona.', '0.5' => 'Lo alude.', '1.5' => 'Aplica/rechaza según el caso'],
+            Rubric::parseLevels($levels),
+        );
+
+        // And pasting that file straight back must not rewrite the rubric.
+        $report = app(GradingSuggestionImporter::class)->applyRubric($this->evaluation->fresh(), $parsed);
+        $this->assertSame(2, $report['unchanged']);
+        $this->assertSame(0, $report['created']);
+
+        $stored = collect($this->evaluation->fresh()->content['sections'][0]['blocks'][1]['rubric']['criteria'][0]['levels'])
+            ->mapWithKeys(fn ($description, $score) => [(string) $score => $description])
+            ->all();
+
+        $this->assertEquals(
+            ['0' => 'No lo menciona.', '0.5' => 'Lo alude.', '1.5' => 'Aplica/rechaza según el caso'],
+            $stored,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contentWithLevels(): array
+    {
+        $content = $this->content();
+        $content['sections'][0]['blocks'][1]['rubric'] = [
+            'source' => 'agent',
+            'criteria' => [[
+                'key' => 'distingue',
+                'label' => 'Distingue consulta y reporte',
+                'points' => 1.5,
+                'levels' => [
+                    '0' => 'No lo menciona.',
+                    '0.5' => 'Lo alude.',
+                    '1.5' => 'Aplica/rechaza según el caso',
+                ],
+            ]],
+        ];
+
+        return $content;
     }
 
     private function export(

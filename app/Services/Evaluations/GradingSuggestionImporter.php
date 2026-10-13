@@ -7,6 +7,7 @@ use App\Enums\GradingSuggestionState;
 use App\Models\EvaluationAttempt;
 use App\Models\GradingSuggestion;
 use App\Models\OnlineEvaluation;
+use Illuminate\Support\Collection;
 
 /**
  * Turns a filled grading file into proposals a teacher can review.
@@ -41,7 +42,7 @@ final class GradingSuggestionImporter
             ->keyBy('id');
 
         $rubrics = $this->rubrics($evaluation);
-        $blocks = GradingFileBuilder::gradableBlocksIn($this->content($evaluation));
+        $blocks = $this->servedBlocks($evaluation, $attempts);
         $grouped = $this->groupByAttemptAndBlock($parsed->markRows);
 
         foreach ($grouped as $group) {
@@ -107,6 +108,11 @@ final class GradingSuggestionImporter
                     'key' => $row['key'],
                     'label' => $row['label'],
                     'points' => $row['points'],
+                    // The levels come back in the file, so a rubric that is
+                    // exported and re-imported has to arrive whole. Dropping them
+                    // here used to make every grading-mode re-save overwrite a
+                    // good rubric with a levels-free one.
+                    'levels' => Rubric::parseLevels($row['levels'] ?? []),
                 ], $rows),
             ]);
 
@@ -161,6 +167,15 @@ final class GradingSuggestionImporter
         foreach ($rows as $row) {
             $total += $row['points'];
 
+            // Collected before any branching: a question with no rubric comes
+            // back as a single keyless row, and its flags are exactly the ones
+            // that say the answer was off-topic or tried to manipulate the
+            // grader. Losing them made the worst cases look the cleanest.
+            $flags = [...$flags, ...array_map(
+                fn (GradingFlag $flag) => $flag->value,
+                $row['flags'],
+            )];
+
             if ($row['key'] === null) {
                 $criteria[] = [
                     'key' => null,
@@ -173,10 +188,6 @@ final class GradingSuggestionImporter
                 continue;
             }
 
-            $flags = [...$flags, ...array_map(
-                fn (GradingFlag $flag) => $flag->value,
-                $row['flags'],
-            )];
             $criteria[] = [
                 'key' => $row['key'],
                 'label' => $this->labelFor($rubric, $row['key']),
@@ -302,6 +313,32 @@ final class GradingSuggestionImporter
     }
 
     /**
+     * The questions these attempts were actually served, keyed by block id.
+     *
+     * Validating against the evaluation's current content instead would reject a
+     * proposal for a question the student answered and the teacher reviewed, just
+     * because the block was deleted from the evaluation in the meantime. The
+     * snapshot is also where the points live, and those are the points the teacher
+     * marked against.
+     *
+     * Rubrics are a different matter: they are written onto the evaluation, so they
+     * still resolve against its content.
+     *
+     * @param  Collection<int, EvaluationAttempt>  $attempts
+     * @return array<string, array<string, mixed>>
+     */
+    private function servedBlocks(OnlineEvaluation $evaluation, Collection $attempts): array
+    {
+        $sections = [];
+
+        foreach ($attempts as $attempt) {
+            $sections = [...$sections, ...EvaluationContent::sections($attempt->content_snapshot ?? [])];
+        }
+
+        return GradingFileBuilder::gradableBlocksIn(['sections' => $sections]);
+    }
+
+    /**
      * @return array<string, array<string, mixed>>
      */
     private function rubrics(OnlineEvaluation $evaluation): array
@@ -331,7 +368,12 @@ final class GradingSuggestionImporter
                     continue;
                 }
 
-                if (($content['sections'][$sIndex]['blocks'][$bIndex]['rubric'] ?? null) == $rubric) {
+                // Compared through the normalizer: a rubric written in the editor
+                // has no `version` key, so comparing the raw stored array against a
+                // normalized one reports a change on every single re-save.
+                $stored = Rubric::fromBlock($content['sections'][$sIndex]['blocks'][$bIndex])?->toArray();
+
+                if ($stored == $rubric) {
                     return false;
                 }
 

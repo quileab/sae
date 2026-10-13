@@ -91,7 +91,7 @@ class GradingReviewer
                 'key' => $rRow['key'] ?? '—',
                 'label' => $rRow['label'] ?? '—',
                 'points' => (float) ($rRow['points'] ?? 0),
-                'levels' => self::levels($rRow['levels'] ?? []),
+                'levels' => Rubric::parseLevels($rRow['levels'] ?? []),
                 'block_points' => $blockPoints,
             ];
         }
@@ -102,40 +102,6 @@ class GradingReviewer
             'rows' => $rows,
             'rubric_rows' => $rubricRows,
         ];
-    }
-
-    /**
-     * The file carries the performance levels as one cell, "0: nada / 1: algo".
-     *
-     * The parser keeps that text as written, so it has to be split here before it
-     * reaches the preview, which renders it as score/description pairs the same
-     * way Rubric does.
-     *
-     * @return array<string, string>
-     */
-    private static function levels(mixed $raw): array
-    {
-        if (is_array($raw)) {
-            return $raw;
-        }
-
-        $levels = [];
-
-        foreach (explode('/', (string) $raw) as $chunk) {
-            if (! str_contains($chunk, ':')) {
-                continue;
-            }
-
-            [$score, $description] = explode(':', $chunk, 2);
-            $score = trim($score);
-            $description = trim($description);
-
-            if ($score !== '' && $description !== '') {
-                $levels[$score] = $description;
-            }
-        }
-
-        return $levels;
     }
 
     /**

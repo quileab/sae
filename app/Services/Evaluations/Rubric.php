@@ -134,6 +134,57 @@ final class Rubric
     }
 
     /**
+     * Read back the performance levels a grading file carries in one cell.
+     *
+     * The file format flattens the score/description map into "0: nada / 0.5: algo"
+     * so it fits a Markdown table. Parsing belongs here, next to the normalization
+     * that produces the map, because the same cell is read by the preview and by
+     * the import: a second parser would be a second opinion on the same format.
+     *
+     * Only the exact " / " separator is honoured. Descriptions routinely contain a
+     * bare slash ("aplica/rechaza"), and splitting on every slash would invent
+     * phantom levels out of them.
+     *
+     * @return array<string, string>
+     */
+    public static function parseLevels(mixed $raw): array
+    {
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        $levels = [];
+
+        foreach (explode(' / ', (string) $raw) as $chunk) {
+            if (! str_contains($chunk, ':')) {
+                continue;
+            }
+
+            [$score, $description] = explode(':', $chunk, 2);
+            $score = trim($score);
+            $description = trim($description);
+
+            if ($score !== '' && $description !== '') {
+                $levels[$score] = $description;
+            }
+        }
+
+        return $levels;
+    }
+
+    /**
+     * The same map as parseLevels() reads, for the grading file.
+     *
+     * @param  array<string, string>  $levels
+     */
+    public static function formatLevels(array $levels): string
+    {
+        return collect($levels)
+            ->map(fn (string $description, string $score) => $score.': '.$description)
+            ->implode(' / ');
+    }
+
+    /**
      * @return array{version: int, source: string, criteria: array<int, array{key: string, label: string, points: float, levels: array<string, string>}>}
      */
     public function toArray(): array

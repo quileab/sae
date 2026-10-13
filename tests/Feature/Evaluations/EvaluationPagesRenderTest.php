@@ -158,9 +158,17 @@ class EvaluationPagesRenderTest extends TestCase
         $this->assertSame(
             'v2',
             $preview->instance()->content['sections'][0]['blocks'][0]['id'],
-            'Picking an alternative must preview that question.'
+            'Picking an alternative must preview that question.',
         );
         $preview->assertSee('Alternativa B.');
+
+        // And asking for another combination goes back to a real draw, which can
+        // land on either alternative.
+        $preview->call('previewAgain');
+        $this->assertContains(
+            $preview->instance()->content['sections'][0]['blocks'][0]['id'],
+            ['v1', 'v2'],
+        );
     }
 
     #[Test]
