@@ -128,6 +128,9 @@ final class GradingSuggestionImporter
             }
         }
 
+        // Attempt snapshots are deliberately left alone: RubricResolver lets
+        // attempts without proposals adopt this rubric and keeps the frozen
+        // copy only where proposals were already measured against an older one.
         if ($changed) {
             $evaluation->update(['content' => $content]);
         }
@@ -303,7 +306,7 @@ final class GradingSuggestionImporter
      */
     private function rubrics(OnlineEvaluation $evaluation): array
     {
-        return Rubric::snapshotFor($this->content($evaluation));
+        return RubricResolver::current($evaluation);
     }
 
     /**

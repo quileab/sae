@@ -2,6 +2,8 @@
 
 namespace App\Services\Evaluations;
 
+use App\Enums\EvaluationBlockType;
+
 class EvaluationContent
 {
     /**
@@ -15,12 +17,23 @@ class EvaluationContent
     public static function isAnswered(array $block, mixed $answer): bool
     {
         return match ($block['type'] ?? null) {
-            'open_text' => filled($answer['text'] ?? null) || filled($answer['variant'] ?? null),
+            EvaluationBlockType::OpenText->value => filled($answer['text'] ?? null) || filled($answer['variant'] ?? null),
             'table_design' => filled($answer['tables'] ?? null) || filled($answer['relations'] ?? null),
             'checkboxes' => ! empty($answer),
             'matching' => collect(is_array($answer) ? $answer : [])->filter()->isNotEmpty(),
             default => filled($answer),
         };
+    }
+
+    /**
+     * Formats point values compactly, dropping redundant trailing zeros.
+     * E.g. 1.50 -> "1,5", 2.00 -> "2", 0.00 -> "0".
+     */
+    public static function formatPoints(float|int|string|null $points): string
+    {
+        $value = (float) ($points ?? 0);
+
+        return rtrim(rtrim(number_format($value, 2, ',', ''), '0'), ',') ?: '0';
     }
 
     /**
@@ -99,11 +112,11 @@ class EvaluationContent
         }
 
         if (! isset($block['type'])) {
-            $block['type'] = 'open_text';
+            $block['type'] = EvaluationBlockType::OpenText->value;
         }
 
         switch ($block['type']) {
-            case 'open_text':
+            case EvaluationBlockType::OpenText->value:
                 // A rubric that cannot be marked is dropped rather than kept half
                 // usable: the assistant grader would silently misaward against it.
                 if (isset($block['rubric'])) {
@@ -262,7 +275,7 @@ class EvaluationContent
 
                 return ['score' => 0.0, 'requires_manual' => true];
 
-            case 'open_text':
+            case EvaluationBlockType::OpenText->value:
             default:
                 return ['score' => 0.0, 'requires_manual' => true];
         }

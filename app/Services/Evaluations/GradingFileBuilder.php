@@ -54,7 +54,7 @@ final class GradingFileBuilder
 
         foreach ($content['sections'] ?? [] as $section) {
             foreach ($section['blocks'] ?? [] as $block) {
-                if (($block['type'] ?? null) === 'open_text' && ! empty($block['id'])) {
+                if (($block['type'] ?? null) === EvaluationBlockType::OpenText->value && ! empty($block['id'])) {
                     $blocks[$block['id']] = $block;
                 }
             }
@@ -122,10 +122,7 @@ final class GradingFileBuilder
 
     private function rubrics(): array
     {
-        $rubrics = $this->attempts->first()?->rubric_snapshot
-            ?? Rubric::snapshotFor($this->content());
-
-        return array_intersect_key($rubrics, $this->gradableBlocks());
+        return array_intersect_key(RubricResolver::current($this->evaluation), $this->gradableBlocks());
     }
 
     private function header(): string
@@ -171,7 +168,7 @@ final class GradingFileBuilder
         $blocks = $this->gradableBlocks();
         $points = round((float) collect($blocks)->sum('points'), 2);
         $auto = collect($this->allBlocks())
-            ->reject(fn (array $b) => $b['type'] === 'open_text')
+            ->reject(fn (array $b) => $b['type'] === EvaluationBlockType::OpenText->value)
             ->map(fn (array $b) => EvaluationBlockType::tryFrom($b['type'] ?? '')?->label() ?? $b['type'])
             ->unique()
             ->values();

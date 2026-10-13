@@ -91,7 +91,6 @@ class AssistGradingTest extends TestCase
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openAssist')
             ->call('buildAssistMarkdown')
-            ->tap(fn ($c) => dump('summary='.json_encode($c->get('assistSummary')), 'blockId='.var_export($c->get('assistBlockId'), true)))
             ->assertSet('assistSummary.attempts', 1)
             ->assertSet('assistSummary.blocks', 1)
             ->assertSet('assistSummary.has_rubric', false)

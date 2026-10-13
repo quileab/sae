@@ -65,6 +65,16 @@ class EvaluationAttempt extends Model
         ]);
     }
 
+    public function scopeAwaitingGrade(Builder $query): Builder
+    {
+        return $query->where('status', AttemptStatus::Submitted->value);
+    }
+
+    public function scopeForEvaluation(Builder $query, int $evaluationId): Builder
+    {
+        return $query->where('online_evaluation_id', $evaluationId);
+    }
+
     public function getStatusAttribute(): AttemptStatus
     {
         return AttemptStatus::tryFrom($this->attributes['status'] ?? '') ?? AttemptStatus::InProgress;

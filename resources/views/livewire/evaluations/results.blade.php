@@ -4,14 +4,18 @@ use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
 use App\Models\Grade;
 use App\Services\Evaluations\AttemptGrader;
+use App\Services\Evaluations\EvaluationContent;
 use App\Services\Evaluations\FinalGradeResolver;
 use App\Services\Evaluations\GradeSyncPreview;
 use App\Services\Evaluations\GradingFileBuilder;
+use App\Services\Evaluations\GradingReviewer;
 use App\Enums\GradingSuggestionState;
 use App\Services\Evaluations\GradingFileParser;
 use App\Services\Evaluations\GradingSuggestionImporter;
 use App\Services\Evaluations\ParsedGradingFile;
 use App\Services\Evaluations\Rubric;
+use App\Services\Evaluations\RubricResolver;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
@@ -22,42 +26,43 @@ new class extends Component {
     use Toast, WithPagination;
 
     public ?OnlineEvaluation $evaluation = null;
-    public $isTeacher = false;
+    public bool $isTeacher = false;
 
     // Manual grading state
-    public $gradingAttemptId = null;
+    public ?int $gradingAttemptId = null;
     public ?EvaluationAttempt $gradingAttempt = null;
-    public $manualScores = [];
-    public $feedback = '';
-    public $suggestionRejectionReason = null;
+    public array $manualScores = [];
+    public string $feedback = '';
+    public ?string $suggestionRejectionReason = null;
     // Position of the graded attempt within the finished attempts of the
     // evaluation, in table order. Drives the prev/next navigation.
-    public $gradingPrevId = null;
-    public $gradingNextId = null;
-    public $gradingPosition = null;
-    public $gradingTotal = null;
+    public ?int $gradingPrevId = null;
+    public ?int $gradingNextId = null;
+    public ?int $gradingPosition = null;
+    public ?int $gradingTotal = null;
 
     // Grade sync state
-    public $showSyncModal = false;
-    public $syncPreview = [];
-    public $syncUserIds = [];
+    public bool $showSyncModal = false;
+    public array $syncPreview = [];
+    public array $syncUserIds = [];
 
     // Assisted grading state. The markdown is never bound with wire:model: a
     // full cohort runs to hundreds of kilobytes.
-    public $showAssistModal = false;
-    public $assistMode = 'grading';
-    public $assistAnonymize = false;
-    public $assistBlockId = null;
-    public $assistMarkdown = null;
-    public $assistSummary = [];
-    public $assistPasted = null;
-    public $assistPreview = [];
-    public $assistRubricRows = 0;
-    public $assistMarkRows = 0;
-    public $assistErrors = [];
-    public $assistWarnings = [];
-    public $assistApplied = [];
-    public $assistRubricApplied = [];
+    public bool $showAssistModal = false;
+    public string $assistMode = 'grading';
+    public bool $assistAnonymize = false;
+    public ?string $assistBlockId = null;
+    public ?string $assistMarkdown = null;
+    public array $assistSummary = [];
+    public ?string $assistPasted = null;
+    public array $assistPreview = [];
+    public array $assistRubricPreview = [];
+    public int $assistRubricRows = 0;
+    public int $assistMarkRows = 0;
+    public array $assistErrors = [];
+    public array $assistWarnings = [];
+    public array $assistApplied = [];
+    public array $assistRubricApplied = [];
 
 
 public function mount($id)
@@ -145,7 +150,7 @@ public function attemptHeaders(): array
     {
         if (! $this->isTeacher) return collect();
 
-        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+        return EvaluationAttempt::forEvaluation($this->evaluation->id)
             ->with('user')
             // One grouped count for the whole page instead of a query per row.
             ->withCount([
@@ -161,11 +166,34 @@ public function attemptHeaders(): array
     {
         if ($this->isTeacher) return collect();
 
-        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+        return EvaluationAttempt::forEvaluation($this->evaluation->id)
             ->where('user_id', auth()->id())
-            ->whereIn('status', ['submitted', 'graded'])
+            ->finished()
             ->orderByDesc('attempt_number')
             ->get();
+    }
+
+    /**
+     * The attempt currently open in the grading dialog.
+     *
+     * Single gate for every grading action: the id lives in a public Livewire
+     * property, so it is re-authorized and re-checked against this evaluation
+     * on each call instead of being trusted.
+     */
+    private function currentGradingAttempt(): EvaluationAttempt
+    {
+        $this->authorize('grade', $this->evaluation);
+
+        return $this->attemptOfThisEvaluation($this->gradingAttemptId);
+    }
+
+    private function attemptOfThisEvaluation(mixed $attemptId): EvaluationAttempt
+    {
+        $attempt = EvaluationAttempt::findOrFail($attemptId);
+
+        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        return $attempt;
     }
 
     public function openGrading($attemptId)
@@ -174,10 +202,9 @@ public function attemptHeaders(): array
             return;
         }
 
-        $attempt = EvaluationAttempt::findOrFail($attemptId);
-
         $this->authorize('grade', $this->evaluation);
-        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+
+        $attempt = $this->attemptOfThisEvaluation($attemptId);
 
         $this->gradingAttemptId = $attempt->id;
         $this->gradingAttempt = $attempt->load(['user', 'gradingSuggestions']);
@@ -185,7 +212,7 @@ public function attemptHeaders(): array
         $this->feedback = $attempt->feedback ?? '';
 
         // Neighbors in table order, so prev/next never loses the teacher's place.
-        $orderedIds = EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
+        $orderedIds = EvaluationAttempt::forEvaluation($this->evaluation->id)
             ->finished()
             ->orderBy('user_id')
             ->orderByDesc('attempt_number')
@@ -210,11 +237,7 @@ public function attemptHeaders(): array
  */
     public function acceptSuggestions()
     {
-        $this->authorize('grade', $this->evaluation);
-
-        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
-
-        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+        $attempt = $this->currentGradingAttempt();
 
         $pending = $attempt->gradingSuggestions()->pending()->get();
 
@@ -230,16 +253,22 @@ public function attemptHeaders(): array
             $scores[$suggestion->block_id] = (float) $suggestion->total_points;
         }
 
-        $graded = app(AttemptGrader::class)->applyManualMarks($attempt, $scores, $attempt->feedback);
+        // One transaction: a failure must not leave a graded attempt whose
+        // proposals still read as pending.
+        $graded = DB::transaction(function () use ($attempt, $scores, $pending) {
+            $graded = app(AttemptGrader::class)->applyManualMarks($attempt, $scores, $attempt->feedback);
 
-        foreach ($pending as $suggestion) {
-            $suggestion->update([
-                'state' => GradingSuggestionState::Accepted->value,
-                'final_points' => (float) $suggestion->total_points,
-                'accepted_at' => now(),
-                'accepted_by' => auth()->id(),
-            ]);
-        }
+            foreach ($pending as $suggestion) {
+                $suggestion->update([
+                    'state' => GradingSuggestionState::Accepted->value,
+                    'final_points' => (float) $suggestion->total_points,
+                    'accepted_at' => now(),
+                    'accepted_by' => auth()->id(),
+                ]);
+            }
+
+            return $graded;
+        });
 
         $this->manualScores = $graded->block_scores;
         $this->gradingAttempt = $graded->fresh(['user', 'gradingSuggestions']);
@@ -261,11 +290,7 @@ public function attemptHeaders(): array
      */
     public function prefillSuggestions()
     {
-        $this->authorize('grade', $this->evaluation);
-
-        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
-
-        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+        $attempt = $this->currentGradingAttempt();
 
         $suggestions = $attempt->gradingSuggestions()->pending()->get()
             ->keyBy('block_id');
@@ -287,15 +312,28 @@ public function attemptHeaders(): array
         $this->info('Notas sugeridas cargadas. Revisalas, ajustá lo que quieras y guardá.');
     }
 
+    /**
+     * Apply the suggested grade for a single block.
+     */
+    public function applySuggestion($blockId)
+    {
+        $attempt = $this->currentGradingAttempt();
+
+        $suggestion = $attempt->gradingSuggestions()
+            ->where('block_id', $blockId)
+            ->first();
+
+        if ($suggestion) {
+            $this->manualScores[$blockId] = (float) $suggestion->total_points;
+            $this->info("Propuesta aplicada al bloque.");
+        }
+    }
+
     public function rejectSuggestions()
     {
-        $this->authorize('grade', $this->evaluation);
-
         $reason = (string) ($this->suggestionRejectionReason ?: '');
 
-        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
-
-        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+        $attempt = $this->currentGradingAttempt();
 
         $pending = $attempt->gradingSuggestions()->pending()->get();
 
@@ -305,14 +343,16 @@ public function attemptHeaders(): array
             return;
         }
 
-        foreach ($pending as $suggestion) {
-            $suggestion->update([
-                'state' => GradingSuggestionState::Rejected->value,
-                'disagreement_reason' => $reason !== '' ? $reason : null,
-                'accepted_at' => null,
-                'accepted_by' => null,
-            ]);
-        }
+        DB::transaction(function () use ($pending, $reason) {
+            foreach ($pending as $suggestion) {
+                $suggestion->update([
+                    'state' => GradingSuggestionState::Rejected->value,
+                    'disagreement_reason' => $reason !== '' ? $reason : null,
+                    'accepted_at' => null,
+                    'accepted_by' => null,
+                ]);
+            }
+        });
 
         $this->gradingAttempt = $attempt->fresh(['user', 'gradingSuggestions']);
         $this->suggestionRejectionReason = null;
@@ -333,11 +373,7 @@ public function attemptHeaders(): array
 
     public function saveGrading()
     {
-        $this->authorize('grade', $this->evaluation);
-
-        $attempt = EvaluationAttempt::whereKey($this->gradingAttemptId)->firstOrFail();
-
-        abort_unless($attempt->online_evaluation_id === $this->evaluation->id, 404);
+        $attempt = $this->currentGradingAttempt();
 
         $this->validate([
             'manualScores' => 'required|array',
@@ -356,27 +392,29 @@ public function attemptHeaders(): array
             ]);
         }
 
-        $grader->applyManualMarks($attempt, $this->manualScores, $this->feedback);
-
         // Settle the pending proposals against what the teacher actually saved:
         // identical numbers count as accepted, anything else as edited. A block
         // the teacher left empty stays undecided on purpose, since there is no
         // final mark to compare the proposal against.
-        foreach ($attempt->gradingSuggestions()->pending()->get() as $suggestion) {
-            if (! array_key_exists($suggestion->block_id, $this->manualScores) || $this->manualScores[$suggestion->block_id] === null) {
-                continue;
+        DB::transaction(function () use ($grader, $attempt) {
+            $grader->applyManualMarks($attempt, $this->manualScores, $this->feedback);
+
+            foreach ($attempt->gradingSuggestions()->pending()->get() as $suggestion) {
+                if (! array_key_exists($suggestion->block_id, $this->manualScores) || $this->manualScores[$suggestion->block_id] === null) {
+                    continue;
+                }
+
+                $saved = (float) $this->manualScores[$suggestion->block_id];
+                $same = abs($saved - (float) $suggestion->total_points) < 0.005;
+
+                $suggestion->update([
+                    'state' => $same ? GradingSuggestionState::Accepted->value : GradingSuggestionState::Edited->value,
+                    'final_points' => $saved,
+                    'accepted_at' => now(),
+                    'accepted_by' => auth()->id(),
+                ]);
             }
-
-            $saved = (float) $this->manualScores[$suggestion->block_id];
-            $same = abs($saved - (float) $suggestion->total_points) < 0.005;
-
-            $suggestion->update([
-                'state' => $same ? GradingSuggestionState::Accepted->value : GradingSuggestionState::Edited->value,
-                'final_points' => $saved,
-                'accepted_at' => now(),
-                'accepted_by' => auth()->id(),
-            ]);
-        }
+        });
 
         unset($this->attempts, $this->stats);
 
@@ -429,15 +467,27 @@ public function attemptHeaders(): array
     {
         $this->authorize('exportGrading', $this->evaluation);
 
-        $this->assistMode = GradingFileBuilder::MODE_GRADING;
-        $this->assistAnonymize = false;
         $this->assistBlockId = $this->firstBlockWithoutRubric();
+        $hasRubric = $this->assistBlockId && array_key_exists($this->assistBlockId, $this->assistRubrics());
+        $this->assistMode = $hasRubric ? GradingFileBuilder::MODE_GRADING : GradingFileBuilder::MODE_RUBRIC;
+        $this->assistAnonymize = false;
         $this->reset([
-            'assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview',
+            'assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview', 'assistRubricPreview',
             'assistErrors', 'assistWarnings', 'assistApplied', 'assistRubricApplied',
             'assistRubricRows', 'assistMarkRows',
         ]);
         $this->showAssistModal = true;
+    }
+
+    public function updatedAssistBlockId($value): void
+    {
+        $hasRubric = $value && array_key_exists($value, $this->assistRubrics());
+        $this->assistMode = $hasRubric ? GradingFileBuilder::MODE_GRADING : GradingFileBuilder::MODE_RUBRIC;
+        $this->reset([
+            'assistMarkdown', 'assistSummary', 'assistPasted', 'assistPreview', 'assistRubricPreview',
+            'assistErrors', 'assistWarnings', 'assistApplied', 'assistRubricApplied',
+            'assistRubricRows', 'assistMarkRows',
+        ]);
     }
 
     public function buildAssistMarkdown()
@@ -505,61 +555,29 @@ public function attemptHeaders(): array
         $this->authorize('exportGrading', $this->evaluation);
 
         $parsed = GradingFileParser::parse((string) $this->assistPasted);
-        $messages = $parsed->errorMessages();
+        $review = app(GradingReviewer::class)->review(
+            evaluation: $this->evaluation,
+            parsed: $parsed,
+            attempts: $this->assistAttempts(),
+            blocks: $this->assistBlocks(),
+        );
 
-        if ($parsed->evaluationId() !== null && $parsed->evaluationId() !== $this->evaluation->id) {
-            $messages[] = sprintf(
-                'El archivo dice ser de la evaluación %d, no de la %d.',
-                $parsed->evaluationId(),
-                $this->evaluation->id,
-            );
-        }
+        $this->assistErrors = $review['errors'];
+        $this->assistWarnings = $review['warnings'];
+        $this->assistPreview = $review['rows'];
+        $this->assistRubricPreview = $review['rubric_rows'];
 
-        $attempts = $this->assistAttempts()->keyBy('id');
-        $rows = [];
-
-        foreach ($parsed->markRows as $index => $mark) {
-            $attempt = $attempts->get((int) $mark['ref']);
-            $blockPoints = (float) ($this->assistBlock($mark['block'])['points'] ?? 0);
-
-            $status = 'ok';
-            $detail = '';
-
-            if ($attempt === null) {
-                $status = 'desconocido';
-                $detail = 'No hay ningún intento con ese ref en esta evaluación.';
-            } elseif (! array_key_exists($mark['block'], $this->assistBlocks())) {
-                $status = 'error';
-                $detail = 'La pregunta no existe.';
-            } elseif ($mark['points'] < 0 || $mark['points'] > $blockPoints) {
-                $status = 'error';
-                $detail = sprintf('Fuera de rango: la pregunta vale %.2f.', $blockPoints);
-            } elseif ($this->alreadyMarked($attempt, $mark['block'])) {
-                $status = 'sobrescribe';
-                $detail = 'Ya tiene una nota cargada a mano.';
+        if ($review['rows'] === []) {
+            if ($review['rubric_rows'] !== []) {
+                $this->success(sprintf(
+                    'Rúbrica revisada: %d criterio%s listo%s para guardar.',
+                    count($review['rubric_rows']),
+                    count($review['rubric_rows']) === 1 ? '' : 's',
+                    count($review['rubric_rows']) === 1 ? '' : 's',
+                ));
+            } else {
+                $this->warning('No se encontró ninguna nota ni rúbrica para revisar.');
             }
-
-            $rows[] = [
-                'line' => $index + 1,
-                'ref' => $mark['ref'],
-                'student' => $attempt?->user?->fullname ?? '—',
-                'block' => $mark['block'],
-                'key' => $mark['key'] ?? '—',
-                'points' => $mark['points'],
-                'max' => $blockPoints,
-                'flags' => array_map(fn ($flag) => $flag->value, $mark['flags']),
-                'justification' => $mark['justification'],
-                'status' => $status,
-                'detail' => $detail,
-            ];
-        }
-
-        $this->assistErrors = $messages;
-        $this->assistWarnings = array_column($parsed->warnings, 'message');
-        $this->assistPreview = $rows;
-
-        if ($rows === []) {
-            $this->warning('No se encontró ninguna nota para revisar.');
         }
     }
 
@@ -576,8 +594,9 @@ public function attemptHeaders(): array
         $this->assistRubricRows = count($parsed->rubricRows);
         $this->assistMarkRows = count($parsed->markRows);
 
-        if ($this->assistPreview !== [] || $this->assistErrors !== []) {
+        if ($this->assistPreview !== [] || $this->assistRubricPreview !== [] || $this->assistErrors !== []) {
             $this->assistPreview = [];
+            $this->assistRubricPreview = [];
             $this->assistErrors = [];
         }
     }
@@ -637,11 +656,16 @@ public function attemptHeaders(): array
 
         $report = app(GradingSuggestionImporter::class)->applyRubric($this->evaluation, $parsed);
 
+        $this->evaluation->refresh();
+
         $this->assistErrors = array_merge($this->assistErrors, $report['rejected']);
         $this->assistRubricApplied = $report;
 
         if ($report['created'] > 0) {
             $this->success('Rúbrica guardada en la evaluación.');
+            $this->assistRubricPreview = [];
+            $this->assistRubricRows = 0;
+            $this->assistMode = GradingFileBuilder::MODE_GRADING;
         } elseif ($report['unchanged'] > 0) {
             $this->info('La rúbrica ya era la misma.');
         } else {
@@ -680,8 +704,8 @@ public function attemptHeaders(): array
     {
         $this->reset([
             'showAssistModal', 'assistMarkdown', 'assistSummary', 'assistPasted',
-            'assistPreview', 'assistErrors', 'assistWarnings', 'assistBlockId',
-'assistApplied', 'assistRubricApplied',
+            'assistPreview', 'assistRubricPreview', 'assistErrors', 'assistWarnings', 'assistBlockId',
+            'assistApplied', 'assistRubricApplied',
             'assistRubricRows', 'assistMarkRows',
         ]);
     }
@@ -689,7 +713,7 @@ public function attemptHeaders(): array
     #[Computed]
     public function assistBlockOptions(): array
     {
-        $rubrics = Rubric::snapshotFor($this->assistContent());
+        $rubrics = $this->assistRubrics();
 
         // MaryUI reads `id` / `name` out of each option, so this has to be a
         // list of rows rather than a keyed array.
@@ -699,7 +723,7 @@ public function attemptHeaders(): array
                 'name' => sprintf(
                     '%s — %s pts%s',
                     $id,
-                    rtrim(rtrim(number_format((float) ($block['points'] ?? 0), 2, ',', ''), '0'), ',') ?: '0',
+                    EvaluationContent::formatPoints($block['points'] ?? 0),
                     array_key_exists($id, $rubrics) ? '' : ' — sin rúbrica',
                 ),
             ])
@@ -710,32 +734,16 @@ public function attemptHeaders(): array
     #[Computed]
     public function assistPendingCount(): int
     {
-        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
-            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+        return EvaluationAttempt::forEvaluation($this->evaluation->id)
+            ->awaitingGrade()
             ->count();
-    }
-
-    /**
- * Whether a block already carries a mark a teacher entered.
- *
- * A stored zero is not treated as a mark: every open_text block is stored as zero
- * by the auto-grader, so only a positive score, or a finished attempt, means there
- * is something real to overwrite.
- */
-    private function alreadyMarked(EvaluationAttempt $attempt, string $block): bool
-    {
-        if ($attempt->status !== \App\Enums\AttemptStatus::Submitted) {
-            return true;
-        }
-
-        return (float) ($attempt->block_scores[$block] ?? 0) > 0;
     }
 
     private function assistAttempts()
     {
         return EvaluationAttempt::with('user')
-            ->where('online_evaluation_id', $this->evaluation->id)
-            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+            ->forEvaluation($this->evaluation->id)
+            ->awaitingGrade()
             ->orderBy('id')
             ->get();
     }
@@ -772,17 +780,27 @@ public function attemptHeaders(): array
      */
     private function assistSourceSnapshot(): ?array
     {
-        return EvaluationAttempt::where('online_evaluation_id', $this->evaluation->id)
-            ->where('status', \App\Enums\AttemptStatus::Submitted->value)
+        return EvaluationAttempt::forEvaluation($this->evaluation->id)
+            ->awaitingGrade()
             ->whereNotNull('content_snapshot')
             ->orderBy('id')
             ->value('content_snapshot');
     }
 
+    /**
+     * Rubrics currently defined on the evaluation, keyed by block id.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function assistRubrics(): array
+    {
+        return RubricResolver::current($this->evaluation);
+    }
+
     private function assistHasRubric(): bool
     {
         $blocks = $this->assistBlockId ? [$this->assistBlockId => true] : $this->assistBlocks();
-        $rubrics = Rubric::snapshotFor($this->assistContent());
+        $rubrics = $this->assistRubrics();
 
         return array_intersect_key($rubrics, $blocks) !== [];
     }
@@ -793,7 +811,7 @@ public function attemptHeaders(): array
      */
     private function firstBlockWithoutRubric(): ?string
     {
-        $rubrics = Rubric::snapshotFor($this->assistContent());
+        $rubrics = $this->assistRubrics();
 
         foreach ($this->assistBlocks() as $id => $block) {
             if (! array_key_exists($id, $rubrics)) {
@@ -1166,7 +1184,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                             <x-button
                                 label="Guardar rúbrica ({{ $assistRubricRows }})"
                                 icon="o-list-bullet"
-                                class="btn-sm btn-ghost"
+                                class="btn-sm {{ $assistMarkRows === 0 ? 'btn-primary' : 'btn-neutral' }}"
                                 wire:click="applyPastedRubric"
                                 spinner="applyPastedRubric"
                             />
@@ -1208,6 +1226,52 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         </div>
                     @endif
 
+                    @if($assistRubricPreview !== [])
+                        <div class="space-y-2">
+                            <h5 class="text-xs font-bold uppercase tracking-wider text-base-content/70 flex items-center gap-1.5">
+                                <x-icon name="o-table-cells" class="w-4 h-4 text-primary" />
+                                Previsualización de la Rúbrica ({{ count($assistRubricPreview) }} criterios)
+                            </h5>
+                            <div class="overflow-x-auto rounded border border-base-300">
+                                <table class="table table-xs table-zebra">
+                                    <thead>
+                                        <tr>
+                                            <th>Pregunta</th>
+                                            <th>Clave</th>
+                                            <th>Criterio</th>
+                                            <th class="text-right">Ptos Máx</th>
+                                            <th>Niveles</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($assistRubricPreview as $rRow)
+                                            <tr>
+                                                <td class="font-mono text-xs">{{ $rRow['block'] }}</td>
+                                                <td class="font-mono text-xs">{{ $rRow['key'] }}</td>
+                                                <td>{{ $rRow['label'] }}</td>
+                                                <td class="text-right font-semibold whitespace-nowrap">
+                                                    {{ EvaluationContent::formatPoints($rRow['points']) }}
+                                                    @if(! empty($rRow['block_points']))
+                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($rRow['block_points']) }}</span>
+                                                    @endif
+                                                </td>
+                                                <td class="text-xs text-base-content/70">
+                                                    @if(! empty($rRow['levels']))
+                                                        @foreach($rRow['levels'] as $score => $desc)
+                                                            <div><span class="font-semibold">{{ $score }}:</span> {{ $desc }}</div>
+                                                        @endforeach
+                                                    @else
+                                                        <span class="italic text-base-content/40">—</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+
                     @if($assistPreview !== [])
                         <div class="overflow-x-auto">
                             <table class="table table-xs table-zebra">
@@ -1243,8 +1307,8 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                 </div>
                                             </td>
                                             <td class="text-right font-semibold whitespace-nowrap">
-                                                {{ rtrim(rtrim(number_format($row['points'], 2, ',', ''), '0'), ',') }}
-                                                <span class="text-xs font-normal text-base-content/50">/ {{ $row['max'] }}</span>
+                                                {{ EvaluationContent::formatPoints($row['points']) }}
+                                                <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($row['max']) }}</span>
                                             </td>
                                             <td>
                                                 <span class="badge badge-xs {{ $badge }}">{{ $row['status'] }}</span>
@@ -1375,6 +1439,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
             id="grading-dialog"
             class="modal"
             wire:key="grading-dialog"
+            wire:ignore.self
             x-on:cancel.prevent="$el.close(); $wire.closeGrading()"
         >
         @if($gradingAttemptId && $gradingAttempt)
@@ -1382,7 +1447,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                 $attemptToGrade = $gradingAttempt;
                 $snapshotContent = $attemptToGrade->content_snapshot ?? $evaluation->content;
                 $sections = $snapshotContent['sections'] ?? [];
-                $rubrics = $attemptToGrade->rubric_snapshot ?? App\Services\Evaluations\Rubric::snapshotFor($snapshotContent);
+                $rubrics = App\Services\Evaluations\RubricResolver::forAttempt($attemptToGrade, $evaluation);
             @endphp
                 <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
                     <div class="flex items-center gap-2 mb-4">
@@ -1422,115 +1487,183 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                         ->firstWhere('block_id', $bId);
                                 @endphp
                                 <div class="bg-base-200 p-4 rounded-lg">
-                                    <div class="flex justify-between items-start gap-4 mb-2">
-                                        <div class="font-semibold">
-                                            @if(! empty($block['prompt']))
-                                                {{ $block['prompt'] }}
-                                            @else
-                                                <span class="italic text-base-content/60">Sin consigna</span>
-                                            @endif
-                                            @php $blockType = App\Enums\EvaluationBlockType::tryFrom($block['type'] ?? ''); @endphp
-                                            <span class="badge badge-ghost badge-xs ml-1">{{ $blockType?->shortLabel() ?? '?' }}</span>
+                                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                        {{-- Columna izquierda: Pregunta y Respuesta (9 columnas) --}}
+                                        <div class="md:col-span-9 flex flex-col justify-center gap-3">
+                                            <div class="flex items-start gap-2">
+                                                <x-icon name="o-question-mark-circle" class="w-5 h-5 text-success mt-0.5 shrink-0" />
+                                                <div class="font-semibold text-base">
+                                                    @if(! empty($block['prompt']))
+                                                        {{ $block['prompt'] }}
+                                                    @else
+                                                        <span class="italic text-base-content/60">Sin consigna</span>
+                                                    @endif
+                                                    @php $blockType = App\Enums\EvaluationBlockType::tryFrom($block['type'] ?? ''); @endphp
+                                                    <span class="badge badge-ghost badge-xs ml-1">{{ $blockType?->shortLabel() ?? '?' }}</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-start gap-2 text-sm">
+                                                <x-icon name="o-chat-bubble-left-ellipsis" class="w-5 h-5 text-info mt-0.5 shrink-0" />
+                                                <div class="flex-1 min-w-0 overflow-x-auto text-base-content/90">
+                                                    <x-evaluation-answer :block="$block" :answer="$studentAnswer" />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="w-28 shrink-0">
-                                            <x-input
-                                                wire:model="manualScores.{{ $bId }}"
-                                                type="number"
-                                                step="0.1"
-                                                max="{{ $block['points'] ?? 1 }}"
-                                                min="0"
-                                                suffix="/ {{ $block['points'] ?? 1 }}"
-                                                class="input-sm"
-                                            />
+
+                                        {{-- Columna derecha: Calificación (3 columnas) --}}
+                                        <div class="md:col-span-3 flex flex-col justify-center gap-3 bg-base-100 p-4 rounded border border-base-300 shadow-xs min-w-[220px]">
+                                            @php
+                                                $previousScore = $attemptToGrade->block_scores[$bId] ?? null;
+                                                $blockMaxPoints = (float) ($block['points'] ?? 1);
+                                                $isSuggestionApplied = $suggestion && isset($manualScores[$bId]) && abs((float)$manualScores[$bId] - (float)$suggestion->total_points) < 0.005;
+                                            @endphp
+
+                                            {{-- Anterior --}}
+                                            <div class="flex items-center justify-between text-sm">
+                                                <span class="text-base-content/60 font-semibold uppercase text-xs tracking-wider">Anterior</span>
+                                                <span class="font-semibold bg-base-200 px-2 py-0.5 rounded">
+                                                    @if($previousScore !== null)
+                                                        {{ EvaluationContent::formatPoints($previousScore) }} <span class="font-normal text-base-content/50 text-xs">pts</span>
+                                                    @else
+                                                        <span class="text-base-content/40 font-normal italic text-xs">Sin calificar</span>
+                                                    @endif
+                                                </span>
+                                            </div>
+
+                                            {{-- Propuesta --}}
+                                            <div class="flex items-center justify-between text-sm {{ $suggestion ? 'text-primary' : 'text-base-content/50' }}">
+                                                <span class="flex items-center gap-1 font-semibold uppercase text-xs tracking-wider">
+                                                    Propuesta @if($suggestion)✨@endif
+                                                </span>
+                                                @if($suggestion)
+                                                    <div class="flex items-center gap-1">
+                                                        <span class="font-bold text-base">
+                                                            {{ EvaluationContent::formatPoints($suggestion->total_points) }}
+                                                        </span>
+                                                        <x-button
+                                                            icon="o-arrow-down"
+                                                            class="btn-xs {{ $isSuggestionApplied ? 'btn-ghost text-success' : 'btn-primary' }} p-1 min-h-0 h-7"
+                                                            wire:click="applySuggestion('{{ $bId }}')"
+                                                            spinner="applySuggestion('{{ $bId }}')"
+                                                            tooltip="Aplicar propuesta"
+                                                        />
+                                                    </div>
+                                                @else
+                                                    <span class="text-xs italic">Sin propuesta</span>
+                                                @endif
+                                            </div>
+
+                                            <hr class="border-base-200" />
+
+                                            {{-- Nueva --}}
+                                            <div class="flex items-center justify-between mt-1">
+                                                <span class="font-bold uppercase text-xs tracking-wider text-base-content/80">Nueva</span>
+                                                <div class="flex items-center gap-1">
+                                                    <x-input
+                                                        wire:model="manualScores.{{ $bId }}"
+                                                        type="number"
+                                                        step="0.1"
+                                                        max="{{ $blockMaxPoints }}"
+                                                        min="0"
+                                                        class="input-sm w-24 font-bold bg-base-200 text-right"
+                                                    />
+                                                    <span class="text-xs font-semibold text-base-content/60">/ {{ EvaluationContent::formatPoints($blockMaxPoints) }}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="bg-base-100 p-3 rounded text-sm border border-base-300">
-                                        <x-evaluation-answer :block="$block" :answer="$studentAnswer" />
                                     </div>
 
                                     @if($suggestion)
                                         @php $settled = ! $suggestion->isPending(); @endphp
-                                        <div class="mt-3 rounded border {{ $settled ? 'border-base-300' : 'border-primary' }} bg-base-100 p-3 text-sm">
-                                            <div class="mb-2 flex flex-wrap items-center gap-2">
-                                                <span class="font-semibold">Propuesta del asistente</span>
-                                                <span class="badge {{ $suggestion->state_badge }} badge-sm">{{ $suggestion->state_label }}</span>
+                                        <details class="collapse collapse-arrow mt-3 rounded border {{ $settled ? 'border-base-300' : 'border-primary/50' }} bg-base-100 text-sm">
+                                            <summary class="collapse-title min-h-0 py-3 pr-10 flex flex-wrap items-center gap-2 font-semibold">
+                                                <x-icon name="o-sparkles" class="w-4 h-4 text-primary" />
+                                                Análisis del Asistente
+                                                <span class="badge {{ $suggestion->state_badge }} badge-xs">{{ $suggestion->state_label }}</span>
                                                 @if($suggestion->revision > 1)
                                                     <span class="badge badge-ghost badge-xs">rev {{ $suggestion->revision }}</span>
                                                 @endif
                                                 @foreach($suggestion->flagList() as $flag)
                                                     <span class="badge {{ $flag->badgeClass() }} badge-xs">{{ $flag->label() }}</span>
                                                 @endforeach
-                                            </div>
-
-                                            <table class="table table-xs">
-                                                <tbody>
-                                                    @foreach($suggestion->criteria as $criterion)
+                                            </summary>
+                                            
+                                            <div class="collapse-content pb-3">
+                                                <table class="table table-xs border-t border-base-200 mt-1 pt-2">
+                                                    <tbody>
+                                                        @foreach($suggestion->criteria as $criterion)
+                                                            <tr>
+                                                                <td class="align-top">
+                                                                    {{ $criterion['label'] ?? $criterion['key'] }}
+                                                                    @if(! empty($criterion['justification']))
+                                                                        <div class="mt-0.5 text-xs text-base-content/60">{{ $criterion['justification'] }}</div>
+                                                                    @endif
+                                                                </td>
+                                                                <td class="w-20 text-right align-top font-semibold whitespace-nowrap">
+                                                                    {{ EvaluationContent::formatPoints($criterion['points_awarded']) }}
+                                                                    @if(! empty($criterion['points_max']))
+                                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($criterion['points_max']) }}</span>
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                    <tfoot>
                                                         <tr>
-                                                            <td class="align-top">
-                                                                {{ $criterion['label'] ?? $criterion['key'] }}
-                                                                @if(! empty($criterion['justification']))
-                                                                    <div class="mt-0.5 text-xs text-base-content/60">{{ $criterion['justification'] }}</div>
-                                                                @endif
-                                                            </td>
-                                                            <td class="w-20 text-right align-top font-semibold whitespace-nowrap">
-                                                                {{ rtrim(rtrim(number_format((float) $criterion['points_awarded'], 2, ',', ''), '0'), ',') }}
-                                                                @if(! empty($criterion['points_max']))
-                                                                    <span class="text-xs font-normal text-base-content/50">/ {{ rtrim(rtrim(number_format((float) $criterion['points_max'], 2, ',', ''), '0'), ',') }}</span>
-                                                                @endif
-                                                            </td>
+                                                            <td class="text-right font-semibold">Total</td>
+                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($suggestion->total_points) }}</td>
                                                         </tr>
-                                                    @endforeach
-                                                </tbody>
-                                                <tfoot>
-                                                    <tr>
-                                                        <td class="text-right font-semibold">Total</td>
-                                                        <td class="text-right font-semibold whitespace-nowrap">{{ rtrim(rtrim(number_format((float) $suggestion->total_points, 2, ',', ''), '0'), ',') }}</td>
-                                                    </tr>
-                                                </tfoot>
-                                            </table>
+                                                    </tfoot>
+                                                </table>
 
-                                            @if($settled && $suggestion->disagreement_reason)
-                                                <div class="mt-2 text-xs text-base-content/60">
-                                                    Motivo del rechazo: {{ $suggestion->disagreement_reason }}
-                                                </div>
-                                            @endif
-                                        </div>
+                                                @if($settled && $suggestion->disagreement_reason)
+                                                    <div class="mt-2 text-xs text-base-content/60">
+                                                        Motivo del rechazo: {{ $suggestion->disagreement_reason }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </details>
                                     @endif
 
                                     @if($rubric)
                                         @php $rubricProblems = $rubric->problems((float) ($block['points'] ?? 1)); @endphp
-                                        <div class="mt-3 rounded border border-base-300 bg-base-100 p-3 text-sm">
-                                            <div class="mb-2 flex items-center gap-2">
-                                                <span class="font-semibold">Rúbrica</span>
+                                        <details class="collapse collapse-arrow mt-3 rounded border border-base-300 bg-base-100 text-sm">
+                                            <summary class="collapse-title min-h-0 py-3 pr-10 flex flex-wrap items-center gap-2 font-semibold">
+                                                <x-icon name="o-table-cells" class="w-4 h-4 text-base-content/60" />
+                                                Rúbrica
                                                 <span class="badge badge-ghost badge-xs">v{{ $rubric->version }}</span>
                                                 <span class="badge badge-ghost badge-xs">{{ $rubric->source === App\Services\Evaluations\Rubric::SOURCE_AGENT ? 'propuesta por agente' : 'definida por el docente' }}</span>
-                                            </div>
-                                            <table class="table table-xs">
-                                                <tbody>
-                                                    @foreach($rubric->criteria as $criterion)
+                                            </summary>
+                                            
+                                            <div class="collapse-content pb-3">
+                                                <table class="table table-xs border-t border-base-200 mt-1 pt-2">
+                                                    <tbody>
+                                                        @foreach($rubric->criteria as $criterion)
+                                                            <tr>
+                                                                <td class="w-8 font-mono text-xs align-top">{{ $criterion['key'] }}</td>
+                                                                <td class="align-top">
+                                                                    {{ $criterion['label'] }}
+                                                                    @foreach($criterion['levels'] as $score => $description)
+                                                                        <div class="mt-1 text-xs text-base-content/60">{{ $score }} → {{ $description }}</div>
+                                                                    @endforeach
+                                                                </td>
+                                                                <td class="w-16 text-right align-top font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($criterion['points']) }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                    <tfoot>
                                                         <tr>
-                                                            <td class="w-8 font-mono text-xs align-top">{{ $criterion['key'] }}</td>
-                                                            <td class="align-top">
-                                                                {{ $criterion['label'] }}
-                                                                @foreach($criterion['levels'] as $score => $description)
-                                                                    <div class="mt-1 text-xs text-base-content/60">{{ $score }} → {{ $description }}</div>
-                                                                @endforeach
-                                                            </td>
-                                                            <td class="w-16 text-right align-top font-semibold whitespace-nowrap">{{ number_format($criterion['points'], 2) }}</td>
+                                                            <td colspan="2" class="text-right font-semibold">Total</td>
+                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($rubric->maxPoints()) }}</td>
                                                         </tr>
-                                                    @endforeach
-                                                </tbody>
-                                                <tfoot>
-                                                    <tr>
-                                                        <td colspan="2" class="text-right font-semibold">Total</td>
-                                                        <td class="text-right font-semibold whitespace-nowrap">{{ number_format($rubric->maxPoints(), 2) }}</td>
-                                                    </tr>
-                                                </tfoot>
-                                            </table>
-                                            @foreach($rubricProblems as $problem)
-                                                <div class="mt-2 text-xs text-error">{{ $problem }}</div>
-                                            @endforeach
-                                        </div>
+                                                    </tfoot>
+                                                </table>
+                                                @foreach($rubricProblems as $problem)
+                                                    <div class="mt-2 text-xs text-error">{{ $problem }}</div>
+                                                @endforeach
+                                            </div>
+                                        </details>
                                     @endif
                                 </div>
                             @endforeach
@@ -1540,29 +1673,43 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                     @php $pendingSuggestions = $attemptToGrade->gradingSuggestions->filter->isPending(); @endphp
 
                     @if($pendingSuggestions->isNotEmpty())
-                        <div class="rounded-lg border border-primary bg-base-100 p-4 space-y-3">
-                            <div class="text-sm">
-                                <strong>{{ $pendingSuggestions->count() }}</strong> propuesta{{ $pendingSuggestions->count() === 1 ? '' : 's' }} del asistente
-                                para este alumno. Aceptarlas writes la nota final; ajustarlas te deja corregir los números a mano.
+                        <div class="rounded-lg border border-primary/40 bg-base-100 p-5">
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                                {{-- Izquierda: Texto y Motivo --}}
+                                <div class="md:col-span-8 lg:col-span-9">
+                                    <h4 class="font-bold text-primary flex items-center gap-2 mb-1">
+                                        <x-icon name="o-sparkles" class="w-5 h-5" />
+                                        Acciones en lote
+                                    </h4>
+                                    <p class="text-sm text-base-content/70">
+                                        Hay <strong>{{ $pendingSuggestions->count() }}</strong> propuesta{{ $pendingSuggestions->count() === 1 ? '' : 's' }} del asistente pendiente{{ $pendingSuggestions->count() === 1 ? '' : 's' }}.
+                                        Revisalas individualmente arriba o aplicá una acción rápida a todas.
+                                    </p>
+                                    <div class="mt-4 max-w-sm">
+                                        <x-select
+                                            label="Al rechazar, indicar motivo (opcional)"
+                                            wire:model="suggestionRejectionReason"
+                                            :options="[
+                                                ['id' => '', 'alias' => 'Sin motivo'],
+                                                ['id' => 'criterio_mal_aplicado', 'alias' => 'Criterio mal aplicado'],
+                                                ['id' => 'respuesta_ambigua', 'alias' => 'Respuesta ambigua'],
+                                                ['id' => 'el_modelo_se_equivoco', 'alias' => 'El modelo se equivocó'],
+                                                ['id' => 'rubrica_inadecuada', 'alias' => 'La rúbrica no sirve'],
+                                            ]"
+                                            option-value="id"
+                                            option-label="alias"
+                                        />
+                                    </div>
+                                </div>
+
+                                {{-- Derecha: Botones --}}
+                                <div class="md:col-span-4 lg:col-span-3 flex flex-col gap-2">
+                                    <x-button label="Aplicar para revisar" icon="o-pencil-square" class="btn-sm btn-success" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
+                                    <x-button label="Aceptar y finalizar" icon="o-check" class="btn-sm btn-primary" wire:click="acceptSuggestions" spinner="acceptSuggestions" />
+                                    <div class="border-t border-base-200 my-1"></div>
+                                    <x-button label="Rechazar todas" icon="o-x-circle" class="btn-sm btn-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" />
+                                </div>
                             </div>
-                            <div class="flex flex-wrap gap-2">
-                                <x-button label="Aceptar y finalizar" icon="o-check" class="btn-sm btn-primary" wire:click="acceptSuggestions" spinner="acceptSuggestions" />
-                                <x-button label="Cargar para ajustar" icon="o-pencil-square" class="btn-sm btn-ghost" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
-                                <x-button label="Rechazar" icon="o-x-circle" class="btn-sm btn-ghost text-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" />
-                            </div>
-                            <x-select
-                                label="Motivo del rechazo (opcional, sirve para mejorar el prompt)"
-                                wire:model="suggestionRejectionReason"
-                                :options="[
-                                    ['id' => '', 'alias' => 'Sin motivo'],
-                                    ['id' => 'criterio_mal_aplicado', 'alias' => 'Criterio mal aplicado'],
-                                    ['id' => 'respuesta_ambigua', 'alias' => 'Respuesta ambigua'],
-                                    ['id' => 'el_modelo_se_equivoco', 'alias' => 'El modelo se equivocó'],
-                                    ['id' => 'rubrica_inadecuada', 'alias' => 'La rúbrica no sirve'],
-                                ]"
-                                option-value="id"
-                                option-label="alias"
-                            />
                         </div>
                     @endif
 
@@ -1572,7 +1719,6 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         <x-button label="Guardar Corrección" icon="o-check" class="btn-primary" wire:click="saveGrading" />
                     </div>
                 </div>
-            </div>
     @endif
         </dialog>
             <x-card title="Detalle de Intentos por Estudiante">
