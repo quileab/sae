@@ -325,56 +325,58 @@
         </div>
     @endif
 
-    {{-- Unit Modal --}}
-    <x-modal wire:model="showUnitModal" title="{{ $editingUnit ? 'Editar Unidad' : 'Nueva Unidad' }}" class="backdrop-blur">
-        <x-form wire:submit="saveUnit">
-            <x-input label="Nombre" wire:model="unitForm.name" />
-            <x-textarea label="Descripción" wire:model="unitForm.description" />
-            <x-input label="Orden" type="number" wire:model="unitForm.order" />
-            <x-toggle label="Visible para los alumnos" wire:model="unitForm.is_visible" />
+    <teleport to="body">
+        {{-- Unit Modal --}}
+        <x-modal wire:model="showUnitModal" title="{{ $editingUnit ? 'Editar Unidad' : 'Nueva Unidad' }}" class="backdrop-blur">
+            <x-form wire:submit="saveUnit">
+                <x-input label="Nombre" wire:model="unitForm.name" />
+                <x-textarea label="Descripción" wire:model="unitForm.description" />
+                <x-input label="Orden" type="number" wire:model="unitForm.order" />
+                <x-toggle label="Visible para los alumnos" wire:model="unitForm.is_visible" />
 
-            <x-slot:actions>
-                <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveUnit" />
-            </x-slot:actions>
-        </x-form>
-    </x-modal>
+                <x-slot:actions>
+                    <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveUnit" />
+                </x-slot:actions>
+            </x-form>
+        </x-modal>
 
-    {{-- Topic Modal --}}
-    <x-modal wire:model="showTopicModal" title="{{ $editingTopic ? 'Editar Tema' : 'Nuevo Tema' }}" class="backdrop-blur" size="lg">
-        <x-form wire:submit="saveTopic">
-            <x-input label="Nombre" wire:model="topicForm.name" />
-            <x-input label="Orden" type="number" wire:model="topicForm.order" />
-            <x-toggle label="Visible para los alumnos" wire:model="topicForm.is_visible" />
+        {{-- Topic Modal --}}
+        <x-modal wire:model="showTopicModal" title="{{ $editingTopic ? 'Editar Tema' : 'Nuevo Tema' }}" class="backdrop-blur items-start" box-class="max-w-5xl mt-8">
+            <x-form wire:submit="saveTopic">
+                <x-input label="Nombre" wire:model="topicForm.name" />
+                <x-input label="Orden" type="number" wire:model="topicForm.order" />
+                <x-toggle label="Visible para los alumnos" wire:model="topicForm.is_visible" />
 
-            @php
-                $config = [
-                    'plugins' => 'autoresize',
-                    'min_height' => 200,
-                    'max_height' => 400,
-                    'statusbar' => false,
-                    'toolbar' => 'undo redo | h1 h2 h3 | bold italic underline | bullist numlist | quicktable link',
-                    'quickbars_selection_toolbar' => 'bold italic link',
-                ];
-            @endphp
+                @php
+                    $config = [
+                        'plugins' => 'autoresize',
+                        'min_height' => 300,
+                        'max_height' => 600,
+                        'statusbar' => false,
+                        'toolbar' => 'undo redo | h1 h2 h3 | bold italic underline | bullist numlist | quicktable link',
+                        'quickbars_selection_toolbar' => 'bold italic link',
+                    ];
+                @endphp
 
-            <x-editor label="Contenido pedagógico" wire:model="topicForm.content" :config="$config" />
+                <x-editor label="Contenido pedagógico" wire:model="topicForm.content" :config="$config" />
 
-            <x-slot:actions>
-                <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveTopic" />
-            </x-slot:actions>
-        </x-form>
-    </x-modal>
+                <x-slot:actions>
+                    <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveTopic" />
+                </x-slot:actions>
+            </x-form>
+        </x-modal>
 
-    {{-- Resource Modal --}}
-    <x-modal wire:model="showResourceModal" title="{{ $editingResource ? 'Editar Recurso' : 'Nuevo Recurso' }}" class="backdrop-blur">
-        <x-form wire:submit="saveResource">
-            <x-input label="Título del recurso" wire:model="resourceForm.title" placeholder="Ej: Guía de ejercicios, Video explicativo..." />
-            <x-input label="URL / Enlace" wire:model="resourceForm.url" placeholder="https://..." />
-            <x-toggle label="Visible para los alumnos" wire:model="resourceForm.is_visible" />
+        {{-- Resource Modal --}}
+        <x-modal wire:model="showResourceModal" title="{{ $editingResource ? 'Editar Recurso' : 'Nuevo Recurso' }}" class="backdrop-blur">
+            <x-form wire:submit="saveResource">
+                <x-input label="Título del recurso" wire:model="resourceForm.title" placeholder="Ej: Guía de ejercicios, Video explicativo..." />
+                <x-input label="URL / Enlace" wire:model="resourceForm.url" placeholder="https://..." />
+                <x-toggle label="Visible para los alumnos" wire:model="resourceForm.is_visible" />
 
-            <x-slot:actions>
-                <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveResource" />
-            </x-slot:actions>
-        </x-form>
-    </x-modal>
+                <x-slot:actions>
+                    <x-button label="Guardar" class="btn-primary" type="submit" spinner="saveResource" />
+                </x-slot:actions>
+            </x-form>
+        </x-modal>
+    </teleport>
 </div>

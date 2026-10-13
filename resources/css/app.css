@@ -2,6 +2,8 @@
 @import "tailwindcss";
 /* DaisyUI */
 @plugin "daisyui";
+/* Typography */
+@plugin "@tailwindcss/typography";
 
 /* Alpine.js - ocultar elementos antes de la inicialización */
 [x-cloak] { display: none !important; }

@@ -14,6 +14,7 @@
     "license": "AGPL-3.0-or-later",
     "require": {
         "php": "^8.2",
+        "afipsdk/afip.php": "@dev",
         "barryvdh/laravel-dompdf": "^3.1",
         "intervention/image": "*",
         "laravel/framework": "12.*",
@@ -22,7 +23,10 @@
         "livewire/livewire": "^4.0",
         "livewire/volt": "^1.10",
         "mercadopago/dx-php": "^3.8",
-        "robsontenorio/mary": "2.0"
+        "robsontenorio/mary": "2.0",
+        "setasign/fpdf": "^1.9",
+        "setasign/fpdi": "^2.6",
+        "tmw/fpdm": "^2.9"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -82,8 +86,18 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "policy": {
+            "advisories": {
+                "ignore": ["PKSA-37cw-b473-k9np", "PKSA-p3w6-ybvq-zfbx"]
+            }
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "afipsdk",
+        "type": "path",
+        "url": "packages/afipsdk"
+    }]
 }
