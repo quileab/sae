@@ -60,7 +60,7 @@ class EvaluationContent
      *
      * @return array<int, array<string, mixed>>
      */
-    protected static function sections(array $content): array
+    public static function sections(array $content): array
     {
         return self::normalize($content)['sections'] ?? [];
     }

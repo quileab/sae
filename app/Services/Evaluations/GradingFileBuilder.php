@@ -71,7 +71,10 @@ final class GradingFileBuilder
      */
     public function gradableBlocks(): array
     {
-        $blocks = self::gradableBlocksIn($this->content());
+        $blocks = array_filter(
+            $this->poolBlocks(),
+            fn (array $block) => ($block['type'] ?? null) === EvaluationBlockType::OpenText->value,
+        );
 
         if ($this->blockId !== null) {
             $blocks = array_intersect_key($blocks, [$this->blockId => true]);
@@ -120,6 +123,95 @@ final class GradingFileBuilder
         return $this->attempts->first()?->content_snapshot ?? $this->evaluation->content ?? [];
     }
 
+    /**
+     * Every question the cohort was actually served, keyed by block id.
+     *
+     * A group that sorts alternatives hands a different question to each
+     * student, so there is no single list to grade against: the pool is the
+     * union of what the attempts froze, and each student's answers section
+     * carries only the questions they received.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function poolBlocks(): array
+    {
+        $blocks = [];
+
+        foreach ($this->attempts as $attempt) {
+            foreach (EvaluationContent::sections($attempt->content_snapshot ?? []) as $section) {
+                foreach ($section['blocks'] ?? [] as $block) {
+                    if (! empty($block['id'])) {
+                        $blocks[$block['id']] = $block;
+                    }
+                }
+            }
+        }
+
+        if ($blocks === []) {
+            // Nobody has started yet: the teacher is drafting rubrics, so offer
+            // the authored questions in full.
+            foreach (EvaluationContent::sections($this->evaluation->content ?? []) as $section) {
+                foreach ($section['blocks'] ?? [] as $block) {
+                    if (! empty($block['id'])) {
+                        $blocks[$block['id']] = $block;
+                    }
+                }
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Global [P#] handles for the pool, so section 2 and section 3 name the
+     * same question with the same number even when students got different
+     * variants.
+     *
+     * @return array<string, int>
+     */
+    private function poolIndex(): array
+    {
+        $index = [];
+        $number = 0;
+
+        foreach ($this->gradableBlocks() as $blockId => $block) {
+            $index[$blockId] = ++$number;
+        }
+
+        return $index;
+    }
+
+    /**
+     * The gradable questions one student received, in the pool's numbering.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function attemptBlocks(EvaluationAttempt $attempt): array
+    {
+        $pool = $this->poolIndex();
+        $snapshot = $attempt->content_snapshot;
+
+        // An attempt without a snapshot predates the feature and holds the whole
+        // evaluation, so fall back to the pool rather than dropping the student.
+        $sections = $snapshot === null
+            ? EvaluationContent::sections($this->evaluation->content ?? [])
+            : EvaluationContent::sections($snapshot);
+
+        $blocks = [];
+
+        foreach ($sections as $section) {
+            foreach ($section['blocks'] ?? [] as $block) {
+                $blockId = $block['id'] ?? null;
+
+                if ($blockId !== null && isset($pool[$blockId])) {
+                    $blocks[$blockId] = $block;
+                }
+            }
+        }
+
+        return $blocks;
+    }
+
     private function rubrics(): array
     {
         return array_intersect_key(RubricResolver::current($this->evaluation), $this->gradableBlocks());
@@ -127,7 +219,7 @@ final class GradingFileBuilder
 
     private function header(): string
     {
-        $warning = $this->snapshotMismatch();
+        $warning = $this->driftedQuestionsWarning();
 
         return implode("\n", [
             '# Corrección asistida — '.$this->evaluation->title,
@@ -146,21 +238,77 @@ final class GradingFileBuilder
     }
 
     /**
-     * The export can only describe one set of questions, so a cohort that started
-     * before a content edit has to be marked in batches.
+     * Questions a student was served whose definition no longer matches the
+     * evaluation.
+     *
+     * Differing forms are not a problem here: every attempt carries its own
+     * snapshot and the export follows them. Editing a question mid-flight is,
+     * because the paper the student answered and the paper the teacher sees are
+     * no longer the same thing.
+     *
+     * @return array<int, string>
      */
-    private function snapshotMismatch(): string
+    private function driftedQuestions(): array
     {
-        $reference = sha1(json_encode($this->content()));
-        $mismatched = $this->attempts
-            ->filter(fn (EvaluationAttempt $attempt) => sha1(json_encode($attempt->content_snapshot ?? [])) !== $reference);
+        $current = [];
 
-        return $mismatched->isEmpty()
+        foreach (EvaluationContent::sections($this->evaluation->content ?? []) as $section) {
+            foreach ($section['blocks'] ?? [] as $block) {
+                if (! empty($block['id'])) {
+                    $current[$block['id']] = $block;
+                }
+            }
+        }
+
+        $drifted = [];
+
+        foreach ($this->poolBlocks() as $blockId => $block) {
+            if (! isset($current[$blockId]) || $this->signature($block) !== $this->signature($current[$blockId])) {
+                $drifted[] = $blockId;
+            }
+        }
+
+        return $drifted;
+    }
+
+    private function driftedQuestionsWarning(): string
+    {
+        $count = count($this->driftedQuestions());
+
+        return $count === 0
             ? ''
             : sprintf(
-                'OJO %d intentos no comparten el contenido exportado; corregí por separado',
-                $mismatched->count(),
+                'OJO %d preguntas que ya se respondieron cambiaron o se borraron desde entonces; se exporta la versión que vio el alumno, no la actual',
+                $count,
             );
+    }
+
+    private function signature(array $block): string
+    {
+        return sha1(json_encode($this->canonicalize($block)));
+    }
+
+    /**
+     * Deep copy with every map sorted by key.
+     *
+     * MySQL reorders the keys of a JSON column when it stores it, so two payloads
+     * that are equal as data can serialise differently. Comparing them straight
+     * from json_encode would report every question as changed the moment a
+     * snapshot round-tripped through the database.
+     */
+    private function canonicalize(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $sorted = array_map(fn (mixed $item) => $this->canonicalize($item), $value);
+
+        if (! array_is_list($sorted)) {
+            ksort($sorted);
+        }
+
+        return $sorted;
     }
 
     private function context(): string
@@ -186,6 +334,10 @@ final class GradingFileBuilder
                 '- Ya corregidas automáticamente y **fuera de alcance**: %s. No las vuelvas a puntuar.',
                 $auto->implode(', '),
             );
+        }
+
+        if ($this->drawsQuestions()) {
+            $lines[] = '- Cada alumno recibió **una alternativa distinta por grupo**: hay más preguntas aquí que las que ve una sola persona. Solo corré las que aparecen en la sección 3 de cada alumno.';
         }
 
         $lines[] = '';
@@ -236,6 +388,12 @@ final class GradingFileBuilder
     private function questions(): string
     {
         $lines = ['## 2. Preguntas', ''];
+
+        if ($this->drawsQuestions()) {
+            $lines[] = 'Esta evaluación **sortea una alternativa por grupo**, así que cada alumno vio una consigna distinta de las de su grupo. Corregí contra la consigna concreta de cada alumno: el bloque de esa persona te dice cuál recibió. Los `[P#]` son los mismos en las secciones 2 y 3.';
+            $lines[] = '';
+        }
+
         $index = 0;
 
         foreach ($this->gradableBlocks() as $blockId => $block) {
@@ -276,6 +434,7 @@ final class GradingFileBuilder
             return implode("\n", [...$lines, '_No hay intentos pendientes._', '']);
         }
 
+        $pool = $this->poolIndex();
         $studentIndex = 0;
 
         foreach ($this->attempts as $attempt) {
@@ -289,14 +448,27 @@ final class GradingFileBuilder
             );
             $lines[] = '';
 
-            $questionIndex = 0;
+            $blocks = $this->attemptBlocks($attempt);
 
-            foreach ($this->gradableBlocks() as $blockId => $block) {
-                $questionIndex++;
+            if ($blocks === []) {
+                // The student drew the other alternatives of the group, so there
+                // is nothing of the exported scope to grade.
+                $lines[] = '_Le tocaron otras variantes del grupo; ninguna de las preguntas exportadas le fue asignada._';
+                $lines[] = '';
+
+                continue;
+            }
+
+            foreach ($blocks as $blockId => $block) {
                 $answer = $attempt->answers[$blockId] ?? null;
                 $text = $answer['text'] ?? null;
                 $chosen = $answer['variant'] ?? null;
-                $lines[] = sprintf('#### [P%d] `%s` · %s pts', $questionIndex, $blockId, $this->number($block['points'] ?? 0));
+                $lines[] = sprintf(
+                    '#### [P%d] `%s` · %s pts',
+                    $pool[$blockId],
+                    $blockId,
+                    $this->number($block['points'] ?? 0),
+                );
 
                 if ($chosen !== null && ! empty($block['variants'])) {
                     $variant = collect($block['variants'])->firstWhere('key', $chosen);
@@ -393,6 +565,15 @@ final class GradingFileBuilder
         return implode("\n", $lines);
     }
 
+    /**
+     * Whether the evaluation hands out alternatives, which changes what the
+     * model is looking at.
+     */
+    private function drawsQuestions(): bool
+    {
+        return AttemptContent::hasDrawnGroups($this->evaluation->content ?? []);
+    }
+
     private function studentLabel(EvaluationAttempt $attempt): string
     {
         return $this->anonymize ? '' : ' · '.$attempt->user->fullname;
@@ -400,9 +581,7 @@ final class GradingFileBuilder
 
     private function allBlocks(): array
     {
-        return collect($this->content()['sections'] ?? [])
-            ->flatMap(fn (array $section) => $section['blocks'] ?? [])
-            ->all();
+        return array_values($this->poolBlocks());
     }
 
     /**

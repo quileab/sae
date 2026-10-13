@@ -152,6 +152,45 @@ class MyEvaluationsTest extends TestCase
     }
 
     #[Test]
+    public function progress_counts_the_questions_the_student_was_served(): void
+    {
+        // The group holds four alternatives but the student only received one,
+        // so "1 of 4" would be a lie about how much work is left.
+        $evaluation = $this->publishedEvaluation('Con sorteo', [
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addWeek(),
+            'content' => ['sections' => [[
+                'id' => 'sec_1',
+                'title' => 'Unidad 1',
+                'draw' => 1,
+                'blocks' => array_map(fn (int $n) => [
+                    'id' => 'v'.$n,
+                    'type' => 'open_text',
+                    'prompt' => 'Alternativa '.$n.'.',
+                    'points' => 1,
+                ], range(1, 4)),
+            ]]],
+        ]);
+
+        EvaluationAttempt::factory()->create([
+            'user_id' => $this->student->id,
+            'online_evaluation_id' => $evaluation->id,
+            'content_snapshot' => ['sections' => [[
+                'id' => 'sec_1',
+                'title' => 'Unidad 1',
+                'draw' => 1,
+                'blocks' => [['id' => 'v2', 'type' => 'open_text', 'prompt' => 'Alternativa 2.', 'points' => 1]],
+            ]]],
+            'answers' => ['v2' => ['text' => 'Mi respuesta.']],
+        ]);
+
+        $state = $this->stateFor($evaluation);
+
+        $this->assertSame(1, $state['answered']);
+        $this->assertSame(1, $state['total']);
+    }
+
+    #[Test]
     public function an_attempt_awaiting_grading_is_not_actionable_but_shows_results(): void
     {
         $evaluation = $this->publishedEvaluation('Esperando', [

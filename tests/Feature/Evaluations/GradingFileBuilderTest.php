@@ -209,7 +209,7 @@ class GradingFileBuilderTest extends TestCase
     }
 
     #[Test]
-    public function it_warns_when_the_cohort_did_not_start_from_the_same_content(): void
+    public function it_warns_when_a_graded_question_changed_after_it_was_served(): void
     {
         $same = $this->attempt();
         $stale = $this->attempt(content: ['sections' => [[
@@ -220,7 +220,49 @@ class GradingFileBuilderTest extends TestCase
 
         $file = (new GradingFileBuilder($this->evaluation, collect([$same, $stale])))->build();
 
-        $this->assertStringContainsString('SAE OJO 1 intentos no comparten el contenido exportado', $file);
+        $this->assertStringContainsString('SAE OJO 1 preguntas que ya se respondieron cambiaron', $file);
+    }
+
+    #[Test]
+    public function it_says_nothing_when_each_student_got_a_different_variant(): void
+    {
+        // A drawn group hands a different question to each student, which is the
+        // feature working, not content that drifted mid-flight.
+        $variants = ['sections' => [[
+            'id' => 'sec_variants',
+            'title' => 'Unidad 1',
+            'draw' => 1,
+            'blocks' => [
+                ['id' => 'v1', 'type' => 'open_text', 'prompt' => 'Alternativa A.', 'points' => 1],
+                ['id' => 'v2', 'type' => 'open_text', 'prompt' => 'Alternativa B.', 'points' => 1],
+            ],
+        ]]];
+
+        $this->evaluation->update(['content' => $variants]);
+
+        $first = $this->attempt(['v1' => ['text' => 'Respuesta con la alternativa A.']], [
+            'sections' => [['id' => 'sec_variants', 'title' => 'Unidad 1', 'draw' => 1, 'blocks' => [$variants['sections'][0]['blocks'][0]]]],
+        ]);
+
+        $second = $this->attempt(['v2' => ['text' => 'Respuesta con la alternativa B.']], [
+            'sections' => [['id' => 'sec_variants', 'title' => 'Unidad 1', 'draw' => 1, 'blocks' => [$variants['sections'][0]['blocks'][1]]]],
+        ]);
+
+        $builder = new GradingFileBuilder($this->evaluation->fresh(), collect([$first, $second]));
+        $file = $builder->build();
+
+        $this->assertStringNotContainsString('SAE OJO', $file);
+        // Each student carries only the question they were served.
+        $this->assertStringContainsString('Alternativa A.', $file);
+        $this->assertStringContainsString('Alternativa B.', $file);
+        $this->assertStringContainsString('una alternativa distinta por grupo', $file);
+        $firstRef = GradingFileBuilder::reference($first);
+        $secondRef = GradingFileBuilder::reference($second);
+
+        $this->assertSame(1, substr_count($file, '<!-- SAE-ALUMNO '.$firstRef.' v1 -->'));
+        $this->assertSame(1, substr_count($file, '<!-- SAE-ALUMNO '.$secondRef.' v2 -->'));
+        $this->assertStringNotContainsString('<!-- SAE-ALUMNO '.$firstRef.' v2 -->', $file);
+        $this->assertStringNotContainsString('<!-- SAE-ALUMNO '.$secondRef.' v1 -->', $file);
     }
 
     #[Test]

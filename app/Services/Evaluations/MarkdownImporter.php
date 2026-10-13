@@ -90,6 +90,7 @@ class MarkdownImporter
             [
                 'title' => 'Preguntas Importadas',
                 'intro' => '',
+                'draw' => 0,
                 'blocks' => $blocks,
             ],
         ];

@@ -312,7 +312,7 @@ class SuggestionReviewTest extends TestCase
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->assertSee('Propuesta del asistente')
+            ->assertSee('Análisis del Asistente')
             ->assertSee('Distingue dato de información')
             ->assertSee('Menciona el concepto pero no lo desarrolla.')
             ->assertSee('Respuesta insuficiente')

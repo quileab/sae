@@ -19,6 +19,7 @@ use Tests\TestCase;
 class EvaluationAttemptTest extends TestCase
 {
     use RefreshDatabase;
+    use VariantContent;
 
     private Subject $subject;
 
@@ -52,6 +53,69 @@ class EvaluationAttemptTest extends TestCase
             self::canonical($attempt->content_snapshot),
             'The attempt must freeze the evaluation content it was graded against.'
         );
+    }
+
+    #[Test]
+    public function starting_an_attempt_stores_the_questions_it_was_served(): void
+    {
+        $student = $this->enrolledStudent();
+        $evaluation = OnlineEvaluation::factory()->openFor()->create([
+            'subject_id' => $this->subject->id,
+            'teacher_id' => $this->teacher()->id,
+            'content' => $this->variantContent(),
+        ]);
+
+        Volt::actingAs($student)->test('evaluations.take', ['id' => $evaluation->id]);
+
+        $served = array_column($evaluation->content['sections'][0]['blocks'], 'id');
+
+        $attempt = EvaluationAttempt::where('user_id', $student->id)->firstOrFail();
+        $snapshotIds = array_column($attempt->content_snapshot['sections'][0]['blocks'], 'id');
+
+        $this->assertCount(1, $snapshotIds, 'A drawn group serves one question per student.');
+        $this->assertContains($snapshotIds[0], $served, 'And it must be one the student could have been given.');
+        $this->assertCount(
+            1,
+            $attempt->rubric_snapshot,
+            'Rubrics are frozen for what the student received, not for the alternatives they never saw.'
+        );
+        $this->assertSame(
+            [$snapshotIds[0]],
+            array_keys($attempt->rubric_snapshot),
+            'The frozen rubric belongs to the served question.'
+        );
+    }
+
+    #[Test]
+    public function a_retry_draws_again_instead_of_repeating_the_first_paper(): void
+    {
+        $student = $this->enrolledStudent();
+        $evaluation = OnlineEvaluation::factory()->openFor()->create([
+            'subject_id' => $this->subject->id,
+            'teacher_id' => $this->teacher()->id,
+            'max_attempts' => 0,
+            'content' => $this->variantContent(),
+        ]);
+
+        $served = [];
+
+        for ($pass = 1; $pass <= 12; $pass++) {
+            $attempt = EvaluationAttempt::where('user_id', $student->id)->orderByDesc('id')->first();
+
+            if ($attempt === null || $attempt->isFinished()) {
+                Volt::actingAs($student)->test('evaluations.take', ['id' => $evaluation->id])
+                    ->call('submitAttempt');
+            }
+
+            $served[] = EvaluationAttempt::where('user_id', $student->id)
+                ->orderByDesc('id')
+                ->firstOrFail()
+                ->content_snapshot['sections'][0]['blocks'][0]['id'];
+        }
+
+        // Twelve passes over four alternatives: getting the same one every time
+        // would mean the draw is not happening at all.
+        $this->assertGreaterThan(1, count(array_unique($served)), 'A retry must not be a rehearsal of the first paper.');
     }
 
     #[Test]
@@ -235,6 +299,37 @@ class EvaluationAttemptTest extends TestCase
         ]);
 
         return $student;
+    }
+}
+
+/**
+ * One group offering four alternatives on the same theme, which is what a
+ * teacher writes to stop two neighbours receiving the same paper.
+ */
+trait VariantContent
+{
+    /**
+     * @return array<string, mixed>
+     */
+    private function variantContent(): array
+    {
+        return ['sections' => [[
+            'id' => 'sec_1',
+            'title' => 'Unidad 1: Entidades',
+            'draw' => 1,
+            'blocks' => array_map(fn (int $number) => [
+                'id' => 'v'.$number,
+                'type' => 'open_text',
+                'prompt' => 'Alternativa '.$number.'.',
+                'points' => 1,
+                'rubric' => [
+                    'source' => 'teacher',
+                    'criteria' => [
+                        ['key' => 'c1', 'label' => 'Explica', 'points' => 1, 'levels' => []],
+                    ],
+                ],
+            ], range(1, 4)),
+        ]]];
     }
 }
 

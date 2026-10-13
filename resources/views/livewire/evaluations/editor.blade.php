@@ -5,6 +5,7 @@ use App\Enums\EvaluationStatus;
 use App\Models\OnlineEvaluation;
 use App\Models\Subject;
 use App\Models\ClassSession;
+use App\Services\Evaluations\AttemptContent;
 use App\Services\Evaluations\EvaluationContent;
 use App\Services\Evaluations\MarkdownImporter;
 use Illuminate\Validation\Rule;
@@ -102,6 +103,42 @@ new class extends Component {
             ->sum(fn (array $section) => count($section['blocks'] ?? []));
     }
 
+    /**
+     * How many questions a student actually receives, and how many the authored
+     * set holds. They differ as soon as a group sorts alternatives.
+     */
+    #[Computed]
+    public function drawnQuestionCount()
+    {
+        $count = 0;
+
+        foreach ($this->sections as $section) {
+            $blocks = count($section['blocks'] ?? []);
+            $draw = (int) ($section['draw'] ?? 0);
+
+            $count += $draw >= 1 ? min($draw, $blocks) : $blocks;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Cheapest and dearest totals a student can be marked on.
+     *
+     * @return array{min: float, max: float}
+     */
+    #[Computed]
+    public function drawnScoreRange()
+    {
+        return AttemptContent::scoreRange(['sections' => array_values($this->sections)]);
+    }
+
+    #[Computed]
+    public function hasDrawnGroups()
+    {
+        return AttemptContent::hasDrawnGroups(['sections' => array_values($this->sections)]);
+    }
+
     public function getSubjectProperty()
     {
         return Subject::find($this->subject_id);
@@ -124,8 +161,9 @@ new class extends Component {
     {
         $this->sections[] = [
             'id' => uniqid('sec_'),
-            'title' => 'Nueva Sección',
+            'title' => 'Nuevo grupo',
             'intro' => '',
+            'draw' => 0,
             'blocks' => []
         ];
     }
@@ -532,6 +570,7 @@ protected function synchroniseAnswerKey(array &$block, ?string $tableName): void
             'ends_at' => 'nullable|date|after_or_equal:starts_at',
             'subject_id' => 'required|integer|exists:subjects,id',
             'sections' => 'required|array|min:1',
+            'sections.*.draw' => 'nullable|integer|min:0',
         ]);
 
         $data = [
@@ -667,6 +706,29 @@ protected function synchroniseAnswerKey(array &$block, ?string $tableName): void
                 <strong>0 a 10</strong>. Las preguntas de desarrollo quedan pendientes
                 hasta que las corrijas a mano.
             </x-alert>
+
+            @if($this->hasDrawnGroups)
+                @php $range = $this->drawnScoreRange; @endphp
+                <x-alert icon="o-swatch" class="alert-info mt-2 text-sm">
+                    Con el sorteo por grupo, cada alumno recibe
+                    <strong>{{ $this->drawnQuestionCount }}</strong> de las {{ $this->questionCount }}
+                    preguntas y se lo corrige sobre
+                    @if($range['min'] === $range['max'])
+                        <strong>{{ $range['min'] }}</strong> puntos
+                    @else
+                        entre <strong>{{ $range['min'] }}</strong> y <strong>{{ $range['max'] }}</strong> puntos
+                    @endif
+                    , no sobre los {{ $this->totalPoints }} de la evaluación completa.
+                </x-alert>
+
+                @if($range['min'] !== $range['max'])
+                    <x-alert icon="o-exclamation-triangle" class="alert-warning mt-2 text-sm">
+                        Hay grupos cuyas alternativas valen distinto, así que la nota ya no significa
+                        lo mismo para todos: un alumno puede haber recibido solo las fáciles.
+                        Igualá los puntajes dentro de cada grupo para que las notas sean comparables.
+                    </x-alert>
+                @endif
+            @endif
         </x-card>
         @else
         <!-- Importar MD -->
@@ -695,13 +757,41 @@ B. Una base vacía
 
         @foreach($sections as $sIndex => $section)
             <div class="border-2 border-base-300 rounded-xl overflow-hidden bg-base-100 shadow-sm" wire:key="section-{{ $section['id'] ?? $sIndex }}">
-                <div class="bg-base-200 p-4 flex justify-between items-center">
+                <div class="bg-base-200 p-4 flex justify-between items-center gap-4">
                     <div class="flex-1 space-y-2 mr-4">
-                        <x-input wire:model="sections.{{$sIndex}}.title" placeholder="Título de la Sección" class="font-bold text-lg" />
-                        <x-input wire:model="sections.{{$sIndex}}.intro" placeholder="Introducción / Texto opcional para la sección" class="text-sm" />
+                        <x-input wire:model="sections.{{$sIndex}}.title" placeholder="Grupo / Unidad" class="font-bold text-lg" />
+                        <x-input wire:model="sections.{{$sIndex}}.intro" placeholder="Introducción / Texto opcional para el grupo" class="text-sm" />
                     </div>
-                    <x-button icon="o-trash" class="btn-error btn-sm btn-circle btn-outline" wire:click="removeSection({{ $sIndex }})" />
+
+                    <div class="flex items-start gap-2">
+                        <div class="w-40">
+                            <x-input
+                                wire:model="sections.{{$sIndex}}.draw"
+                                type="number"
+                                min="0"
+                                max="{{ max(count($section['blocks'] ?? []), 1) }}"
+                                label="Sorteo"
+                                hint="0 = mostrar todas"
+                                class="input-sm"
+                            />
+                        </div>
+                        <x-button icon="o-trash" class="btn-error btn-sm btn-circle btn-outline mt-6" wire:click="removeSection({{ $sIndex }})" />
+                    </div>
                 </div>
+
+                @php $drawCount = (int) ($section['draw'] ?? 0); $blockCount = count($section['blocks'] ?? []); @endphp
+                @if($drawCount >= 1 && $blockCount > 1)
+                    <div class="px-4 pt-3">
+                        <x-alert icon="o-swatch" class="alert-info text-sm py-2">
+                            Cada alumno recibe <strong>{{ $drawCount }}</strong> de las
+                            <strong>{{ $blockCount }}</strong> preguntas de este grupo, sorteadas al azar.
+                            @if($drawCount === 1)
+                                Escribí alternativas <strong>equivalentes en dificultad</strong>: es la única
+                                forma de que dos notas signifiquen lo mismo.
+                            @endif
+                        </x-alert>
+                    </div>
+                @endif
                 
                 <div class="p-4 space-y-6">
                     @foreach($section['blocks'] ?? [] as $bIndex => $block)

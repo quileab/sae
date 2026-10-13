@@ -107,6 +107,66 @@ class EvaluationEditorTest extends TestCase
     }
 
     #[Test]
+    public function the_editor_persists_how_many_questions_a_group_serves(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher']);
+        session(['current_subject_id' => $this->subject->id]);
+
+        Volt::actingAs($teacher)
+            ->test('evaluations.editor')
+            ->set('title', 'Parcial 1')
+            ->set('sections', [[
+                'id' => 'sec_1',
+                'title' => 'Unidad 1: Entidades',
+                'intro' => '',
+                'draw' => 1,
+                'blocks' => [
+                    ['id' => 'v1', 'type' => 'open_text', 'prompt' => 'Alternativa A.', 'points' => 1],
+                    ['id' => 'v2', 'type' => 'open_text', 'prompt' => 'Alternativa B.', 'points' => 1],
+                ],
+            ]])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $evaluation = OnlineEvaluation::firstOrFail();
+
+        $this->assertSame(1, $evaluation->content['sections'][0]['draw']);
+        $this->assertSame('Unidad 1: Entidades', $evaluation->content['sections'][0]['title']);
+    }
+
+    #[Test]
+    public function the_editor_refuses_a_group_that_would_serve_a_negative_number(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher']);
+        session(['current_subject_id' => $this->subject->id]);
+
+        Volt::actingAs($teacher)
+            ->test('evaluations.editor')
+            ->set('title', 'Parcial 1')
+            ->set('sections', [[
+                'id' => 'sec_1',
+                'title' => 'Unidad 1',
+                'draw' => -2,
+                'blocks' => [['id' => 'v1', 'type' => 'open_text', 'prompt' => 'Alternativa A.', 'points' => 1]],
+            ]])
+            ->call('save')
+            ->assertHasErrors(['sections.0.draw']);
+
+        $this->assertDatabaseMissing('online_evaluations', ['title' => 'Parcial 1']);
+    }
+
+    #[Test]
+    public function a_new_group_defaults_to_serving_every_question(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher']);
+        session(['current_subject_id' => $this->subject->id]);
+
+        $component = Volt::actingAs($teacher)->test('evaluations.editor')->call('addSection');
+
+        $this->assertSame(0, $component->get('sections')[0]['draw']);
+    }
+
+    #[Test]
     public function the_editor_rejects_an_out_of_range_passing_score(): void
     {
         $teacher = User::factory()->create(['role' => 'teacher']);

@@ -152,15 +152,21 @@ class StudentEvaluationState
      */
     private function progress(OnlineEvaluation $evaluation, ?EvaluationAttempt $attempt): array
     {
+        // The attempt's snapshot is what the student was actually served, so a
+        // drawn group counts once and not by how many alternatives it holds.
+        // Falling back to the authored content keeps a student who has not
+        // started yet from being shown "0 of 0".
+        $content = $attempt?->content_snapshot ?: $evaluation->content;
+
         $total = 0;
 
-        foreach ($evaluation->content['sections'] ?? [] as $section) {
+        foreach ($content['sections'] ?? [] as $section) {
             $total += count($section['blocks'] ?? []);
         }
 
         $blocksById = [];
 
-        foreach ($evaluation->content['sections'] ?? [] as $section) {
+        foreach ($content['sections'] ?? [] as $section) {
             foreach ($section['blocks'] ?? [] as $block) {
                 if (isset($block['id'])) {
                     $blocksById[$block['id']] = $block;

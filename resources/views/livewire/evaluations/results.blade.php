@@ -749,6 +749,14 @@ public function attemptHeaders(): array
     }
 
     /**
+     * The blocks the assistant panel offers, which is every question the
+     * students awaiting a mark were actually served.
+     *
+     * A group that sorts alternatives hands a different question to each
+     * student, so one attempt's snapshot would hide the other variants from the
+     * teacher and from the rubric they are about to write. The union is what
+     * makes the draw visible before grading it.
+     *
      * @return array<string, array<string, mixed>>
      */
     private function assistBlocks(): array
@@ -757,7 +765,7 @@ public function attemptHeaders(): array
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>
      */
     private function assistBlock(string $id): ?array
     {
@@ -765,26 +773,48 @@ public function attemptHeaders(): array
     }
 
     /**
+     * The union of the snapshots being graded, so the panel lists every variant
+     * in play.
+     *
      * @return array<string, mixed>
      */
     private function assistContent(): array
     {
-        return $this->assistSourceSnapshot() ?? $this->evaluation->content ?? [];
+        $blocks = [];
+
+        foreach ($this->assistSourceSnapshots() as $snapshot) {
+            foreach (EvaluationContent::sections($snapshot) as $section) {
+                foreach ($section['blocks'] ?? [] as $block) {
+                    if (! empty($block['id'])) {
+                        $blocks[$block['id']] = $block;
+                    }
+                }
+            }
+        }
+
+        if ($blocks === []) {
+            return $this->evaluation->content ?? [];
+        }
+
+        return ['sections' => [['title' => '', 'blocks' => array_values($blocks)]]];
     }
 
     /**
-     * The export describes the questions students were served, not the current
-     * content, so it reads the snapshot of the cohort it will send.
+     * The snapshots of the cohort this export is about to grade.
      *
-     * @return array<string, mixed>|null
+     * @return array<int, array<string, mixed>>
      */
-    private function assistSourceSnapshot(): ?array
+    private function assistSourceSnapshots(): array
     {
+        // Read through the models rather than pluck(): pluck() would hand back the
+        // raw JSON string instead of the decoded content.
         return EvaluationAttempt::forEvaluation($this->evaluation->id)
             ->awaitingGrade()
             ->whereNotNull('content_snapshot')
             ->orderBy('id')
-            ->value('content_snapshot');
+            ->get()
+            ->map(fn (EvaluationAttempt $attempt) => $attempt->content_snapshot)
+            ->all();
     }
 
     /**

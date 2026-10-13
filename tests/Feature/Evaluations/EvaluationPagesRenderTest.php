@@ -123,6 +123,47 @@ class EvaluationPagesRenderTest extends TestCase
     }
 
     #[Test]
+    public function the_preview_shows_one_real_combination_and_offers_every_alternative(): void
+    {
+        $teacher = User::factory()->create(['role' => 'teacher']);
+        $this->teacherOwnsSubject($teacher);
+
+        $evaluation = OnlineEvaluation::factory()->openFor()->create([
+            'subject_id' => $this->subject->id,
+            'teacher_id' => $teacher->id,
+            'content' => ['sections' => [[
+                'id' => 'sec_1',
+                'title' => 'Unidad 1: Entidades',
+                'draw' => 1,
+                'blocks' => [
+                    ['id' => 'v1', 'type' => 'open_text', 'prompt' => 'Alternativa A.', 'points' => 1],
+                    ['id' => 'v2', 'type' => 'open_text', 'prompt' => 'Alternativa B.', 'points' => 1],
+                ],
+            ]]],
+        ]);
+
+        $preview = Volt::actingAs($teacher)->test('evaluations.take', ['id' => $evaluation->id]);
+
+        // What the student sees first is one combination, not the whole group.
+        $preview->assertSee('combinación real');
+        $this->assertCount(1, $preview->instance()->content['sections'][0]['blocks']);
+
+        // Every alternative stays reachable for review.
+        $this->assertArrayHasKey('v1', $preview->instance()->previewOptions());
+        $this->assertArrayHasKey('v2', $preview->instance()->previewOptions());
+
+        $preview->set('previewBlockId', 'v2');
+
+        // The swap has to reach what is rendered, not just the selector.
+        $this->assertSame(
+            'v2',
+            $preview->instance()->content['sections'][0]['blocks'][0]['id'],
+            'Picking an alternative must preview that question.'
+        );
+        $preview->assertSee('Alternativa B.');
+    }
+
+    #[Test]
     public function the_take_screen_renders_for_an_enrolled_student(): void
     {
         $student = User::factory()->create(['role' => 'student']);

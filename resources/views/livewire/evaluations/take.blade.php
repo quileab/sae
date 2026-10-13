@@ -5,12 +5,14 @@ use App\Enums\EvaluationStatus;
 use App\Models\OnlineEvaluation;
 use App\Models\EvaluationAttempt;
 use App\Services\Evaluations\AttemptGrader;
+use App\Services\Evaluations\AttemptContent;
 use App\Services\Evaluations\EvaluationContent;
 use App\Services\Evaluations\Rubric;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Mary\Traits\Toast;
+use Illuminate\Support\Str;
 
 new #[Layout('layouts.app')] class extends Component {
     use Toast;
@@ -23,6 +25,25 @@ new #[Layout('layouts.app')] class extends Component {
     public $remainingSeconds = 0;
     public $isPreview = false;
     public $lastSavedAt = null;
+
+    /**
+     * Which alternative of a drawn group the preview is showing.
+     *
+     * Empty means "the combination a student would actually get", which is the
+     * default: a teacher should first see the real paper, then walk the
+     * alternatives to check that every variant is answerable and fair.
+     */
+    public $previewBlockId = '';
+
+    /**
+     * Discard the preview and draw again, so the teacher can see that the
+     * combinations really do vary.
+     */
+    public function previewAgain(): void
+    {
+        $this->previewBlockId = '';
+        $this->content = $this->previewContent();
+    }
 
     public function mount($id)
     {
@@ -39,7 +60,7 @@ new #[Layout('layouts.app')] class extends Component {
 
         if ($this->isPreview) {
             // Mock preview attempt
-            $this->content = $this->evaluation->content;
+            $this->content = $this->previewContent();
             $totalSeconds = $this->evaluation->duration_minutes * 60;
             $this->remainingSeconds = $totalSeconds;
             $this->warning('Modo Vista Previa: Estás viendo la evaluación como estudiante, pero tus respuestas no se guardarán.');
@@ -63,6 +84,12 @@ new #[Layout('layouts.app')] class extends Component {
                 // Max attempts reached, redirect to results
                 return $this->redirectRoute('evaluations.results', ['id' => $this->evaluation->id]);
             }
+            // Each attempt draws its own questions from the groups that offer
+            // alternatives, so a second attempt is not a rehearsal of the first.
+            // The draw lands in the snapshot, which is what grading normalises
+            // against and what the grading file exports.
+            $served = AttemptContent::draw($this->evaluation->content);
+
             // Create new attempt
             $this->attempt = EvaluationAttempt::create([
                 'user_id' => $user->id,
@@ -71,10 +98,12 @@ new #[Layout('layouts.app')] class extends Component {
                 'status' => AttemptStatus::InProgress->value,
                 'started_at' => now(),
                 'answers' => [],
-                'content_snapshot' => $this->evaluation->content,
+                'content_snapshot' => $served,
                 // Frozen for the same reason as the content: a rubric edited after
                 // submission must not reinterpret suggestions made against it.
-                'rubric_snapshot' => Rubric::snapshotFor($this->evaluation->content),
+                // Built from the served questions so the student is not measured
+                // against rubrics for questions they were never shown.
+                'rubric_snapshot' => Rubric::snapshotFor($served),
             ]);
         }
 
@@ -151,6 +180,83 @@ new #[Layout('layouts.app')] class extends Component {
  *
  * @return array<int, array{block: array, section: string, intro: string, number: int, block_id: string, answered: bool}>
  */
+#[Computed]
+public function previewContent(): array
+{
+    $content = AttemptContent::draw($this->evaluation->content ?? []);
+
+    if ($this->previewBlockId === '') {
+        return $content;
+    }
+
+    // Swapping the drawn question for the one the teacher picked keeps the
+    // surrounding groups untouched, so the preview still shows a real form with
+    // one alternative swapped in.
+    foreach ($content['sections'] as $sIndex => $section) {
+        foreach ($section['blocks'] ?? [] as $bIndex => $block) {
+            if (($block['id'] ?? null) !== $this->previewBlockId) {
+                continue;
+            }
+
+            $alternative = $this->previewBlock();
+
+            if ($alternative !== null) {
+                $content['sections'][$sIndex]['blocks'][$bIndex] = $alternative;
+            }
+
+            return $content;
+        }
+    }
+
+    return $content;
+}
+
+/**
+ * Every alternative a drawn group can serve, for the preview selector.
+ *
+ * @return array<string, string>
+ */
+#[Computed]
+public function previewOptions(): array
+{
+    $options = [];
+
+    foreach (AttemptContent::variantGroups($this->evaluation->content ?? []) as $group) {
+        foreach ($group['blocks'] as $block) {
+            if (empty($block['id'])) {
+                continue;
+            }
+
+            $options[$block['id']] = sprintf(
+                '%s · %s · %s pts',
+                $group['title'],
+                Str::limit(trim(strip_tags($block['prompt'] ?? '(sin consigna)')), 70),
+                EvaluationContent::formatPoints($block['points'] ?? 0),
+            );
+        }
+    }
+
+    return $options;
+}
+
+/**
+ * The authored question behind the preview selection, with the group it came
+ * from so the swap keeps that group's heading.
+ */
+#[Computed]
+public function previewBlock(): ?array
+{
+    foreach (AttemptContent::variantGroups($this->evaluation->content ?? []) as $group) {
+        foreach ($group['blocks'] as $block) {
+            if (($block['id'] ?? null) === $this->previewBlockId) {
+                return $block;
+            }
+        }
+    }
+
+    return null;
+}
+
 #[Computed]
 public function questionIndex(): array
 {
@@ -311,6 +417,30 @@ public function saveProgress()
                 @endunless
             </div>
         </div>
+
+        @if($isPreview && $this->previewOptions)
+            <div class="max-w-7xl mx-auto mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <x-alert icon="o-swatch" class="alert-info py-2">
+                    Esta es la <strong>combinación real</strong> que recibiría un alumno: a cada grupo
+                    le toca una de sus alternativas, sorteada al azar.
+                </x-alert>
+                <div class="flex items-center gap-2">
+                    <x-select
+                        wire:model.live="previewBlockId"
+                        :options="$this->previewOptions"
+                        placeholder="Ver otra alternativa del grupo…"
+                        class="select-sm min-w-64"
+                    />
+                    <x-button
+                        wire:click="previewAgain"
+                        label="Sortear otra"
+                        icon="o-arrow-path"
+                        class="btn-xs btn-ghost"
+                        spinner="previewAgain"
+                    />
+                </div>
+            </div>
+        @endif
 
         @unless($isPreview)
             <progress class="progress progress-success w-full mt-2 h-1.5"
