@@ -151,7 +151,39 @@ class SuggestionReviewTest extends TestCase
     }
 
     #[Test]
-    public function accepting_proposals_writes_the_mark_through_the_grader(): void
+    public function carrying_a_proposal_to_the_inputs_writes_nothing(): void
+    {
+        // The batch action only fills the boxes: nothing reaches the database
+        // until the teacher confirms, so no mark is ever written behind their back.
+        $this->seedProposal(total: 1.5, max: 1.5);
+        GradingSuggestion::factory()->create([
+            'evaluation_attempt_id' => $this->attempt->id,
+            'block_id' => 'q2',
+            'total_points' => 0.5,
+            'max_points' => 1.0,
+            'state' => GradingSuggestionState::Proposed->value,
+        ]);
+
+        $this->actingAs($this->teacher);
+
+        $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempt->id)
+            ->call('prefillSuggestions')
+            ->assertSet('manualScores', ['q1' => 1.5, 'q2' => 0.5]);
+
+        $this->attempt->refresh();
+
+        $this->assertSame(AttemptStatus::Submitted, $this->attempt->status, 'Loading a proposal must not grade.');
+        $this->assertNotEquals('8.00', (string) $this->attempt->score);
+
+        foreach (GradingSuggestion::all() as $suggestion) {
+            $this->assertSame(GradingSuggestionState::Proposed, $suggestion->state);
+            $this->assertNull($suggestion->final_points);
+        }
+    }
+
+    #[Test]
+    public function saving_after_carrying_writes_the_mark_through_the_grader(): void
     {
         $this->seedProposal(total: 1.5, max: 1.5);
         GradingSuggestion::factory()->create([
@@ -166,7 +198,8 @@ class SuggestionReviewTest extends TestCase
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->call('acceptSuggestions');
+            ->call('prefillSuggestions')
+            ->call('saveGrading');
 
         $this->attempt->refresh();
 
@@ -183,7 +216,7 @@ class SuggestionReviewTest extends TestCase
     }
 
     #[Test]
-    public function accepting_keeps_a_mark_the_teacher_entered_by_hand(): void
+    public function saving_keeps_a_mark_the_teacher_entered_by_hand(): void
     {
         // q2 was credited by hand and never became a proposal.
         $this->attempt->update(['block_scores' => ['q1' => 0, 'q2' => 1.0]]);
@@ -193,22 +226,24 @@ class SuggestionReviewTest extends TestCase
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->call('acceptSuggestions');
+            ->call('prefillSuggestions')
+            ->call('saveGrading');
 
         $this->assertEquals(['q1' => 1.0, 'q2' => 1.0], $this->attempt->fresh()->block_scores);
         $this->assertSame('8.00', (string) $this->attempt->fresh()->score);
     }
 
     #[Test]
-    public function accepting_nothing_leaves_the_attempt_pending(): void
+    public function saving_an_untouched_attempt_still_works_without_any_proposal(): void
     {
         $this->actingAs($this->teacher);
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->call('acceptSuggestions');
+            ->set('manualScores', ['q1' => 1.5, 'q2' => 1.0])
+            ->call('saveGrading');
 
-        $this->assertSame(AttemptStatus::Submitted, $this->attempt->fresh()->status);
+        $this->assertSame(AttemptStatus::Graded, $this->attempt->fresh()->status);
         $this->assertSame(0, GradingSuggestion::count());
     }
 
@@ -316,17 +351,17 @@ class SuggestionReviewTest extends TestCase
             ->assertSee('Distingue dato de información')
             ->assertSee('Menciona el concepto pero no lo desarrolla.')
             ->assertSee('Respuesta insuficiente')
-            ->assertSee('Aceptar y finalizar');
+            ->assertSee('Llevar a los casilleros');
     }
 
     #[Test]
-    public function an_attempt_with_no_proposals_offers_nothing_to_accept(): void
+    public function an_attempt_with_no_proposals_offers_nothing_to_batch(): void
     {
         $this->actingAs($this->teacher);
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->assertDontSee('Aceptar y finalizar');
+            ->assertDontSee('Llevar a los casilleros');
     }
 
     #[Test]
@@ -340,9 +375,11 @@ class SuggestionReviewTest extends TestCase
 
         $this->actingAs($this->teacher);
 
-        // Without opening the modal: the table is what carries the badge.
+        // Without opening the modal: the table is what carries the badge, and it
+        // spells out what the number is instead of showing a bare numeral.
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
-            ->assertSee('Propuestas del asistente esperando revisión');
+            ->assertSee('1 prop.')
+            ->assertSee('1 propuesta espera');
     }
 
     #[Test]
@@ -351,7 +388,7 @@ class SuggestionReviewTest extends TestCase
         $this->actingAs($this->teacher);
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
-            ->assertDontSee('Propuestas del asistente esperando revisión');
+            ->assertDontSee('propuestas esperan');
     }
 
     #[Test]
@@ -363,9 +400,9 @@ class SuggestionReviewTest extends TestCase
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->call('acceptSuggestions')
-            ->call('closeGrading')
-            ->assertDontSee('Propuestas del asistente esperando revisión');
+            ->call('prefillSuggestions')
+            ->call('saveGrading')
+            ->assertDontSee('propuestas esperan');
     }
 
     #[Test]

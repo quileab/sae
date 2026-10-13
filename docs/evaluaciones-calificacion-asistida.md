@@ -83,15 +83,41 @@ con 0 puntos.
 Orden docente: cabecera → **KPIs** → panel de corrección asistida (al abrirse) →
 diálogo de corrección (overlay) → tabla de intentos.
 
-- KPIs: pendientes (cola de trabajo), promedio, aprobación. Sin "Rango".
-- Tabla como superficie de triage: columnas Alumno / Estado / Nota / Propuesta /
-  Acción, badge con pendientes por intento, filtros por estado de revisión.
-- Corrección en **modal `<dialog>` nativo a pantalla completa**, con
-  anterior/siguiente (`N de M`) sin perder el lugar en la lista. Una sola tabla
-  fusionada rúbrica+propuesta por pregunta; la nota se edita **por criterio**
-  con suma automática al total del bloque.
-- Avisos como `x-notice`: icono que abre modal (teleportado al `<body>`), no
-  tooltips largos ni alertas inline.
+Regla que ordena la pantalla: **un mismo dato no puede decir dos cosas distintas,
+y nada que cambie el comportamiento puede quedar escondido detrás de un ícono.**
+
+- **KPIs: 3 tarjetas**, todas contadas en alumnos: `Alumnos corregidos` con
+  denominador (`12 de 18`) y los pendientes nombrados por unidad ("3 alumnos sin
+  nota"), `Promedio General` sobre 10, y `Tasa de Aprobación` con el umbral a la
+  vista. La tabla de abajo cuenta intentos y por eso declara su total en el
+  subtítulo: antes los dos números se contradecían sin que ninguno estuviera mal.
+  Se sacó "Rango de Notas": un mínimo–máximo sin escala no dice nada accionable y
+  ocupaba el mismo peso que el promedio.
+- **Tabla de intentos**: Estudiante / Intento / Estado / Entrega / Calificación /
+  acción. El badge de propuestas pendientes **dice "3 prop."** y no un numeral
+  suelto que solo se entendía pasando el mouse.
+- **Corrección en `<dialog>` nativo a pantalla completa**, con anterior/siguiente
+  (`N de M`). Arriba declara la escala: la nota /10 del intento, la nota de
+  aprobación y el aviso de que los casilleros llevan puntos de cada pregunta y no
+  la nota. Adentro, por pregunta: la propuesta del asistente (colapsable) y la
+  rúbrica vigente (colapsable), y el puntaje a nivel de bloque.
+- **Un solo botón escribe.** "Llevar a los casilleros" solo copia las propuestas a
+  los inputs; la nota la escribe **Guardar Corrección**, que además liquida cada
+  propuesta como aceptada o ajustada y deja la traza (`final_points`,
+  `accepted_at`, `accepted_by`). Antes había un "Aceptar y finalizar" que
+  calificaba el intento en el acto, así que la misma decisión tenía dos caminos y
+  una nota final se escribía sin que el docente la confirmara.
+- **Avisos como `x-notice`**: icono que abre modal teleportado al `<body>`, con
+  **rótulo visible** cuando el aviso cambia lo que pasa (falta rúbrica, revisar no
+  guarda nada, guardar la rúbrica cambia cómo se corrige).
+
+Pendiente: aviso de trabajo sin guardar al cerrar o cambiar de alumno, y
+confirmación en "Rechazar todas" (hoy el motivo por defecto es "Sin motivo", que
+es justo el dato que necesita `evaluations:calibrate`).
+
+**Lo que no se unificó y por qué:** la coma decimal. `EvaluationContent::formatPoints`
+escribe `2,5`, pero `<input type="number">` no acepta coma: el navegador la parsea
+como vacío y el docente no podría escribir. El input queda con punto a propósito.
 
 ## Comandos
 

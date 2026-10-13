@@ -91,6 +91,15 @@ public function mount($id)
         return FinalGradeResolver::resolve($this->evaluation, $studentAttempts);
     }
 
+    /**
+     * Cohort progress for the teacher, counted in students.
+     *
+     * 'total' and 'pending' are students, not attempts: the attempts table right
+     * below counts attempts, so the two used to disagree on screen without
+     * either number being wrong. 'delivered' exists so the template can show the
+     * denominator instead of a bare count, and 'pending' is named as students
+     * wherever it is written out.
+     */
     #[Computed]
     public function stats()
     {
@@ -102,8 +111,10 @@ public function mount($id)
             ->get()
             ->groupBy('user_id');
 
+        $delivered = $attemptsByUser->count();
+
         if ($attemptsByUser->isEmpty()) {
-            return ['total' => 0, 'average' => 0, 'approved' => 0, 'max' => 0, 'min' => 0, 'passRate' => 0];
+            return ['total' => 0, 'delivered' => 0, 'pending' => 0, 'average' => 0, 'approved' => 0, 'passRate' => 0];
         }
 
         $finalScores = collect();
@@ -115,7 +126,7 @@ public function mount($id)
         }
 
         if ($finalScores->isEmpty()) {
-            return ['total' => $attemptsByUser->count(), 'average' => 0, 'approved' => 0, 'max' => 0, 'min' => 0, 'passRate' => 0, 'pending' => $attemptsByUser->count()];
+            return ['total' => 0, 'delivered' => $delivered, 'pending' => $delivered, 'average' => 0, 'approved' => 0, 'passRate' => 0];
         }
 
         $passingScore = $this->evaluation->passing_score;
@@ -123,12 +134,11 @@ public function mount($id)
 
         return [
             'total' => $finalScores->count(),
-            'pending' => $attemptsByUser->count() - $finalScores->count(),
+            'delivered' => $delivered,
+            'pending' => $delivered - $finalScores->count(),
             'average' => round($finalScores->average(), 2),
             'approved' => $approvedCount,
             'passRate' => round(($approvedCount / $finalScores->count()) * 100),
-            'max' => $finalScores->max(),
-            'min' => $finalScores->min(),
         ];
     }
 
@@ -229,61 +239,6 @@ public function attemptHeaders(): array
     }
 
     /**
- * Accept every pending proposal of the attempt being graded.
- *
- * applyManualMarks replaces the whole block_scores array on purpose, so this
- * rebuilds the complete map from the current values plus the proposals. That is
- * also why the unit here is the attempt: a single block cannot be accepted alone.
- */
-    public function acceptSuggestions()
-    {
-        $attempt = $this->currentGradingAttempt();
-
-        $pending = $attempt->gradingSuggestions()->pending()->get();
-
-        if ($pending->isEmpty()) {
-            $this->info('No hay propuestas pendientes para este intento.');
-
-            return;
-        }
-
-        $scores = $attempt->block_scores ?? [];
-
-        foreach ($pending as $suggestion) {
-            $scores[$suggestion->block_id] = (float) $suggestion->total_points;
-        }
-
-        // One transaction: a failure must not leave a graded attempt whose
-        // proposals still read as pending.
-        $graded = DB::transaction(function () use ($attempt, $scores, $pending) {
-            $graded = app(AttemptGrader::class)->applyManualMarks($attempt, $scores, $attempt->feedback);
-
-            foreach ($pending as $suggestion) {
-                $suggestion->update([
-                    'state' => GradingSuggestionState::Accepted->value,
-                    'final_points' => (float) $suggestion->total_points,
-                    'accepted_at' => now(),
-                    'accepted_by' => auth()->id(),
-                ]);
-            }
-
-            return $graded;
-        });
-
-        $this->manualScores = $graded->block_scores;
-        $this->gradingAttempt = $graded->fresh(['user', 'gradingSuggestions']);
-        $this->suggestionRejectionReason = null;
-
-        $this->success(sprintf(
-            '%d propuesta%s aceptada%s. La nota del intento quedó en %s.',
-            $pending->count(),
-            $pending->count() === 1 ? '' : 's',
-            $pending->count() === 1 ? '' : 's',
-            number_format((float) $graded->score, 2),
-        ));
-    }
-
-    /**
      * Copy the proposal into the inputs and let the teacher finish the job. The
      * numbers are editable on purpose: adjusting is the normal case, not an
      * exception.
@@ -309,7 +264,7 @@ public function attemptHeaders(): array
 
         $this->manualScores = $scores;
 
-        $this->info('Notas sugeridas cargadas. Revisalas, ajustá lo que quieras y guardá.');
+        $this->info('Notas sugeridas cargadas en los casilleros. Revisalas, ajustá lo que quieras y confirmá con Guardar Corrección.');
     }
 
     /**
@@ -967,33 +922,31 @@ public function attemptHeaders(): array
     </div>
 
     @if($this->isTeacher)
-            <!-- KPIs Docente -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {{-- Three cards, not four. The old range told a teacher nothing they
+                 could act on, and a min-max with no scale reads as a gap. Every
+                 count here is students; the attempts table below counts attempts
+                 and says how many rows it is showing. --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <x-stat
                     title="Alumnos corregidos"
-                    value="{{ $this->stats['total'] }}"
-                    description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' pendientes') : 'todos corregidos' }}"
+                    value="{{ $this->stats['total'] }} de {{ $this->stats['delivered'] }}"
+                    description="{{ ($this->stats['pending'] ?? 0) > 0 ? ($this->stats['pending'].' alumnos sin nota') : 'todos los alumnos tienen nota' }}"
                     icon="o-users"
                     class="bg-base-100 shadow-sm border border-base-200"
                 />
                 <x-stat
                     title="Promedio General"
                     value="{{ $this->stats['average'] }}"
+                    description="sobre 10"
                     icon="o-chart-bar"
                     class="bg-base-100 shadow-sm border border-base-200"
                 />
                 <x-stat
                     title="Tasa de Aprobación"
                     value="{{ $this->stats['passRate'] ?? 0 }}%"
-                    description="{{ $this->stats['approved'] }} de {{ $this->stats['total'] }} aprobados"
+                    description="{{ $this->stats['approved'] }} de {{ $this->stats['total'] }} aprobados · aprueba con {{ EvaluationContent::formatPoints($this->evaluation->passing_score) }}"
                     icon="o-check-badge"
                     class="bg-base-100 shadow-sm border border-base-200 text-success"
-                />
-                <x-stat
-                    title="Rango de Notas"
-                    value="{{ $this->stats['min'] }} – {{ $this->stats['max'] }}"
-                    icon="o-arrows-up-down"
-                    class="bg-base-100 shadow-sm border border-base-200"
                 />
             </div>
     @endif
@@ -1092,6 +1045,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                 <x-notice
                                     variant="warning"
                                     title="Esta pregunta no tiene rúbrica"
+                                    label="Esta pregunta no tiene rúbrica"
                                     text="Sin criterios, el asistente tendría que inventar la vara de cada corrección y los resultados no serían comparables entre alumnos. Conviene pedirle primero una rúbrica en modo «Solo redactar la rúbrica», revisarla, y recién después pedir las notas."
                                 />
                             @endunless
@@ -1105,8 +1059,15 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                 <ol class="list-decimal list-inside space-y-1 mt-2">
                                     <li>Elegí la pregunta y generá el archivo.</li>
                                     <li>Copiá el markdown y pegalo en tu asistente.</li>
-                                    <li>Pedile que complete las secciones 4 y 5 y que termine con un bloque de código markdown para que se copie literal.</li>
-                                    <li>Volvé a la sección 2, pegá lo que devolvió y revisá la tabla.</li>
+                                    <li>
+                                        Pedile que complete las secciones <strong>4 y 5 del archivo</strong>
+                                        (la rúbrica y las notas) y que termine con un bloque de código
+                                        markdown para que se copie literal.
+                                    </li>
+                                    <li>
+                                        Volvé <strong>arriba, al paso 2 de este panel</strong>, pegá lo que
+                                        devolvió y revisá la tabla.
+                                    </li>
                                     <li>Guardá las propuestas y después aceptá o ajustá alumno por alumno desde la corrección.</li>
                                 </ol>
 
@@ -1189,6 +1150,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         <x-notice
                             variant="info"
                             title="Esto todavía no guarda nada"
+                            label="Revisar no guarda nada"
                             text="Pegar y revisar solo te muestra qué se leería al archivo, con los errores que tuviera y cuántas propuestas quedarían pendientes. Las notas no se escriben acá: las aprobás vos, una por una, desde la corrección de cada alumno."
                         />
                     </h4>
@@ -1221,6 +1183,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                             <x-notice
                                 variant="warning"
                                 title="Guardar la rúbrica cambia cómo se corrige"
+                                label="Guardar la rúbrica cambia cómo se corrige"
                                 text="La rúbrica pasa a ser la referencia de la pregunta para siempre, y de ahí en adelante todas las correcciones se miden contra ella, no contra tu criterio libre. Guardala solo si la leíste y te sirve; si algo no te cierra, cambiala en el editor antes de usarla."
                             />
                         @endif
@@ -1500,6 +1463,22 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" />
                     </div>
 
+                    {{-- The per-question inputs are raw block points, while the table
+                         behind this dialog and the gradebook are /10. Stating both, and
+                         the passing mark, keeps the teacher from reading "6" out of one
+                         screen as "6 out of 10". --}}
+                    @php $currentScore = $attemptToGrade->score; @endphp
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60 border-b pb-3">
+                        <span>
+                            Nota actual del intento:
+                            <strong class="{{ $currentScore !== null && $currentScore >= $this->evaluation->passing_score ? 'text-success' : ($currentScore !== null ? 'text-error' : '') }}">
+                                {{ $currentScore !== null ? number_format((float) $currentScore, 2).' / 10' : 'todavía sin nota' }}
+                            </strong>
+                        </span>
+                        <span>Aprobás con {{ EvaluationContent::formatPoints($this->evaluation->passing_score) }} / 10</span>
+                        <span>Abajo van los puntos de cada pregunta, no la nota sobre 10.</span>
+                    </div>
+
                     <div class="space-y-8">
                     @foreach($sections as $sIndex => $section)
                         <div class="space-y-4">
@@ -1713,7 +1692,8 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                     </h4>
                                     <p class="text-sm text-base-content/70">
                                         Hay <strong>{{ $pendingSuggestions->count() }}</strong> propuesta{{ $pendingSuggestions->count() === 1 ? '' : 's' }} del asistente pendiente{{ $pendingSuggestions->count() === 1 ? '' : 's' }}.
-                                        Revisalas individualmente arriba o aplicá una acción rápida a todas.
+                                        Revisalas individualmente arriba o llevá todas a los casilleros de abajo y confirmá con
+                                        <strong>Guardar Corrección</strong>: es el único paso que escribe la nota.
                                     </p>
                                     <div class="mt-4 max-w-sm">
                                         <x-select
@@ -1733,9 +1713,13 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                 </div>
 
                                 {{-- Derecha: Botones --}}
+                                {{-- Only two actions, and only one of them writes.
+                                     There used to be an "Aceptar y finalizar" here that
+                                     graded the attempt on the spot, so the same decision
+                                     had two commits and the label read like a queue
+                                     action rather than "this grade is now final". --}}
                                 <div class="md:col-span-4 lg:col-span-3 flex flex-col gap-2">
-                                    <x-button label="Aplicar para revisar" icon="o-pencil-square" class="btn-sm btn-success" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
-                                    <x-button label="Aceptar y finalizar" icon="o-check" class="btn-sm btn-primary" wire:click="acceptSuggestions" spinner="acceptSuggestions" />
+                                    <x-button label="Llevar a los casilleros" icon="o-pencil-square" class="btn-sm btn-success" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
                                     <div class="border-t border-base-200 my-1"></div>
                                     <x-button label="Rechazar todas" icon="o-x-circle" class="btn-sm btn-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" />
                                 </div>
@@ -1751,8 +1735,29 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                 </div>
     @endif
         </dialog>
-            <x-card title="Detalle de Intentos por Estudiante">
-                <x-table :headers="$this->attemptHeaders()" :rows="$this->attempts" with-pagination>
+            @php
+                // Names what the table counts. The KPI above counts students and
+                // this table counts attempts, so without the totals the two
+                // look like they disagree.
+                $attemptRows = $this->attempts;
+                $attemptRowsSummary = sprintf(
+                    '%d intentos · %d alumnos sin nota',
+                    $attemptRows->total(),
+                    $this->stats['pending'] ?? 0,
+                );
+
+                if ($attemptRows->total() > 0) {
+                    $attemptRowsSummary = sprintf(
+                        '%d intentos · mostrando %d–%d · %d alumnos sin nota',
+                        $attemptRows->total(),
+                        $attemptRows->firstItem(),
+                        $attemptRows->lastItem(),
+                        $this->stats['pending'] ?? 0,
+                    );
+                }
+            @endphp
+            <x-card title="Detalle de Intentos por Estudiante" :subtitle="$attemptRowsSummary">
+                <x-table :headers="$this->attemptHeaders()" :rows="$attemptRows" with-pagination>
                     @scope('cell_user_id', $attempt)
                         {{-- Inline max-width: holds even if the CSS bundle predates this markup. --}}
                         <span class="font-bold block truncate" style="max-width:11rem" title="{{ $attempt->user->fullname }}">{{ $attempt->user->fullname }}</span>
@@ -1780,7 +1785,10 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         @if($attempt->isFinished())
                             <div class="flex items-center justify-end gap-2">
                                 @if(($attempt->pending_suggestions_count ?? 0) > 0)
-                                    <span class="badge badge-primary badge-sm tooltip tooltip-left lg:tooltip-right" data-tip="Propuestas del asistente esperando revisión">{{ $attempt->pending_suggestions_count }}</span>
+                                    {{-- Spelled out: a bare coloured numeral in the
+                                         only actionable column was readable only
+                                         on hover, which is too late for a queue. --}}
+                                    <span class="badge badge-primary badge-sm whitespace-nowrap tooltip tooltip-left lg:tooltip-right" data-tip="{{ $attempt->pending_suggestions_count }} {{ $attempt->pending_suggestions_count == 1 ? 'propuesta espera' : 'propuestas esperan' }} revisión">{{ $attempt->pending_suggestions_count }} prop.</span>
                                 @endif
                                 <x-button
                                     icon="o-pencil-square"

@@ -169,6 +169,28 @@ class AssistClipboardContractTest extends TestCase
     }
 
     #[Test]
+    public function no_notice_that_changes_behaviour_hides_behind_a_bare_icon(): void
+    {
+        // A note the teacher only finds by hovering is a note that gets missed, and
+        // these three are the ones that change what happens: the question has no
+        // rubric, reviewing saves nothing, and saving a rubric rewrites how the
+        // question gets graded from then on. Each must carry a visible label.
+        $html = $this->renderDialog(pasted: $this->pasteWithRubricRows());
+
+        foreach ([
+            'Esta pregunta no tiene rúbrica',
+            'Revisar no guarda nada',
+            'Guardar la rúbrica cambia cómo se corrige',
+        ] as $label) {
+            $this->assertMatchesRegularExpression(
+                '/<span class="text-xs">'.preg_quote($label, '/').'<\/span>/',
+                $html,
+                'a behaviour-changing notice must show its label, not just an icon: '.$label,
+            );
+        }
+    }
+
+    #[Test]
     public function the_mode_selector_carries_its_own_explainer(): void
     {
         $html = $this->renderDialog();
