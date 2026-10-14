@@ -1584,8 +1584,17 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
             @endphp
                 <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
                     <div class="flex items-center gap-2 mb-4">
+                        {{-- The unsaved-work warning cannot be a conditional attribute here.
+                             An @if (or any echo) inside a Blade component's attribute list makes
+                             the tag compiler emit the following tags as literal text, so the
+                             buttons silently vanish. Both variants are spelled out instead, and
+                             tests/Feature/Evaluations/GradingOverlayTest guards against the leak. --}}
                         @if($gradingPrevId)
-                            <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
+                            @if($this->gradingHasUnsavedWork)
+                                <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" wire:confirm="{{ $this->unsavedWorkWarning }}" />
+                            @else
+                                <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" />
+                            @endif
                         @else
                             <x-button icon="o-chevron-left" class="btn-ghost btn-sm" disabled />
                         @endif
@@ -1596,11 +1605,19 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                             @endif
                         </div>
                         @if($gradingNextId)
-                            <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
+                            @if($this->gradingHasUnsavedWork)
+                                <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" wire:confirm="{{ $this->unsavedWorkWarning }}" />
+                            @else
+                                <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" />
+                            @endif
                         @else
                             <x-button icon="o-chevron-right" class="btn-ghost btn-sm" disabled />
                         @endif
-                        <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
+                        @if($this->gradingHasUnsavedWork)
+                            <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" wire:confirm="{{ $this->unsavedWorkWarning }}" />
+                        @else
+                            <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" />
+                        @endif
                     </div>
 
                     {{-- The per-question inputs are raw block points, while the table

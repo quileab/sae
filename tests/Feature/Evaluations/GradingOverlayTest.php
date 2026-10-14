@@ -219,6 +219,43 @@ class GradingOverlayTest extends TestCase
     }
 
     #[Test]
+    public function the_navigation_buttons_are_real_buttons_and_not_leaked_markup(): void
+    {
+        $this->actingAs($this->teacher);
+
+        // Blade emits a component tag as literal text when an @if (or any echo)
+        // appears in its attribute list, which silently deletes the button. The
+        // unsaved-work warning is a conditional attribute, so this guards the
+        // whole header in both states.
+        foreach ([false, true] as $dirty) {
+            $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+                ->call('openGrading', $this->attempts[0]->id);
+
+            if ($dirty) {
+                $component->set('manualScores', ['q1' => 1.5]);
+            }
+
+            $html = $component->html();
+
+            $this->assertStringNotContainsString(
+                '<x-button',
+                $html,
+                'a component tag leaked into the output as text'.($dirty ? ' with unsaved work' : ' with a clean form'),
+            );
+            $this->assertStringContainsString(
+                'wire:click="openGrading('.$this->attempts[1]->id.')"',
+                $html,
+                'the next student button must be rendered'.($dirty ? ' with unsaved work' : ' with a clean form'),
+            );
+            $this->assertStringContainsString(
+                'wire:click="closeGrading"',
+                $html,
+                'the close button must be rendered'.($dirty ? ' with unsaved work' : ' with a clean form'),
+            );
+        }
+    }
+
+    #[Test]
     public function closing_does_not_warn_until_the_teacher_changes_something(): void
     {
         $this->actingAs($this->teacher);
