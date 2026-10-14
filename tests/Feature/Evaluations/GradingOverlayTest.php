@@ -203,6 +203,70 @@ class GradingOverlayTest extends TestCase
     /**
      * @return array<string, mixed>
      */
+    #[Test]
+    public function the_maximum_beside_the_input_uses_the_same_decimal_as_the_box(): void
+    {
+        $this->actingAs($this->teacher);
+
+        // The box is an <input type="number">, which cannot hold a comma, so the
+        // "/ 1,5" next to a box showing "1.5" reads as two different numbers.
+        $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempts[0]->id)
+            ->html();
+
+        $this->assertStringContainsString('/ 1.5', $html);
+        $this->assertStringNotContainsString('/ 1,5', $html);
+    }
+
+    #[Test]
+    public function closing_does_not_warn_until_the_teacher_changes_something(): void
+    {
+        $this->actingAs($this->teacher);
+
+        $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempts[0]->id);
+
+        $this->assertStringNotContainsString(
+            'Tenés cambios sin guardar',
+            $component->html(),
+            'Opening a student is not a change.',
+        );
+
+        $component->set('manualScores', ['q1' => 1.5]);
+
+        $this->assertStringContainsString(
+            'Tenés cambios sin guardar',
+            $component->html(),
+            'The warning has to be on the way out once there is something to lose.',
+        );
+        $this->assertStringContainsString('wire:confirm', $component->html());
+    }
+
+    #[Test]
+    public function writing_feedback_counts_as_unsaved_work(): void
+    {
+        $this->actingAs($this->teacher);
+
+        $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempts[0]->id)
+            ->set('feedback', 'Le falta Developing.');
+
+        $this->assertStringContainsString('Tenés cambios sin guardar', $component->html());
+    }
+
+    #[Test]
+    public function clearing_a_box_counts_as_unsaved_work(): void
+    {
+        $this->actingAs($this->teacher);
+
+        // The attempt loads with q1 at 0; blanking it is a decision, not a no-op.
+        $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempts[0]->id)
+            ->set('manualScores', ['q1' => null]);
+
+        $this->assertStringContainsString('Tenés cambios sin guardar', $component->html());
+    }
+
     private function content(): array
     {
         return ['sections' => [[

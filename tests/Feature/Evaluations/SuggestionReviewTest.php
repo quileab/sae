@@ -298,7 +298,7 @@ class SuggestionReviewTest extends TestCase
 
         Volt::test('evaluations.results', ['id' => $this->evaluation->id])
             ->call('openGrading', $this->attempt->id)
-            ->set('suggestionRejectionReason', 'rubrica_inadecuada')
+            ->set('suggestionRejectionReason', 'rubrica_inadeguada')
             ->call('rejectSuggestions');
 
         $this->attempt->refresh();
@@ -308,7 +308,7 @@ class SuggestionReviewTest extends TestCase
 
         foreach (GradingSuggestion::all() as $suggestion) {
             $this->assertSame(GradingSuggestionState::Rejected, $suggestion->state);
-            $this->assertSame('rubrica_inadecuada', $suggestion->disagreement_reason);
+            $this->assertSame('rubrica_inadeguada', $suggestion->disagreement_reason);
             $this->assertNull($suggestion->accepted_at);
         }
     }
@@ -435,8 +435,87 @@ class SuggestionReviewTest extends TestCase
         ]);
     }
 
+    #[Test]
+    public function carrying_a_proposal_does_not_trip_the_unsaved_work_warning(): void
+    {
+        $this->seedProposal(total: 1.0, max: 1.5);
+
+        $this->actingAs($this->teacher);
+
+        // The app filled the boxes, so there is nothing the teacher would lose.
+        // Warning here would be an alarm that teaches them to click through it.
+        $component = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempt->id)
+            ->call('prefillSuggestions');
+
+        $this->assertStringNotContainsString('Tenés cambios sin guardar', $component->html());
+
+        // Touching a number afterwards is the teacher's own work, and that does warn.
+        $component->set('manualScores', ['q1' => 1.2, 'q2' => 0]);
+
+        $this->assertStringContainsString('Tenés cambios sin guardar', $component->html());
+    }
+
+    #[Test]
+    public function rejecting_everything_asks_first_and_names_the_reason(): void
+    {
+        $this->seedProposal(total: 1.0, max: 1.5);
+
+        $this->actingAs($this->teacher);
+
+        $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempt->id)
+            // The stored value is this internal id, so the option list has to
+            // spell it the same way or the confirmation would fall back to
+            // "Sin motivo" while the teacher picked one.
+            ->set('suggestionRejectionReason', 'rubrica_inadeguada')
+            ->html();
+
+        // The reason is what tells evaluations:calibrate why the model was wrong,
+        // so it has to be in the confirmation and not only in the dropdown.
+        $confirmation = $this->confirmationOf($html);
+
+        $this->assertStringContainsString('Se van a rechazar 1 propuesta', $confirmation);
+        $this->assertStringContainsString('La rúbrica no sirve', $confirmation);
+        $this->assertStringContainsString('no se pueden recuperar', $confirmation);
+    }
+
+    #[Test]
+    public function the_rejection_confirmation_says_when_no_reason_was_picked(): void
+    {
+        $this->seedProposal(total: 1.0, max: 1.5);
+
+        $this->actingAs($this->teacher);
+
+        $html = Volt::test('evaluations.results', ['id' => $this->evaluation->id])
+            ->call('openGrading', $this->attempt->id)
+            ->html();
+
+        // "Sin motivo" is the default, so it has to be stated out loud at the
+        // moment of confirming instead of hiding in the dropdown.
+        $confirmation = $this->confirmationOf($html);
+
+        $this->assertStringContainsString('Se van a rechazar 1 propuesta', $confirmation);
+        $this->assertStringContainsString('Sin motivo', $confirmation);
+    }
+
     /**
-     * @param  array<int, array{0: string, 1: string, 2: float, 3: string}>  $rows
+     * The rejection confirmation, which is the one wire:confirm mentioning it.
+     *
+     * Read through html_entity_decode so the assertions can talk about the words
+     * the teacher actually reads.
+     */
+    private function confirmationOf(string $html): string
+    {
+        preg_match('/wire:confirm="([^"]*rechazar[^"]*)"/', $html, $matches);
+
+        $this->assertNotEmpty($matches, 'the reject action must ask before throwing proposals away');
+
+        return html_entity_decode($matches[1]);
+    }
+
+    /**
+     * @param  array<int, array{0: string, 1: ?string, 2: float, 3: string, 4?: array<int, GradingFlag>}>  $rows
      */
     private function marks(array $rows): string
     {

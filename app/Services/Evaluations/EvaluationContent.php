@@ -27,13 +27,20 @@ class EvaluationContent
 
     /**
      * Formats point values compactly, dropping redundant trailing zeros.
-     * E.g. 1.50 -> "1,5", 2.00 -> "2", 0.00 -> "0".
+     * E.g. 1.50 -> "1.5", 2.00 -> "2", 0.00 -> "0".
+     *
+     * The browser format is the default on purpose: these numbers are usually read
+     * next to a numeric input, and <input type="number"> cannot hold a comma, so
+     * writing "1,5" beside a box that shows "1.5" makes the teacher wonder if they
+     * are two different numbers. Pass $decimalComma only where the value is rendered
+     * inside a list, where the local convention reads better.
      */
-    public static function formatPoints(float|int|string|null $points): string
+    public static function formatPoints(float|int|string|null $points, bool $decimalComma = false): string
     {
         $value = (float) ($points ?? 0);
+        $separator = $decimalComma ? ',' : '.';
 
-        return rtrim(rtrim(number_format($value, 2, ',', ''), '0'), ',') ?: '0';
+        return rtrim(rtrim(number_format($value, 2, $separator, ''), '0'), $separator) ?: '0';
     }
 
     /**

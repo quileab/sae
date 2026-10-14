@@ -41,6 +41,13 @@ new class extends Component {
     public ?int $gradingPosition = null;
     public ?int $gradingTotal = null;
 
+    /**
+     * The scores and feedback the inputs are considered "unchanged" from.
+     *
+     * @var array{scores: array<string, float|null>, feedback: string}
+     */
+    public array $gradingBaseline = [];
+
     // Grade sync state
     public bool $showSyncModal = false;
     public array $syncPreview = [];
@@ -220,6 +227,7 @@ public function attemptHeaders(): array
         $this->gradingAttempt = $attempt->load(['user', 'gradingSuggestions']);
         $this->manualScores = $attempt->block_scores ?? [];
         $this->feedback = $attempt->feedback ?? '';
+        $this->markGradingBaseline();
 
         // Neighbors in table order, so prev/next never loses the teacher's place.
         $orderedIds = EvaluationAttempt::forEvaluation($this->evaluation->id)
@@ -238,12 +246,12 @@ public function attemptHeaders(): array
         $this->dispatch('grading-dialog-open');
     }
 
-    /**
-     * Copy the proposal into the inputs and let the teacher finish the job. The
-     * numbers are editable on purpose: adjusting is the normal case, not an
-     * exception.
-     */
-    public function prefillSuggestions()
+/**
+ * Copy the proposal into the inputs and let the teacher finish the job. The
+ * numbers are editable on purpose: adjusting is the normal case, not an
+ * exception.
+ */
+public function prefillSuggestions()
     {
         $attempt = $this->currentGradingAttempt();
 
@@ -263,6 +271,7 @@ public function attemptHeaders(): array
         }
 
         $this->manualScores = $scores;
+        $this->markGradingBaseline();
 
         $this->info('Notas sugeridas cargadas en los casilleros. Revisalas, ajustá lo que quieras y confirmá con Guardar Corrección.');
     }
@@ -280,8 +289,139 @@ public function attemptHeaders(): array
 
         if ($suggestion) {
             $this->manualScores[$blockId] = (float) $suggestion->total_points;
+            $this->markGradingBaseline();
             $this->info("Propuesta aplicada al bloque.");
         }
+    }
+
+    /**
+     * Records what the inputs count as "unchanged from".
+     *
+     * Called whenever the app itself writes into the inputs, not only when the
+     * dialog opens, so the unsaved-work warning fires for what the teacher typed
+     * and stays quiet for a prefill they never looked at. Warning on a prefill
+     * would be an alarm that teaches the teacher to click through it.
+     */
+    private function markGradingBaseline(): void
+    {
+        $this->gradingBaseline = [
+            'scores' => $this->normalizedScores(),
+            'feedback' => trim($this->feedback),
+        ];
+    }
+
+    /**
+     * The score inputs as comparable numbers.
+     *
+     * The values arrive as JSON floats from the database and as strings from the
+     * inputs, so they are cast and blanked out to a single shape before any
+     * comparison.
+     *
+     * @return array<string, float|null>
+     */
+    private function normalizedScores(): array
+    {
+        $scores = [];
+
+        foreach ($this->manualScores as $blockId => $value) {
+            $scores[(string) $blockId] = ($value === null || $value === '') ? null : (float) $value;
+        }
+
+        ksort($scores);
+
+        return $scores;
+    }
+
+    /**
+     * Whether closing or navigating away would throw away real work.
+     */
+    #[Computed]
+    public function gradingHasUnsavedWork(): bool
+    {
+        if ($this->gradingBaseline === []) {
+            return false;
+        }
+
+        if (trim($this->feedback) !== $this->gradingBaseline['feedback']) {
+            return true;
+        }
+
+        $current = $this->normalizedScores();
+        $baseline = $this->gradingBaseline['scores'];
+
+        // A cleared box is a change too, so compare the keys before the values.
+        if (array_keys($current) !== array_keys($baseline)) {
+            return true;
+        }
+
+        foreach ($current as $blockId => $value) {
+            $was = $baseline[$blockId];
+
+            if ($value === null && $was === null) {
+                continue;
+            }
+
+            if ($value === null || $was === null || abs($value - $was) > 0.0001) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    #[Computed]
+    public function unsavedWorkWarning(): string
+    {
+        return 'Tenés cambios sin guardar en la corrección de este alumno. Si seguís, se pierden y la nota no va a quedar registrada.';
+    }
+
+    /**
+     * Why a rejected proposal was rejected, as options for the select.
+     *
+     * The list lives here rather than inline in the markup because the
+     * confirmation repeats it back to the teacher.
+     *
+     * @return array<int, array{id: string, alias: string}>
+     */
+    public function rejectionReasons(): array
+    {
+        return [
+            ['id' => '', 'alias' => 'Sin motivo'],
+            ['id' => 'criterio_mal_aplicado', 'alias' => 'Criterio mal aplicado'],
+            ['id' => 'respuesta_ambigua', 'alias' => 'Respuesta ambigua'],
+            ['id' => 'el_modelo_se_equivoco', 'alias' => 'El modelo se equivocó'],
+            ['id' => 'rubrica_inadeguada', 'alias' => 'La rúbrica no sirve'],
+        ];
+    }
+
+    public function rejectionReasonLabel(): string
+    {
+        $selected = (string) ($this->suggestionRejectionReason ?: '');
+
+        foreach ($this->rejectionReasons() as $reason) {
+            if ($reason['id'] === $selected) {
+                return $reason['alias'];
+            }
+        }
+
+        return 'Sin motivo';
+    }
+
+    /**
+     * Spells out what rejecting costs before it happens.
+     *
+     * Rejecting writes no mark, so the notes are safe; what is not recoverable is
+     * the proposal itself, and a rejection filed without a reason is the one that
+     * teaches nothing about why the assistant was wrong.
+     */
+    public function rejectConfirmation(int $count, string $reasonLabel): string
+    {
+        return sprintf(
+            'Se van a rechazar %d propuesta%s con el motivo "%s". Las notas no cambian, pero esas propuestas ya no se pueden recuperar.',
+            $count,
+            $count === 1 ? '' : 's',
+            $reasonLabel,
+        );
     }
 
     public function rejectSuggestions()
@@ -322,7 +462,7 @@ public function attemptHeaders(): array
 
     public function closeGrading()
     {
-        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason', 'gradingPrevId', 'gradingNextId', 'gradingPosition', 'gradingTotal']);
+        $this->reset(['gradingAttemptId', 'gradingAttempt', 'manualScores', 'feedback', 'suggestionRejectionReason', 'gradingPrevId', 'gradingNextId', 'gradingPosition', 'gradingTotal', 'gradingBaseline']);
         $this->dispatch('grading-dialog-close');
     }
 
@@ -1243,9 +1383,9 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                 <td class="font-mono text-xs">{{ $rRow['key'] }}</td>
                                                 <td>{{ $rRow['label'] }}</td>
                                                 <td class="text-right font-semibold whitespace-nowrap">
-                                                    {{ EvaluationContent::formatPoints($rRow['points']) }}
+                                                    {{ EvaluationContent::formatPoints($rRow['points'], true) }}
                                                     @if(! empty($rRow['block_points']))
-                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($rRow['block_points']) }}</span>
+                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($rRow['block_points'], true) }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="text-xs text-base-content/70">
@@ -1300,8 +1440,8 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                 </div>
                                             </td>
                                             <td class="text-right font-semibold whitespace-nowrap">
-                                                {{ EvaluationContent::formatPoints($row['points']) }}
-                                                <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($row['max']) }}</span>
+                                                {{ EvaluationContent::formatPoints($row['points'], true) }}
+                                                <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($row['max'], true) }}</span>
                                             </td>
                                             <td>
                                                 <span class="badge badge-xs {{ $badge }}">{{ $row['status'] }}</span>
@@ -1445,7 +1585,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                 <div class="modal-box w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto">
                     <div class="flex items-center gap-2 mb-4">
                         @if($gradingPrevId)
-                            <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" />
+                            <x-button icon="o-chevron-left" class="btn-ghost btn-sm" tooltip="Anterior" wire:click="openGrading({{ $gradingPrevId }})" spinner="openGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
                         @else
                             <x-button icon="o-chevron-left" class="btn-ghost btn-sm" disabled />
                         @endif
@@ -1456,11 +1596,11 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                             @endif
                         </div>
                         @if($gradingNextId)
-                            <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" />
+                            <x-button icon="o-chevron-right" class="btn-ghost btn-sm" tooltip="Siguiente" wire:click="openGrading({{ $gradingNextId }})" spinner="openGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
                         @else
                             <x-button icon="o-chevron-right" class="btn-ghost btn-sm" disabled />
                         @endif
-                        <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" />
+                        <x-button icon="o-x-mark" class="btn-ghost btn-sm" tooltip="Cerrar" wire:click="closeGrading" @if($this->gradingHasUnsavedWork) wire:confirm="{{ $this->unsavedWorkWarning }}" @endif />
                     </div>
 
                     {{-- The per-question inputs are raw block points, while the table
@@ -1610,9 +1750,9 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                                     @endif
                                                                 </td>
                                                                 <td class="w-20 text-right align-top font-semibold whitespace-nowrap">
-                                                                    {{ EvaluationContent::formatPoints($criterion['points_awarded']) }}
+                                                                    {{ EvaluationContent::formatPoints($criterion['points_awarded'], true) }}
                                                                     @if(! empty($criterion['points_max']))
-                                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($criterion['points_max']) }}</span>
+                                                                        <span class="text-xs font-normal text-base-content/50">/ {{ EvaluationContent::formatPoints($criterion['points_max'], true) }}</span>
                                                                     @endif
                                                                 </td>
                                                             </tr>
@@ -1621,7 +1761,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                     <tfoot>
                                                         <tr>
                                                             <td class="text-right font-semibold">Total</td>
-                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($suggestion->total_points) }}</td>
+                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($suggestion->total_points, true) }}</td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>
@@ -1657,14 +1797,14 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                                                         <div class="mt-1 text-xs text-base-content/60">{{ $score }} → {{ $description }}</div>
                                                                     @endforeach
                                                                 </td>
-                                                                <td class="w-16 text-right align-top font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($criterion['points']) }}</td>
+                                                                <td class="w-16 text-right align-top font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($criterion['points'], true) }}</td>
                                                             </tr>
                                                         @endforeach
                                                     </tbody>
                                                     <tfoot>
                                                         <tr>
                                                             <td colspan="2" class="text-right font-semibold">Total</td>
-                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($rubric->maxPoints()) }}</td>
+                                                            <td class="text-right font-semibold whitespace-nowrap">{{ EvaluationContent::formatPoints($rubric->maxPoints(), true) }}</td>
                                                         </tr>
                                                     </tfoot>
                                                 </table>
@@ -1679,7 +1819,14 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                         </div>
                     @endforeach
 
-                    @php $pendingSuggestions = $attemptToGrade->gradingSuggestions->filter->isPending(); @endphp
+                    @php
+                        $pendingSuggestions = $attemptToGrade->gradingSuggestions->filter->isPending();
+                        // The reason the teacher picked has to survive into the
+                        // confirmation: evaluations:calibrate reads it to tell
+                        // "the model was wrong" apart from "the rubric was wrong".
+                        $rejectReasonLabel = $this->rejectionReasonLabel();
+                        $rejectCount = $pendingSuggestions->count();
+                    @endphp
 
                     @if($pendingSuggestions->isNotEmpty())
                         <div class="rounded-lg border border-primary/40 bg-base-100 p-5">
@@ -1696,16 +1843,10 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                         <strong>Guardar Corrección</strong>: es el único paso que escribe la nota.
                                     </p>
                                     <div class="mt-4 max-w-sm">
-                                        <x-select
+<x-select
                                             label="Al rechazar, indicar motivo (opcional)"
                                             wire:model="suggestionRejectionReason"
-                                            :options="[
-                                                ['id' => '', 'alias' => 'Sin motivo'],
-                                                ['id' => 'criterio_mal_aplicado', 'alias' => 'Criterio mal aplicado'],
-                                                ['id' => 'respuesta_ambigua', 'alias' => 'Respuesta ambigua'],
-                                                ['id' => 'el_modelo_se_equivoco', 'alias' => 'El modelo se equivocó'],
-                                                ['id' => 'rubrica_inadecuada', 'alias' => 'La rúbrica no sirve'],
-                                            ]"
+                                            :options="$this->rejectionReasons()"
                                             option-value="id"
                                             option-label="alias"
                                         />
@@ -1721,7 +1862,7 @@ El orden que funciona es primero la rúbrica y después las notas: sin criterios
                                 <div class="md:col-span-4 lg:col-span-3 flex flex-col gap-2">
                                     <x-button label="Llevar a los casilleros" icon="o-pencil-square" class="btn-sm btn-success" wire:click="prefillSuggestions" spinner="prefillSuggestions" />
                                     <div class="border-t border-base-200 my-1"></div>
-                                    <x-button label="Rechazar todas" icon="o-x-circle" class="btn-sm btn-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" />
+                                    <x-button label="Rechazar todas" icon="o-x-circle" class="btn-sm btn-error" wire:click="rejectSuggestions" spinner="rejectSuggestions" wire:confirm="{{ $this->rejectConfirmation($rejectCount, $rejectReasonLabel) }}" />
                                 </div>
                             </div>
                         </div>

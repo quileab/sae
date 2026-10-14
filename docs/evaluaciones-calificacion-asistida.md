@@ -110,14 +110,22 @@ y nada que cambie el comportamiento puede quedar escondido detrás de un ícono.
 - **Avisos como `x-notice`**: icono que abre modal teleportado al `<body>`, con
   **rótulo visible** cuando el aviso cambia lo que pasa (falta rúbrica, revisar no
   guarda nada, guardar la rúbrica cambia cómo se corrige).
+- **Cerrar, Anterior y Siguiente preguntan si hay trabajo sin guardar.** El aviso
+  se prende solo cuando cambió algo **el docente**: la app lleva su propia
+  línea de base y la actualiza al abrir el diálogo y al prellenar o aplicar una
+  propuesta, así que prellenar y salir no pregunta nada. Escape sigue cerrando sin
+  preguntar, porque llega por JS y `wire:confirm` no lo intercepta.
+- **"Rechazar todas" confirma antes**, diciendo cuántas van y con qué motivo. El
+  motivo importa porque `evaluations:calibrate` agrupa por él para distinguir
+  "el modelo se equivocó" de "la rúbrica no sirve".
 
-Pendiente: aviso de trabajo sin guardar al cerrar o cambiar de alumno, y
-confirmación en "Rechazar todas" (hoy el motivo por defecto es "Sin motivo", que
-es justo el dato que necesita `evaluations:calibrate`).
-
-**Lo que no se unificó y por qué:** la coma decimal. `EvaluationContent::formatPoints`
-escribe `2,5`, pero `<input type="number">` no acepta coma: el navegador la parsea
-como vacío y el docente no podría escribir. El input queda con punto a propósito.
+**Números decimales.** `EvaluationContent::formatPoints` usa el formato del
+navegador (punto) por defecto, y solo recibe `decimalComma: true` en las cuatro
+tablas —previsualización de rúbrica, previsualización de notas, "Análisis del
+Asistente" y "Rúbrica"— donde el número se lee como lista. El motivo es concreto:
+el valor aparece pegado a un `<input type="number">`, que no acepta coma, así que
+un `2,5` al lado de una caja que muestra `2.5` parece otro número. El input y sus
+vecinos (`/ x`, "Propuesta", "Anterior") van con punto siempre.
 
 ## Comandos
 

@@ -182,6 +182,26 @@ class EvaluationContentTest extends TestCase
         $this->assertFalse($result['requires_manual']);
     }
 
+    #[Test]
+    public function points_use_the_browser_format_unless_a_list_asks_for_the_comma(): void
+    {
+        // Default matters because these numbers sit next to <input type="number">,
+        // which cannot hold a comma: "1,5" beside a box showing "1.5" reads as two
+        // different numbers.
+        $this->assertSame('1.5', EvaluationContent::formatPoints(1.5));
+        $this->assertSame('1.5', EvaluationContent::formatPoints(1.5, decimalComma: false));
+        $this->assertSame('1,5', EvaluationContent::formatPoints(1.5, decimalComma: true));
+
+        // Trailing zeros are dropped either way, including the separator.
+        $this->assertSame('2', EvaluationContent::formatPoints(2));
+        $this->assertSame('2', EvaluationContent::formatPoints(2.0, decimalComma: true));
+        $this->assertSame('0', EvaluationContent::formatPoints(0));
+        $this->assertSame('0', EvaluationContent::formatPoints(null));
+    }
+
+    /**
+     * @return array<string, array{0: bool, 1: string}>
+     */
     public static function emptyAnswerCases(): array
     {
         return [
