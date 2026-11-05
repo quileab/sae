@@ -28,6 +28,7 @@ class UserForm extends Component
         'firstname' => '',
         'lastname' => '',
         'phone' => '',
+        'birth_date' => '',
         'role' => 'student',
         'enabled' => true,
         'status' => 'active',
@@ -55,8 +56,9 @@ class UserForm extends Component
         if ($id !== null) {
             $user = User::findOrFail($id);
             $this->data = $user->toArray();
+            $this->data['birth_date'] = $user->birth_date?->format('Y-m-d') ?? ($user->birth_date ?? '');
             $this->data['status'] = $user->status instanceof UserStatus ? $user->status->value : ($user->status ?? 'active');
-            $this->data['careers'] = $user->careers;
+            $this->data['careers'] = $user->careers()->get()->toArray();
             $this->loadJustifiedAbsences();
         }
 
@@ -106,7 +108,8 @@ class UserForm extends Component
             'data.firstname' => 'required|string|max:255',
             'data.lastname' => 'required|string|max:255',
             'data.phone' => 'nullable|string|max:255',
-            'data.role' => 'required|string|in:admin,principal,director,administrative,preceptor,treasurer,teacher,student,basic_user',
+            'data.birth_date' => 'nullable|date|before:today',
+            'data.role' => 'required|string|in:admin,principal,director,administrative,preceptor,treasurer,teacher,student,basic_user,tutor',
             'data.enabled' => 'required|boolean',
             'data.status' => 'required|string|in:active,graduated,withdrawn,on_leave,passive',
         ], [
@@ -149,6 +152,7 @@ class UserForm extends Component
             'firstname' => $this->data['firstname'],
             'lastname' => $this->data['lastname'],
             'phone' => $this->data['phone'],
+            'birth_date' => ! empty($this->data['birth_date']) ? $this->data['birth_date'] : null,
             'role' => $this->data['role'],
             'enabled' => $this->data['enabled'],
             'status' => $this->data['status'] ?? 'active',
@@ -179,6 +183,11 @@ class UserForm extends Component
         $user->password = $this->data['password'];
         $user->save();
 
+        $this->data['password'] = '';
+        if (empty($this->data['careers'])) {
+            $this->data['careers'] = $user->careers()->get()->toArray();
+        }
+
         $this->success('Contraseña cambiada.');
         $this->drawer = false;
     }
@@ -189,7 +198,7 @@ class UserForm extends Component
 
         $user = User::findOrFail($this->data['id']);
         $user->careers()->syncWithoutDetaching([$this->career_id]);
-        $this->data['careers'] = $user->careers()->get();
+        $this->data['careers'] = $user->careers()->get()->toArray();
     }
 
     public function removeCareer($career_id)
@@ -198,7 +207,7 @@ class UserForm extends Component
 
         $user = User::findOrFail($this->data['id']);
         $user->careers()->detach($career_id);
-        $this->data['careers'] = $user->careers()->get();
+        $this->data['careers'] = $user->careers()->get()->toArray();
     }
 
     public function delete(): void

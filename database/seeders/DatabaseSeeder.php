@@ -12,7 +12,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // No seeders are called directly here after data migration.
-        // You can add new seeders for fresh data if needed.
+        $this->call([
+            ConfigSeeder::class,
+        ]);
     }
 }

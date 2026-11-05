@@ -95,7 +95,8 @@ class MakeVendorDeployZip extends Command
             });
 
             if (! $process->isSuccessful() || ! file_exists($finalPath)) {
-                $this->error('❌ Error al ejecutar 7-Zip: ' . $process->getErrorOutput());
+                $this->error('❌ Error al ejecutar 7-Zip: '.$process->getErrorOutput());
+
                 return 1;
             }
         } else {

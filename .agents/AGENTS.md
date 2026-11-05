@@ -56,3 +56,21 @@ Este archivo contiene el contexto del proyecto **SAE**, consolidando las reglas 
   - Selectores: `<x-select label="..." wire:model.live="..." :options="..." option-value="id" option-label="name" />`
   - Megáfonos/Alertas: `<x-alert icon="o-megaphone" class="alert-warning">...</x-alert>`
   - Inputs: `<x-textarea placeholder="..." wire:model="..." />`
+
+---
+
+## 5. Reglas de dominio: Inscripciones
+
+- **ADMIN obligatorio**: `users.id = 1`. No resolverlo por nombre, rol ni con `auth()->id()`.
+- El catálogo del ADMIN son filas de `inscriptions` con `user_id = 1`; las selecciones de estudiantes usan su propio `user_id`.
+- `value` es texto libre (fechas, letras, palabras o listas separadas por coma). No asumir formato de fecha.
+- `type` es `csv-1` (una opción) o `csv-n` (varias opciones). Se define en el catálogo del ADMIN, por período y materia; no en el cliente.
+- Para `csv-n`, la selección se persiste como string separado por comas, sin duplicados ni vacíos.
+- Contrato completo: `docs/inscripciones.md`.
+
+---
+
+## 6. Fallos conocidos
+
+- Revisar `docs/known-issues.md` antes de diagnosticar fallos ajenos al cambio en curso.
+- Todo fallo que se deje pendiente debe registrarse ahí con síntoma, reproducción, causa raíz y corrección propuesta.

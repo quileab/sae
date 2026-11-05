@@ -45,10 +45,13 @@
                         
                         <div class="mt-1 flex-col gap-1 overflow-y-auto max-h-24 no-scrollbar hidden lg:flex">
                             @foreach ($day['events'] as $event)
-                                <div class="text-[10px] leading-none px-1.5 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity truncate shadow-sm font-medium text-white"
+                                <div class="text-[10px] leading-none px-1.5 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity truncate shadow-sm font-medium text-white flex items-center gap-1"
                                     style="background-color: {{ $event->color }};"
                                     wire:click.stop="eventClick({{ $event->id }})" title="{{ $event->description }}">
-                                    {{ \Carbon\Carbon::parse($event->start)->format('H:i') }} - {{ $event->title }}
+                                    @if ($event->type === 'announcement')
+                                        <x-icon name="o-megaphone" class="w-2.5 h-2.5 shrink-0" />
+                                    @endif
+                                    <span class="truncate">{{ \Carbon\Carbon::parse($event->start)->format('H:i') }} - {{ $event->title }}</span>
                                 </div>
                             @endforeach
                         </div>
@@ -78,9 +81,17 @@
                                 @foreach ($day['events'] as $event)
                                     <div class="border-l-4 pl-3 py-1 bg-base-200/50 rounded-r-md transition-colors hover:bg-base-300/50" style="border-color: {{ $event->color }};">
                                         <div class="font-bold flex flex-col md:flex-row md:justify-between md:items-center gap-1">
-                                            <span class="text-sm cursor-pointer hover:underline" wire:click="eventClick({{ $event->id }})">
-                                                {{ $event->title }}
-                                            </span>
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                @if ($event->type === 'announcement')
+                                                    <span class="badge badge-xs badge-warning gap-1 font-semibold">
+                                                        <x-icon name="o-megaphone" class="w-2.5 h-2.5" />
+                                                        Circular
+                                                    </span>
+                                                @endif
+                                                <span class="text-sm cursor-pointer hover:underline" wire:click="eventClick({{ $event->id }})">
+                                                    {{ $event->title }}
+                                                </span>
+                                            </div>
                                             <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-base-300 self-start md:self-auto">
                                                 {{ \Carbon\Carbon::parse($event->start)->format('H:i') }} a {{ \Carbon\Carbon::parse($event->end)->format('H:i') }}h
                                             </span>

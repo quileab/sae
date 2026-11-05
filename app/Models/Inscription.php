@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Inscription extends Model
 {
+    /**
+     * Usuario ADMIN que guarda el catálogo de opciones de inscripción.
+     */
+    public const CATALOG_USER_ID = 1;
+
     protected $table = 'inscriptions';
 
     protected $guarded = ['id'];

@@ -98,14 +98,21 @@ class Calendar extends Component
         $endDate = $this->date->copy()->lastOfMonth()->endOfWeek(Carbon::SATURDAY);
         $user = auth()->user();
 
-        $events = Event::with('subject', 'presidente', 'vocal1', 'vocal2')->whereBetween('start', [$startDate, $endDate])
+        $events = Event::with('subject', 'career', 'presidente', 'vocal1', 'vocal2')
+            ->where('show_in_calendar', true)
+            ->whereNotNull('start')
+            ->whereBetween('start', [$startDate, $endDate])
             ->where(function ($query) use ($user) {
-                // Admin, director, etc. see everything
+                // Admin, director, administrative, principal see everything
                 if ($user->hasAnyRole(['admin', 'director', 'administrative', 'principal'])) {
                     return;
                 }
 
-                $query->where('target', 'all');
+                $query->where('target', 'all')
+                    ->orWhere(function ($sub) use ($user) {
+                        $role = $user->role instanceof \BackedEnum ? $user->role->value : (string) $user->role;
+                        $sub->whereNotNull('target_roles')->whereJsonContains('target_roles', $role);
+                    });
 
                 if ($user->hasRole('teacher')) {
                     $query->orWhere('target', 'teachers');
@@ -115,13 +122,14 @@ class Calendar extends Component
             })
             ->when($this->career_id, function ($query) {
                 $query->where(function ($q) {
-                    $q->whereHas('subject', function ($q2) {
-                        $q2->where('career_id', $this->career_id);
-                    })->orWhereNull('subject_id');
+                    $q->where('career_id', $this->career_id)
+                        ->orWhereHas('subject', function ($q2) {
+                            $q2->where('career_id', $this->career_id);
+                        })
+                        ->orWhere(function ($q3) {
+                            $q3->whereNull('subject_id')->whereNull('career_id');
+                        });
                 });
-            }, function ($query) {
-                // When no career is selected, show all events
-                return $query;
             })
             ->get();
 

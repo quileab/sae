@@ -8,13 +8,14 @@
     <!-- TABLE  -->
     <x-card>
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            @if($this->subjects->count() == 0)
+            @if(count($subjectOptions) == 0)
                 <x-alert title="Sin materias" description="No tienes materias asignadas." icon="o-exclamation-triangle"
                     class="alert-warning w-full" />
             @else
                 <div class="flex-1 w-full max-w-md">
-                    <x-select label="Materia" icon="o-queue-list" :options="$this->subjects" option-label="fullname"
-                        wire:model.live="subject_id" inline />
+                    <x-choices label="Materia" icon="o-queue-list" :options="$subjectOptions" option-label="name"
+                        option-value="id" wire:model.live="subject_id" inline placeholder="Buscar materia..."
+                        searchable search-function="searchSubjects" min-chars="2" single clearable />
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="join">

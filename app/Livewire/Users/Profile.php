@@ -29,6 +29,8 @@ class Profile extends Component
 
     public $phone;
 
+    public $birth_date;
+
     public $password;
 
     public $password_confirmation;
@@ -41,6 +43,7 @@ class Profile extends Component
         $this->firstname = $user->firstname;
         $this->lastname = $user->lastname;
         $this->phone = $user->phone;
+        $this->birth_date = $user->birth_date?->format('Y-m-d');
     }
 
     public function save()
@@ -53,6 +56,7 @@ class Profile extends Component
             'firstname' => 'nullable|string|max:255',
             'lastname' => 'nullable|string|max:255',
             'phone' => 'nullable|string|max:255',
+            'birth_date' => 'nullable|date|before:today',
             'photo' => 'nullable|image|max:2048',
         ]);
 
@@ -62,6 +66,7 @@ class Profile extends Component
             'firstname' => $data['firstname'],
             'lastname' => $data['lastname'],
             'phone' => $data['phone'],
+            'birth_date' => $data['birth_date'] ?: null,
         ]);
 
         if ($this->photo) {

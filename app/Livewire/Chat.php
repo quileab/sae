@@ -7,6 +7,7 @@ use App\Models\Enrollment;
 use App\Models\Message;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\SubjectOptions;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -84,7 +85,7 @@ class Chat extends Component
     {
         $user = Auth::user();
 
-        if ($this->isStaff()) {
+        if ($this->isStaff() || app(SubjectOptions::class)->canSeeAll($user)) {
             // El personal administrativo/directivo tiene acceso a todas las carreras y materias.
             $allCareers = Career::orderBy('name')->get();
 
@@ -97,7 +98,7 @@ class Chat extends Component
 
             $this->allSubjects = $allSubjectsQuery->map(fn ($s) => [
                 'id' => $s->id,
-                'name' => $s->name,
+                'name' => $s->id.' - '.$s->name,
                 'career_id' => $s->career_id,
             ])->all();
 
@@ -114,7 +115,7 @@ class Chat extends Component
 
             $this->allSubjects = $subjects->map(fn ($s) => [
                 'id' => $s->id,
-                'name' => $s->name,
+                'name' => $s->id.' - '.$s->name,
                 'career_id' => $s->career_id,
             ])->all();
 
@@ -140,7 +141,7 @@ class Chat extends Component
             $this->careers = [];
             $this->allSubjects = $subjects->map(fn ($s) => [
                 'id' => $s->id,
-                'name' => $s->name,
+                'name' => $s->id.' - '.$s->name,
                 'career_id' => $s->career_id,
             ])->all();
             $this->subjects = $this->allSubjects;
@@ -188,17 +189,50 @@ class Chat extends Component
 
     public function updatedSelectedCareerId($careerId)
     {
-        if ($careerId) {
-            $this->subjects = collect($this->allSubjects)->where('career_id', $careerId)->values()->all();
-        } else {
-            $this->subjects = $this->allSubjects;
-        }
-
         $this->selectedSubjectId = null;
+
+        $this->searchSubjects();
 
         if (! Auth::user()->hasRole('student')) {
             $this->users = [];
         }
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $term = mb_strtolower(trim($value));
+
+        $selectedIds = array_filter([
+            $this->selectedSubjectId,
+            $this->recipient_type === 'subject' ? $this->recipient_id : null,
+        ]);
+
+        $subjects = collect($this->allSubjects);
+
+        if ($this->selectedCareerId) {
+            $subjects = $subjects->where('career_id', (int) $this->selectedCareerId);
+        }
+
+        if ($term !== '') {
+            $subjects = $subjects->filter(fn (array $subject) => str_contains(mb_strtolower($subject['name']), $term)
+                || str_contains((string) $subject['id'], $term));
+        }
+
+        $options = $subjects->take(SubjectOptions::MAX_RESULTS)->values();
+
+        $allSubjects = collect($this->allSubjects);
+
+        foreach ($selectedIds as $id) {
+            if (! $options->contains('id', (int) $id)) {
+                $match = $allSubjects->firstWhere('id', (int) $id);
+
+                if ($match) {
+                    $options->push($match);
+                }
+            }
+        }
+
+        $this->subjects = $options->values()->all();
     }
 
     public function updatedSelectedSubjectId($subjectId)

@@ -6,8 +6,9 @@
     {{-- HEADER --}}
     <x-header title="Contenidos" subtitle="{{ $subject->name }}" separator progress-indicator>
         <x-slot:middle class="!justify-end">
-            <x-select wire:model.live="subject_id" :options="$this->subjects" option-label="full_name"
-                option-value="id" placeholder="Cambiar materia..." icon="o-academic-cap" class="min-w-64" />
+            <x-choices wire:model.live="subject_id" :options="$subjectOptions" option-label="name" option-value="id"
+                placeholder="Cambiar materia..." icon="o-academic-cap" class="min-w-64"
+                searchable search-function="searchSubjects" min-chars="2" single clearable />
         </x-slot:middle>
         @if (!$effectiveStudent)
             <x-slot:actions>
@@ -325,7 +326,7 @@
         </div>
     @endif
 
-    <teleport to="body">
+    @teleport('body')
         {{-- Unit Modal --}}
         <x-modal wire:model="showUnitModal" title="{{ $editingUnit ? 'Editar Unidad' : 'Nueva Unidad' }}" class="backdrop-blur">
             <x-form wire:submit="saveUnit">
@@ -378,5 +379,5 @@
                 </x-slot:actions>
             </x-form>
         </x-modal>
-    </teleport>
+    @endteleport
 </div>

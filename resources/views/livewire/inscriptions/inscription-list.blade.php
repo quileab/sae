@@ -24,7 +24,9 @@
             @if(!auth()->user()->hasRole('teacher'))
                 <x-select wire:model.live="career_id" label="Carrera" :options="$careers" />
             @endif
-            <x-select wire:model.live="subject_id" label="Materia" :options="$subjects" placeholder="TODAS" option-label="label_with_id" option-value="id" />
+            <x-choices wire:model.live="subject_id" label="Materia" :options="$subjects" placeholder="Todas"
+                option-label="name" option-value="id" searchable search-function="searchSubjects" min-chars="2"
+                single clearable />
         </div>
         <div class="z-10 relative">
             <div wire:loading class="absolute inset-0 z-50 flex items-center justify-center bg-white/50 dark:bg-gray-800/50">
@@ -36,13 +38,9 @@
             @endphp
             <x-table :headers="$headers" :rows="$items" :sort-by="$sortBy" :selectable="$selectable" wire:model="selectedRows"
                 striped>
-                @scope('cell_pdf', $item, $career_id, $inscription_id)
-                    @php
-                        $pdfFileName = "insc-{$item->user_id}-{$career_id}-{$inscription_id}-.pdf";
-                        $pdfExists = \Illuminate\Support\Facades\Storage::exists("private/inscriptions/$pdfFileName");
-                    @endphp
-                    @if($pdfExists)
-                        <x-button icon="o-document-text" link="/inscriptions/pdf/{{ $pdfFileName }}" external target="_blank" class="btn-sm btn-ghost text-info" />
+                @scope('cell_pdf', $item)
+                    @if($item->pdf_exists)
+                        <x-button icon="o-document-text" link="{{ route('inscriptions.pdf', $item->pdf_file) }}" external target="_blank" class="btn-sm btn-ghost text-info" />
                     @endif
                 @endscope
                 <x-slot:empty>

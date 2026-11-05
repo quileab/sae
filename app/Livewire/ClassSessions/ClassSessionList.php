@@ -3,6 +3,8 @@
 namespace App\Livewire\ClassSessions;
 
 use App\Models\ClassSession;
+use App\Models\Subject;
+use App\Services\SubjectOptions;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -27,6 +29,9 @@ class ClassSessionList extends Component
     #[Url]
     public $cycle_id = null;
 
+    /** @var array<int, array{id: int, name: string}> */
+    public array $subjectOptions = [];
+
     public function mount(): void
     {
         $user = auth()->user();
@@ -36,21 +41,23 @@ class ClassSessionList extends Component
             $this->cycle_id = session('cycle_id') ?? $this->getCycleId();
         }
 
-        $subjects = $this->subjects;
-
         // Subject Context Persistence (URL > Session > First Available)
         if (! $this->subject_id) {
             $this->subject_id = session('current_subject_id');
         }
 
-        if (! $this->subject_id && $subjects->isNotEmpty()) {
-            $this->subject_id = $subjects->first()->id;
+        $this->subjectOptions = app(SubjectOptions::class)->search($user, '', null, [$this->subject_id]);
+
+        if (! $this->subject_id && $this->subjectOptions !== []) {
+            $this->subject_id = $this->subjectOptions[0]['id'];
         }
 
         // Security check: If a subject_id is provided, verify ownership
-        if ($this->subject_id && ! $user->hasSubject($this->subject_id)) {
-            $this->subject_id = $subjects->isNotEmpty() ? $subjects->first()->id : null;
+        if ($this->subject_id && ! $this->canAccessSubject($user, (int) $this->subject_id)) {
+            $this->subject_id = $this->subjectOptions[0]['id'] ?? null;
         }
+
+        $this->subjectOptions = app(SubjectOptions::class)->search($user, '', null, [$this->subject_id]);
 
         // Persist the choice if valid
         if ($this->subject_id) {
@@ -58,10 +65,19 @@ class ClassSessionList extends Component
         }
     }
 
-    #[Computed]
-    public function subjects()
+    public function searchSubjects(string $value = ''): void
     {
-        return auth()->user()->subjects;
+        $this->subjectOptions = app(SubjectOptions::class)->search(
+            auth()->user(),
+            $value,
+            null,
+            [$this->subject_id],
+        );
+    }
+
+    protected function canAccessSubject($user, int $subjectId): bool
+    {
+        return app(SubjectOptions::class)->canSeeAll($user) || $user->hasSubject($subjectId);
     }
 
     #[Computed]
@@ -73,7 +89,8 @@ class ClassSessionList extends Component
     public function updatedSubjectId($value): void
     {
         session()->put('current_subject_id', $value);
-        $this->info('Materia Seleccionada: '.$this->subjects->find($value)->name, position: 'toast-top toast-center');
+        $name = Subject::find($value)?->name ?? 'Materia';
+        $this->info('Materia Seleccionada: '.$name, position: 'toast-top toast-center');
     }
 
     public function clear(): void

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-23T00:00:00Z",
+  "title": "Design System: SAE — Sistema de Administración Escolar",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Indigo Blue", "canonical": "#6366F1", "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#4F46E5", "#6366F1", "#818CF8", "#A5B4FC"] },
+      "primary-deep": { "role": "primary", "displayName": "Indigo Deep", "canonical": "#4F46E5", "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#4F46E5", "#6366F1", "#818CF8", "#A5B4FC"] },
+      "primary-light": { "role": "primary", "displayName": "Indigo Light", "canonical": "#818CF8", "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#4F46E5", "#6366F1", "#818CF8", "#A5B4FC"] },
+      "info": { "role": "secondary", "displayName": "Info Blue", "canonical": "#4285F4", "tonalRamp": ["#0B1A3E", "#1A3A7F", "#2563EB", "#3B82F6", "#4285F4", "#60A5FA", "#93C5FD", "#BFDBFE"] },
+      "success": { "role": "tertiary", "displayName": "Success Green", "canonical": "#22C55E", "tonalRamp": ["#052E16", "#064E3B", "#065F46", "#047857", "#10B981", "#22C55E", "#4ADE80", "#86EFAC"] },
+      "warning": { "role": "tertiary", "displayName": "Warning Amber", "canonical": "#F59E0B", "tonalRamp": ["#451A03", "#78350F", "#92400E", "#B45309", "#D97706", "#F59E0B", "#FBBF24", "#FDE68A"] },
+      "error": { "role": "tertiary", "displayName": "Error Red", "canonical": "#EF4444", "tonalRamp": ["#450A0A", "#7F1D1D", "#991B1B", "#B91C1C", "#DC2626", "#EF4444", "#F87171", "#FCA5A5"] },
+      "neutral": { "role": "neutral", "displayName": "Slate Neutral", "canonical": "#64748B", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#E2E8F0"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Cool Paper", "canonical": "#F1F5F9", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F1F5F9"] },
+      "neutral-bg-elevated": { "role": "neutral", "displayName": "White Surface", "canonical": "#FFFFFF", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#FFFFFF"] },
+      "surface-container": { "role": "neutral", "displayName": "Surface Container", "canonical": "#E2E8F0", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#E2E8F0"] },
+      "surface-container-low": { "role": "neutral", "displayName": "Surface Container Low", "canonical": "#F8FAFC", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F8FAFC"] },
+      "surface-container-lowest": { "role": "neutral", "displayName": "Surface Container Lowest", "canonical": "#FFFFFF", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#FFFFFF"] },
+      "text-on-primary": { "role": "neutral", "displayName": "White on Primary", "canonical": "#FFFFFF", "tonalRamp": ["#F8FAFC", "#F1F5F9", "#E2E8F0", "#CBD5E1", "#94A3B8", "#64748B", "#475569", "#FFFFFF"] },
+      "text-on-surface": { "role": "neutral", "displayName": "Text on Surface", "canonical": "#0F172A", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F8FAFC"] },
+      "text-muted": { "role": "neutral", "displayName": "Text Muted", "canonical": "#64748B", "tonalRamp": ["#0F172A", "#1E293B", "#334155", "#475569", "#64748B", "#94A3B8", "#CBD5E1", "#F1F5F9"] },
+      "gradient-start": { "role": "primary", "displayName": "Gradient Start", "canonical": "#6366F1", "tonalRamp": ["#1E1B4B", "#312E81", "#3730A3", "#4338CA", "#4F46E5", "#6366F1", "#818CF8", "#A5B4FC"] },
+      "gradient-end": { "role": "primary", "displayName": "Gradient End", "canonical": "#7C3AED", "tonalRamp": ["#2E1065", "#4C1D95", "#5B21B6", "#6D28D9", "#7C3AED", "#8B5CF6", "#A78BFA", "#C4B5FD"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles and login header. Uses Inter at 700 weight with condensed tracking." },
+      "body": { "displayName": "Body", "purpose": "Default body text, input labels, descriptions. 0.875rem minimum for dense data scanning." },
+      "label": { "displayName": "Label", "purpose": "Form labels, badges, tab labels, navigation items. Always uppercase with 0.05em letter-spacing." }
+    },
+    "shadows": [
+      { "name": "resting", "value": "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)", "purpose": "Default card shadow. Cards sit on the surface." },
+      { "name": "hover", "value": "0 4px 12px rgba(0,0,0,0.1)", "purpose": "Card hover state. Card lifts off the surface." },
+      { "name": "primary-elevated", "value": "0 2px 8px rgba(99, 102, 241, 0.3)", "purpose": "Primary button shadow. Button feels pressable and clickable." },
+      { "name": "primary-hover", "value": "0 4px 16px rgba(99, 102, 241, 0.4)", "purpose": "Primary button hover. Enhanced lift and shadow." },
+      { "name": "strong", "value": "0 4px 16px rgba(0,0,0,0.12)", "purpose": "Login card shadow. Elevated above everything." },
+      { "name": "focus-ring", "value": "0 0 0 3px rgba(99, 102, 241, 0.15)", "purpose": "Input focus ring. Subtle indigo tint indicating focus." },
+      { "name": "card-accent", "value": "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)", "purpose": "Resting card shadow combined with border-t-4 accent." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions on buttons and interactive elements." },
+      { "name": "duration-fast", "value": "0.2s", "purpose": "Button hover transitions, tab switches, dropdown toggles." },
+      { "name": "duration-normal", "value": "0.3s", "purpose": "Alpine.js x-transition enter/leave durations for sidebar and chat panels." },
+      { "name": "duration-slow", "value": "0.2s ease-in", "purpose": "Chat panel leave transitions, slower dismissals." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA button with indigo background, white text, and elevated shadow.",
+      "html": "<button class=\"ds-btn-primary\">SAVE CHANGES</button>",
+      "css": ".ds-btn-primary { background: #6366F1; color: #FFFFFF; padding: 10px 24px; border: none; border-radius: 4px; font-weight: 600; font-size: 0.875rem; letter-spacing: 0.02em; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3); transition: all 0.2s ease; cursor: pointer; font-family: Inter, system-ui, sans-serif; } .ds-btn-primary:hover { background: #4F46E5; box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4); transform: translateY(-1px); } .ds-btn-primary:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(99, 102, 241, 0.3); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary button with transparent background, border, and hover fill.",
+      "html": "<button class=\"ds-btn-ghost\">CANCEL</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: #0F172A; padding: 8px 16px; border: 1px solid #E2E8F0; border-radius: 4px; font-weight: 600; font-size: 0.875rem; cursor: pointer; font-family: Inter, system-ui, sans-serif; transition: all 0.2s ease; } .ds-btn-ghost:hover { background: #F1F5F9; border-color: #CBD5E1; } .ds-btn-ghost:active { background: #E2E8F0; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Container card with top accent stripe, shadow, and rounded corners.",
+      "html": "<div class=\"ds-card\"><h3>Card Title</h3><p>Card content here</p></div>",
+      "css": ".ds-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-top: 4px solid #6366F1; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06); transition: all 0.2s ease; } .ds-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-1px); }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text input with label, icon support, and indigo focus ring.",
+      "html": "<div class=\"ds-input\"><label>Email</label><input type=\"email\" placeholder=\"name@example.com\" /></div>",
+      "css": ".ds-input input { width: 100%; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 4px; padding: 10px 14px; font-size: 0.875rem; font-family: Inter, system-ui, sans-serif; color: #0F172A; transition: all 0.2s ease; box-sizing: border-box; } .ds-input input:focus { border-color: #6366F1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); outline: none; } .ds-input label { display: block; font-size: 0.75rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-family: Inter, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Alert",
+      "kind": "alert",
+      "refersTo": "alert",
+      "description": "Alert box with colored left border and semantic background.",
+      "html": "<div class=\"ds-alert\">Warning message here</div>",
+      "css": ".ds-alert { border-left: 4px solid #6366F1; background: #F1F5F9; border-radius: 4px; padding: 16px; font-size: 0.875rem; color: #0F172A; font-family: Inter, system-ui, sans-serif; } .ds-alert.alert-warning { border-left-color: #F59E0B; background: #FFFBEB; } .ds-alert.alert-info { border-left-color: #4285F4; background: #EFF6FF; } .ds-alert.alert-error { border-left-color: #EF4444; background: #FEF2F2; }"
+    },
+    {
+      "name": "Chat Bubble Sender",
+      "kind": "custom",
+      "refersTo": "chat-bubble-sender",
+      "description": "Sender message bubble with green tint, rounded corners, and tail.",
+      "html": "<div class=\"ds-chat-bubble-sender\"><p>Message text</p></div>",
+      "css": ".ds-chat-bubble-sender { background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 22px; border-bottom-right-radius: 4px; padding: 12px 16px; max-width: 70%; color: #0F172A; font-size: 0.875rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); font-family: Inter, system-ui, sans-serif; } .ds-chat-bubble-sender p { margin: 0; line-height: 1.5; white-space: pre-wrap; }"
+    },
+    {
+      "name": "Chat Bubble Receiver",
+      "kind": "custom",
+      "refersTo": "chat-bubble-receiver",
+      "description": "Receiver message bubble with blue tint and rounded corners.",
+      "html": "<div class=\"ds-chat-bubble-receiver\"><p>Message text</p></div>",
+      "css": ".ds-chat-bubble-receiver { background: rgba(66, 133, 244, 0.06); border: 1px solid rgba(66, 133, 244, 0.2); border-radius: 22px; border-bottom-left-radius: 4px; padding: 12px 16px; max-width: 70%; color: #0F172A; font-size: 0.875rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); font-family: Inter, system-ui, sans-serif; } .ds-chat-bubble-receiver p { margin: 0; line-height: 1.5; white-space: pre-wrap; }"
+    },
+    {
+      "name": "Active Tab",
+      "kind": "custom",
+      "refersTo": "tab-active",
+      "description": "Active tab with solid indigo background and white text.",
+      "html": "<button class=\"ds-tab-active\">Messages</button>",
+      "css": ".ds-tab-active { background: #6366F1; color: #FFFFFF; border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 0.875rem; font-weight: 600; font-family: Inter, system-ui, sans-serif; cursor: pointer; transition: all 0.2s ease; border: none; } .ds-tab-active:hover { background: #4F46E5; }"
+    },
+    {
+      "name": "Badge Error",
+      "kind": "chip",
+      "refersTo": "badge-error",
+      "description": "Small error badge for unread counts and status indicators.",
+      "html": "<span class=\"ds-badge-error\">!</span>",
+      "css": ".ds-badge-error { display: inline-flex; align-items: center; justify-content: center; background: #EF4444; color: #FFFFFF; border-radius: 9999px; padding: 2px 6px; font-size: 0.625rem; font-weight: 700; font-family: Inter, system-ui, sans-serif; line-height: 1; min-width: 16px; }"
+    },
+    {
+      "name": "Sidebar Menu Item",
+      "kind": "nav",
+      "refersTo": "menu-item",
+      "description": "Sidebar navigation item with icon and text.",
+      "html": "<a class=\"ds-menu-item\" href=\"#\"><svg></svg>Dashboard</a>",
+      "css": ".ds-menu-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; color: #0F172A; font-size: 0.875rem; font-weight: 500; font-family: Inter, system-ui, sans-serif; border-radius: 8px; text-decoration: none; cursor: pointer; transition: all 0.2s ease; } .ds-menu-item:hover { background: #F1F5F9; color: #6366F1; } .ds-menu-item.active { background: rgba(99, 102, 241, 0.08); color: #6366F1; font-weight: 600; } .ds-menu-item svg { width: 20px; height: 20px; flex-shrink: 0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Academic Dashboard",
+    "overview": "SAE's design language blends the warmth of a well-organized classroom with the precision of modern software. The palette leans into a confident blue-indigo spectrum that evokes trust, clarity, and intellectual rigor — never cold, always approachable. Surfaces carry gentle depth through layered shadows and subtle backdrop blurs, creating a sense of physicality that makes every interaction feel deliberate and grounded.\n\nThe system prioritizes scanability and efficient task completion. Teachers and students move through dense information landscapes with clear visual hierarchies, generous spacing, and consistent component behavior. Cards feel like index cards on a corkboard — tangible, organized, and within arm's reach. Buttons are lifted and responsive, catching the eye when action is available and receding when it is not.",
+    "keyCharacteristics": [
+      "Blue-indigo primary palette with warm undertones, not sterile cool",
+      "Elevated, tactile components with subtle shadow depth",
+      "Sidebar-first navigation with collapsible drawers and Alpine.js reactivity",
+      "Glass-morphism accents on login and overlay surfaces",
+      "Consistent 4px-8px rounding on inputs and buttons, 12px on cards",
+      "Gradient text on brand marks (indigo-500 to purple-600)"
+    ],
+    "rules": [
+      { "name": "The Indigo Anchor Rule", "body": "The primary indigo (#6366F1) anchors every meaningful action and state transition. It appears on no more than 15% of any given screen's surface area. Its rarity is the point — when it appears, the eye knows something matters.", "section": "colors" },
+      { "name": "The Warm Efficiency Rule", "body": "Every color choice serves both warmth and efficiency. No decorative-only colors exist; each hue carries a functional role (action, status, warning, error, or neutral hierarchy).", "section": "colors" },
+      { "name": "The Dense Data Rule", "body": "Body text never drops below 0.875rem — teachers scanning grades and attendance records need legibility in dense layouts. Labels are always uppercase with 0.05em letter-spacing for immediate scannability.", "section": "typography" },
+      { "name": "The Gradient Brand Rule", "body": "The brand name uses bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent. This is the only gradient text in the system. Never apply gradients to body copy, buttons, or labels.", "section": "typography" },
+      { "name": "The Corkboard Rule", "body": "Cards have border-t-4 border-t-primary as a top accent stripe, mimicking the physical tab on a file folder. This border-t-4 treatment is the SAE signature — it appears on every x-card.", "section": "elevation" },
+      { "name": "The Lifted Button Rule", "body": "Primary buttons have an elevated shadow (0 2px 8px rgba(99, 102, 241, 0.3)) and a subtle upward translate on hover (translateY(-1px)). They look and feel pressable — the user's finger wants to push them down.", "section": "elevation" },
+      { "name": "The Flat Background Rule", "body": "Background surfaces are intentionally flat and low-contrast (bg-base-200/50). Depth comes only from components, never from the background itself. This keeps the focus on content and interaction.", "section": "elevation" },
+      { "name": "The Accent Stripe Rule", "body": "Every x-card gets border-t-4 border-t-[category-color] as a top border accent. The color matches the card's category (primary for the main panel, warning for payments, info for messages). Never use border-t without the 4px width.", "section": "shapes" },
+      { "name": "The Soft Corner Rule", "body": "All user-facing containers use rounded-lg or larger. Sharp corners are reserved for decorative elements only. The system is friendly — sharp corners are unfriendly.", "section": "shapes" },
+      { "name": "The Top Stripe Rule", "body": "Every x-card gets border-t-4 border-t-[category-color]. This is the visual signature of SAE — never a card without its accent stripe.", "section": "components" },
+      { "name": "The Button Hover Lift Rule", "body": "All buttons have transition: all 0.2s ease. Primary buttons lift (translateY(-1px)) and gain shadow on hover. Ghost buttons fill background on hover. Every button interaction has physical feedback.", "section": "components" },
+      { "name": "The Tab Solidity Rule", "body": "Active tabs use !bg-primary !text-primary-content — full primary background with white text. No outline or ghost treatment for active tabs. This is non-negotiable for SAE's navigation clarity.", "section": "components" }
+    ],
+    "dos": [
+      "Do use the indigo primary (#6366F1) for all primary actions and card accent stripes — it is the system's visual anchor and appears on no more than 15% of any screen",
+      "Do maintain the border-t-4 card accent stripe on every x-card — it is the SAE signature and provides instant category recognition",
+      "Do use rounded-[22px] for chat bubbles with the distinctive rounded-br-[4px] tail — this is a unique system pattern",
+      "Do apply backdrop-blur-xl and bg-slate-900/70 for login surfaces — the glass-morphism effect creates depth and focus",
+      "Do use bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent exclusively for the brand name text — no other gradient text exists",
+      "Do keep body text at 0.875rem minimum for dense data scanning — teachers need legibility in grade tables",
+      "Do use Alpine.js x-data, x-show, x-transition for client-side interactivity alongside Livewire server-side state",
+      "Do use font-sans consistently — the Inter/system-ui stack provides instant rendering and excellent legibility"
+    ],
+    "donts": [
+      "Don't use purple (#570df8) as a standalone primary — the direction is blue-indigo; purple appears only as the secondary gradient end on the brand mark",
+      "Don't add sharp corners (rounded-0 or no radius) to any user-facing component — the system is friendly and rounded",
+      "Don't remove the border-t-4 accent stripe from cards — this is the non-negotiable SAE visual signature",
+      "Don't use decorative-only colors — every color must serve a functional role (action, status, warning, error, or hierarchy)",
+      "Don't apply gradient text to anything other than the brand name — gradients are reserved for the logo",
+      "Don't stack more than two levels of shadow elevation — rest (shadow-md), hover (shadow-lg), and strong (shadow-lg/black) are the maximum",
+      "Don't use font-serif or display fonts — the system uses font-sans (Inter) exclusively for efficiency and screen legibility",
+      "Don't make buttons flat — buttons must have elevated shadows (0 2px 8px rgba(99, 102, 241, 0.3)) and hover lift to feel tactile and pressable"
+    ]
+  }
+}

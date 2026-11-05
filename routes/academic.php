@@ -2,6 +2,7 @@
 
 use App\Enums\RoleGroups;
 use App\Http\Controllers\Api\AttendanceSyncController;
+use App\Http\Controllers\PreEnrollmentReceiptController;
 use App\Http\Controllers\print\PrintClassbookController;
 use App\Http\Controllers\print\PrintInscriptionsController;
 use App\Http\Controllers\print\PrintStudentReportController;
@@ -28,6 +29,7 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('/enrollments', 'enrollment')->middleware('roles:admin,student,principal,director,administrative');
     Route::livewire('/pre-enrollments', 'pre-enrollments.index')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/pre-enrollments/materials', 'pre-enrollments.materials')->middleware('roles:admin,principal,director,administrative');
+    Route::get('/pre-enrollments/receipt/{preEnrollmentPayment}', [PreEnrollmentReceiptController::class, 'show'])->name('pre-enrollments.receipt')->middleware('roles:admin,principal,director,administrative,treasurer');
     Route::livewire('/config-manager', 'config-manager')->middleware('roles:admin,principal,director,administrative');
     Route::livewire('/inscriptions', 'inscriptions.inscription-manager')->middleware('roles:admin,student,principal,director,administrative');
     Route::livewire('/inscriptions/list', 'inscriptions.inscription-list')->middleware('roles:admin,teacher,principal,director,administrative');
@@ -53,6 +55,10 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/evaluations/{id}/edit', 'evaluations.editor')->name('evaluations.edit')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative');
     Volt::route('/evaluations/{id}/results', 'evaluations.results')->name('evaluations.results')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative,student');
     Volt::route('/evaluations/{id}/take', 'evaluations.take')->name('evaluations.take')->whereNumber('id')->middleware('roles:admin,teacher,principal,director,administrative,student');
+    // Licencias y Avisos de Ausencia Docente
+    Volt::route('/teacher-absences/notice', 'teacher-absences.notice')->name('teacher-absences.notice')->middleware('roles:admin,teacher,principal,director,administrative,preceptor');
+    Volt::route('/teacher-absences', 'teacher-absences.index')->name('teacher-absences.index')->middleware('roles:admin,principal,director,administrative,preceptor');
+
     Route::livewire('/profile', 'users.profile')->name('profile');
 
     // Internal Routes for Attendance PWA (Full session support)
@@ -71,4 +77,11 @@ Route::middleware(['auth'])->group(function () {
     Route::livewire('/books/create', 'books.form')->name('books.create')->middleware('roles:admin,administrative,director,preceptor');
     Route::livewire('/books/{id}/edit', 'books.form')->name('books.edit')->middleware('roles:admin,administrative,director,preceptor');
     Route::livewire('/books/loans', 'books.loans')->name('books.loans')->middleware('roles:admin,administrative,director,preceptor');
+
+    // Portal Familias (Tutores / Padres)
+    Volt::route('/family-portal', 'family.portal')->name('family.portal')->middleware('roles:tutor,admin,principal,director,administrative,preceptor');
+
+    // Circulares y Novedades Institucionales
+    Volt::route('/announcements', 'announcements.announcement-feed')->name('announcements.index');
+    Volt::route('/announcements/manage', 'announcements.announcement-manager')->name('announcements.manage')->middleware('roles:admin,principal,director,administrative,preceptor');
 });

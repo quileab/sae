@@ -15,11 +15,14 @@
 //       'paymentDate' => $paymentrecord->created_at,
 //     ];
     
-$amount = number_format($data['payment']->paymentAmount, 2);
-$amountWords = NumberFormatter::create('es', NumberFormatter::SPELLOUT)->format($data['payment']->paymentAmount);
+$amountValue = $data['paymentAmount'] ?? ($data['payment']->paymentAmount ?? $data['payment']->amount ?? 0);
+$amount = number_format($amountValue, 2);
+$formatter = new \NumberFormatter('es', \NumberFormatter::SPELLOUT);
+$amountWords = $formatter->format($amountValue);
 $copies = ['ORIGINAL', 'DUPLICADO'];
 $copy = 'SINGLE';
-
+$isRefund = ($data['payment']->type ?? null) === 'refund';
+$receiptTitle = $data['receiptTitle'] ?? ($isRefund ? 'RECIBO DE DEVOLUCIÓN / REINTEGRO' : null);
 @endphp
 
 <head>
@@ -270,6 +273,9 @@ $copy = 'SINGLE';
         <div class="inline-block text-center">
           <img style="height:3cm; width:auto;" src="{{ public_path('imgs/logo.png') }}" alt="Logo institucional"><br><br>
           RECIBO Nº: {{ str_pad($data['payment']->id, 6, '0', STR_PAD_LEFT) }}
+          @if(!empty($receiptTitle))
+            <br><span class="font-bold font-xs" style="color: #b91c1c;">{{ $receiptTitle }}</span>
+          @endif
         </div>
         <div class="inline-block text-center">
           <p class="font-bold font-md">
@@ -290,14 +296,23 @@ $copy = 'SINGLE';
 
       <div class="w-full text-right">Avellaneda, {{ date('d/m/Y', strtotime($data['payment']->created_at)) }}</div>
       <div class="w-full text-left font-1">
+        @php
+          $payerName = isset($data['user']) 
+            ? ($data['user']->lastname . ', ' . $data['user']->firstname)
+            : ($data['payer_name'] ?? ($data['payment']->payer_name ?? ''));
+          $actionWord = $isRefund ? 'Reintegré a:' : 'Recibí de:';
+          $conceptText = $data['paymentDescription'] ?? ($data['payment']->concept ?? ($data['payment']->description ?? ''));
+          $careerText = $data['career_name'] ?? ($data['payment']->career_name ?? null);
+          if (!$careerText && isset($data['user']->careers)) {
+            $careerText = $data['user']->careers->pluck('name')->implode(' - ');
+          }
+        @endphp
 
-        Recibí de: <b>{{ $data['user']->lastname }}, {{ $data['user']->firstname }}</b><br><br>
-        Concepto: Pago voluntario, <b>{{ $data['paymentDescription'] }}</b><br><br>
-        Curso/Div: <b>
-          @foreach ($data['user']->careers as $career)
-            {{ $career->name }} -
-          @endforeach
-        </b><br><br>
+        {{ $actionWord }} <b>{{ $payerName }}</b><br><br>
+        Concepto: <b>{{ $conceptText }}</b><br><br>
+        @if($careerText)
+          Curso/Div: <b>{{ $careerText }}</b><br><br>
+        @endif
         la cantidad de pesos: <b>{{ $amountWords }}</b><br><br>
         <br>
         SON PESOS: <b>$ {{ $amount }}</b>

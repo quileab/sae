@@ -62,11 +62,13 @@ class PrintClassbookController extends Controller
         }
 
         // Crear un array temporal para las calificaciones y asistencia
-        $grades = [];
         foreach ($classbooks as $classbook) {
             $grade = $classbook->grades->first();
             $classbook->attendance = $grade->attendance ?? null;
             $classbook->grade = $grade->grade ?? null;
+            $classbook->gradeType = $grade->type ?? null;
+            $classbook->approved = $grade?->approved;
+            $classbook->gradeComments = $grade->comments ?? null;
         }
 
         // TODO: Calcular la asistencia y la calificación promedio

@@ -101,13 +101,18 @@
                             @endif
 
                             @if($recipient_type === 'user')
-                                <x-select
+                                <x-choices
                                     label="Curso"
                                     wire:model.live="selectedSubjectId"
                                     :options="$subjects"
                                     option-value="id"
                                     option-label="name"
-                                    placeholder="Selecciona un curso"
+                                    placeholder="Buscar curso..."
+                                    searchable
+                                    search-function="searchSubjects"
+                                    min-chars="2"
+                                    single
+                                    clearable
                                 />
                             @endif
                         @endif
@@ -120,13 +125,18 @@
                                     wire:model.live="selectedCareerId"
                                     :options="$careers"
                                 />
-                                <x-select
+                                <x-choices
                                     label="Curso (para filtrar estudiantes)"
                                     wire:model.live="selectedSubjectId"
                                     :options="$subjects"
                                     option-value="id"
                                     option-label="name"
-                                    placeholder="Selecciona un curso"
+                                    placeholder="Buscar curso..."
+                                    searchable
+                                    search-function="searchSubjects"
+                                    min-chars="2"
+                                    single
+                                    clearable
                                 />
                             @elseif($recipient_type === 'subject')
                                 <x-select
@@ -159,13 +169,18 @@
                             />
 
                         @elseif($recipient_type === 'subject')
-                            <x-select
+                            <x-choices
                                 label="Curso"
                                 wire:model.live="recipient_id"
                                 :options="$subjects"
                                 option-value="id"
                                 option-label="name"
-                                placeholder="Selecciona un curso"
+                                placeholder="Buscar curso..."
+                                searchable
+                                search-function="searchSubjects"
+                                min-chars="2"
+                                single
+                                clearable
                             />
                             <p class="text-xs text-base-content/60">
                                 <x-icon name="o-information-circle" class="w-3 h-3 inline" />

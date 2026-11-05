@@ -14,6 +14,7 @@ enum UserRole: string
     case Preceptor = 'preceptor';
     case Principal = 'principal';
     case BasicUser = 'basic_user';
+    case Tutor = 'tutor';
 
     public function label(): string
     {
@@ -28,6 +29,7 @@ enum UserRole: string
             self::Preceptor => 'Preceptor',
             self::Principal => 'Principal',
             self::BasicUser => 'Usuario básico',
+            self::Tutor => 'Tutor / Familiar',
         };
     }
 

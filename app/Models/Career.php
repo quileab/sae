@@ -22,4 +22,14 @@ class Career extends Model
     {
         return $this->hasMany(Subject::class);
     }
+
+    public function scopeTertiary($query)
+    {
+        return $query->where('level', 'tertiary');
+    }
+
+    public function scopeSecondary($query)
+    {
+        return $query->where('level', 'secondary');
+    }
 }

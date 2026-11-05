@@ -31,7 +31,7 @@ test('admin sees course filter when recipient type is user', function () {
         ->test(Chat::class)
         ->set('activeTab', 'new')
         ->set('recipient_type', 'user')
-        ->assertSee('wire:model.live="selectedSubjectId"', false); // Check for the filter
+        ->assertSee('selectedSubjectId', false); // Check for the filter
 });
 
 test('admin does not see course filter when recipient type is subject', function () {
@@ -44,6 +44,6 @@ test('admin does not see course filter when recipient type is subject', function
         ->test(Chat::class)
         ->set('activeTab', 'new')
         ->set('recipient_type', 'subject')
-        ->assertDontSee('wire:model.live="selectedSubjectId"', false) // Filter should be gone
-        ->assertSee('wire:model.live="recipient_id"', false); // Recipient picker should be there
+        ->assertDontSee('selectedSubjectId', false) // Filter should be gone
+        ->assertSee('recipient_id', false); // Recipient picker should be there
 });

@@ -71,6 +71,14 @@
                     <livewire:bookmarks />
 
                     <x-menu-item title="Dashboard" icon="o-sparkles" link="/dashboard" />
+
+                    @unless($user->hasAnyRole(['admin', 'principal', 'director', 'administrative']))
+                        <x-menu-item title="Circulares" icon="o-megaphone" link="/announcements" />
+                    @endunless
+
+                    @if($user->isTutor() || $user->isStaff())
+                        <x-menu-item title="Portal Familias" icon="o-user-group" link="/family-portal" />
+                    @endif
                     
                     <livewire:unread-messages-indicator type="desktop" />
                     
@@ -85,6 +93,7 @@
                                 <x-menu-item title="{{ $labels['label_careers'] }}" icon="o-academic-cap" link="/careers" />
                                 <x-menu-item title="Materias" icon="o-rectangle-stack" link="/subjects" />
                                 <x-menu-item title="Materias-Usuarios" icon="o-arrow-path-rounded-square" link="/enrollments" />
+                                <x-menu-item title="Licencias Docentes" icon="o-identification" link="/teacher-absences" />
                             </x-menu-sub>
                         </div>
                     @endif
@@ -114,6 +123,11 @@
                             <x-menu-item title="Importar Usuarios" icon="o-user-plus" link="/users/import" />
                             <x-menu-item title="Parámetros" icon="o-adjustments-horizontal" link="/config-manager" />
                             <x-menu-item title="Caché" icon="o-wrench-screwdriver" link="/clear" />
+                        </x-menu-sub>
+
+                        <x-menu-sub title="Circulares" icon="o-megaphone">
+                            <x-menu-item title="Ver Muro" icon="o-eye" link="/announcements" />
+                            <x-menu-item title="Gestionar y Redactar" icon="o-pencil-square" link="/announcements/manage" />
                         </x-menu-sub>
 
                         <x-menu-sub title="Inscripciones" icon="o-clipboard-document-check">
@@ -147,9 +161,10 @@
 
                     @if($user->hasAnyRole(['teacher']))
                         <x-menu-item title="Inscriptos" icon="o-clipboard-document-list" link="/inscriptions/list" />
+                        <x-menu-item title="Aviso de Ausencias" icon="o-clipboard-document-check" link="/teacher-absences/notice" />
                     @endif
 
-                    @if($user->hasAnyRole(['preceptor', 'admin', 'principal']))
+                    @if($user->hasAnyRole(['preceptor', 'admin', 'principal', 'director', 'administrative']))
                         <x-menu-item title="Asistencia" icon="o-clipboard-document-check" link="/attendance" />
                     @endif
                 @endauth
@@ -175,9 +190,7 @@
 
         {{-- CONTENT --}}
         <x-slot:content>
-            <div class="content-list">
-                {{ $slot }}
-            </div>
+            {{ $slot }}
         </x-slot:content>
     </x-main>
 

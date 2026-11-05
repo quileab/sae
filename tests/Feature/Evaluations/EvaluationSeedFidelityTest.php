@@ -302,7 +302,7 @@ class EvaluationSeedFidelityTest extends TestCase
         $this->assertSame(['caso', 'conceptual'], array_column($withVariants['variants'], 'key'));
     }
 
-#[Test]
+    #[Test]
     public function the_recuperatorio_keeps_both_parts_of_the_source_exam(): void
     {
         $this->seedExamples();

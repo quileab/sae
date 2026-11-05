@@ -227,9 +227,12 @@ return [
     | trait, Livewire will use Tailwind templates to render pagination views
     | on the page. If you want Bootstrap CSS, you can specify: "bootstrap"
     |
+    | The "sae" theme uses DaisyUI semantic colors so pagination adapts to the
+    | active light/dark theme (see resources/views/vendor/livewire/sae.blade.php).
+    |
     */
 
-    'pagination_theme' => 'tailwind',
+    'pagination_theme' => 'sae',
 
     /*
     |---------------------------------------------------------------------------

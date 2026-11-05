@@ -7,6 +7,7 @@ use App\Models\Career;
 use App\Models\Config;
 use App\Models\Inscription;
 use App\Models\User;
+use App\Services\InscriptionPdfService;
 use Illuminate\Support\Facades\Storage;
 
 class PrintInscriptionsController extends Controller
@@ -66,7 +67,10 @@ class PrintInscriptionsController extends Controller
             compact('inscriptions', 'student', 'career', 'config', 'insc_conf_id')
         );
         $content = $pdf->download()->getOriginalContent();
-        Storage::put("private/inscriptions/insc-$student->id-$career->id-$insc_conf_id-.pdf", $content);
+        Storage::put(
+            InscriptionPdfService::storagePath($student->id, $career->id, $insc_conf_id),
+            $content,
+        );
 
         return back();
     }

@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\SubjectOptions;
 use Illuminate\Support\Facades\Auth;
 
 trait AuthorizesAccess
@@ -28,7 +29,9 @@ trait AuthorizesAccess
      */
     protected function authorizeSubject(int $subjectId): void
     {
-        if (! Auth::user()->hasSubject($subjectId)) {
+        $user = Auth::user();
+
+        if (! app(SubjectOptions::class)->canSeeAll($user) && ! $user->hasSubject($subjectId)) {
             abort(403, 'No tienes permiso para acceder a esta materia.');
         }
     }

@@ -8,7 +8,9 @@
                 <x-select wire:model.live="career_id" :options="$this->careers" placeholder="TODAS LAS CARRERAS" icon="o-academic-cap" />
                 
                 @if($career_id)
-                    <x-select wire:model.live="subject_id" :options="$this->subjects" placeholder="TODAS LAS MATERIAS" icon="o-queue-list" />
+                    <x-choices wire:model.live="subject_id" :options="$subjectOptions" placeholder="Todas las materias"
+                        icon="o-queue-list" option-value="id" option-label="name" searchable
+                        search-function="searchSubjects" min-chars="2" single clearable />
                 @endif
             </div>
         </x-slot:middle>

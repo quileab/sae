@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'landing' => [
+        'api_key' => env('LANDING_API_KEY'),
+    ],
+
 ];

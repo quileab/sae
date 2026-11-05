@@ -24,7 +24,27 @@
                     </div>
                 @endif
 
-                <!-- Stepper -->
+                @if ($closed)
+                    <div class="text-center py-10 px-4">
+                        <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
+                            <x-icon name="o-lock-closed" class="w-10 h-10 text-warning" />
+                        </div>
+                        <h2 class="text-2xl font-bold mt-6">La inscripción online está cerrada</h2>
+                        <p class="mt-3 max-w-xl mx-auto opacity-70">
+                            El formulario de preinscripción no está disponible en este momento.
+                            Si ya completaste tu trámite, podés consultar su estado con tu DNI.
+                        </p>
+                        <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
+                            <span class="inline-flex items-center gap-2 rounded-full bg-base-200 px-4 py-2 font-medium">
+                                <x-icon name="o-envelope" class="w-4 h-4 text-primary" /> rv8206@gmail.com
+                            </span>
+                            <span class="inline-flex items-center gap-2 rounded-full bg-base-200 px-4 py-2 font-medium">
+                                <x-icon name="o-phone" class="w-4 h-4 text-primary" /> 3482-550035
+                            </span>
+                        </div>
+                    </div>
+                @else
+                    <!-- Stepper -->
                 <ul class="steps steps-horizontal w-full mb-6">
                     <li class="step {{ $step >= 1 ? 'step-primary' : '' }}">Carrera</li>
                     <li class="step {{ $step >= 2 ? 'step-primary' : '' }}">Datos personales</li>
@@ -141,6 +161,7 @@
                         @endif
                     </div>
                 </form>
+                @endif
             </div>
         </div>
         <p class="text-center text-sm opacity-60 mt-4">Tus datos se usan solo para la inscripción oficial SIGAE {{ \App\Services\AcademicCycle::enrollmentCycle() }}.</p>

@@ -45,6 +45,12 @@ class SyncConfigsCommand extends Command
                 'type' => 'bool',
                 'description' => 'Modo AFIP (Off: Testing/Homologación, On: Producción)',
             ],
+            'pre_enrollment_fee' => [
+                'value' => '160000',
+                'group' => 'payments',
+                'type' => 'text',
+                'description' => 'Monto Arancel de Preinscripción ($)',
+            ],
         ];
 
         // Merge with any config file defaults if it exists

@@ -43,8 +43,9 @@
             <x-icon name="o-book-open" class="w-4 h-4" />
             GESTIÓN DE CLASES
         </div>
-        <x-select label="Seleccionar Materia" wire:model.live="subject_id" :options="$this->subjects"
-            option-label="full_name" option-value="id" icon="o-queue-list" />
+        <x-choices label="Seleccionar Materia" wire:model.live="subject_id" :options="$subjectOptions"
+            option-label="name" option-value="id" icon="o-queue-list" placeholder="Buscar materia..."
+            searchable search-function="searchSubjects" min-chars="2" single clearable />
         <div class="grid grid-cols-3 gap-2 mt-4">
             <x-button label="LIBRO TEMAS" icon="o-book-open" class="btn-warning btn-soft btn-sm w-full"
                 link="/printClassbooks/{{ $subject_id }}/{{ Auth::user()->id }}?cycle={{ $this->cycleYear }}" external
@@ -56,7 +57,56 @@
         </div>
     </x-card>
 
-    @if(auth()->user()->isStaff())
+    {{-- Panel de Circulares --}}
+    <x-card title="Circulares" shadow-md class="bg-base-100 border-t-4 border-t-info md:col-span-2">
+        <x-slot:menu>
+            <x-button label="Ver muro" icon="o-arrow-top-right-on-square" class="btn-info btn-outline btn-sm"
+                link="{{ route('announcements.index') }}" />
+        </x-slot:menu>
+
+        @if($this->recentAnnouncements->isEmpty())
+            <div class="text-center py-6 text-base-content/50">
+                <x-icon name="o-megaphone" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p class="text-sm">No hay circulares publicadas por el momento.</p>
+            </div>
+        @else
+            <div class="divide-y divide-base-200">
+                @foreach ($this->recentAnnouncements as $announcement)
+                    @php
+                        [$priorityLabel, $priorityClass] = match ($announcement->priority) {
+                            'urgent' => ['Urgente', 'badge-error text-white'],
+                            'important' => ['Importante', 'badge-warning'],
+                            default => ['Informativa', 'badge-ghost'],
+                        };
+                    @endphp
+                    <a href="{{ route('announcements.index') }}" wire:navigate
+                        class="flex flex-col gap-1 py-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="badge badge-xs font-semibold {{ $priorityClass }}">{{ $priorityLabel }}</span>
+                            @if($announcement->target === 'career' && $announcement->career)
+                                <span class="badge badge-neutral badge-xs">{{ $announcement->career->name }}</span>
+                            @elseif($announcement->target === 'subject' && $announcement->subject)
+                                <span class="badge badge-neutral badge-xs">{{ $announcement->subject->name }}</span>
+                            @endif
+                            <span class="font-semibold text-sm">{{ $announcement->title }}</span>
+                        </div>
+                        <div class="text-xs text-base-content/70 line-clamp-2">{{ Str::limit($announcement->description, 140) }}</div>
+                        <div class="text-[11px] text-base-content/50 flex flex-wrap items-center gap-2">
+                            <span>{{ $announcement->user->fullname ?? 'Dirección' }}</span>
+                            <span>•</span>
+                            <span>{{ $announcement->published_at ? $announcement->published_at->format('d/m/Y H:i') : $announcement->created_at->format('d/m/Y H:i') }}</span>
+                            @if($announcement->expires_at)
+                                <span>•</span>
+                                <span class="text-warning">Vence: {{ $announcement->expires_at->format('d/m/Y') }}</span>
+                            @endif
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        @endif
+    </x-card>
+
+    @if(auth()->user()->isAdministrative())
         {{-- Panel de Estadísticas de Estudiantes --}}
         <x-card title="Estadísticas de Estudiantes" subtitle="Información general de alumnos activos" shadow-md class="bg-base-100 border-t-4 border-t-primary md:col-span-2">
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">

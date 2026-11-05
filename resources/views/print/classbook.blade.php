@@ -56,7 +56,20 @@
             <div class="right">
               <hr>
               <span style="font-size: 0.75rem; color: #6b7280;">
-                @if($classbook->grade > 0)
+                @if($classbook->gradeType === 'practical_work')
+                  @if($classbook->approved)
+                    <span class="badge" style="background: #059669; color: #ffffff;">TP Aprobado</span>
+                  @else
+                    <span class="badge" style="background: #9ca3af; color: #ffffff;">TP Sin aprobar</span>
+                  @endif
+                  @if(! empty($classbook->gradeComments))
+                    <span style="font-weight: 600; color: #111827;">{{ $classbook->gradeComments }}</span>
+                  @endif
+                  @if($classbook->grade > 0)
+                    <span style="margin: 0 0.25rem;">-</span>
+                    <span style="font-weight: 600; color: #111827;">Nota: {{ $classbook->grade }}</span>
+                  @endif
+                @elseif($classbook->grade > 0)
                   <span style="font-weight: 600; color: #111827;">Nota: {{ $classbook->grade }}</span>
                   <span style="margin: 0 0.25rem;">-</span>
                 @endif

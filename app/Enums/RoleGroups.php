@@ -20,6 +20,18 @@ class RoleGroups
     ];
 
     /**
+     * Roles with administrative/management access to institution-wide data.
+     *
+     * @var array<int, UserRole>
+     */
+    public const ADMINISTRATIVE = [
+        UserRole::Admin,
+        UserRole::Principal,
+        UserRole::Director,
+        UserRole::Administrative,
+    ];
+
+    /**
      * Roles allowed to manage attendance through the PWA.
      *
      * @var array<int, UserRole>

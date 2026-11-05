@@ -244,3 +244,14 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - IMPORTANT: Always use `search-docs` tool for version-specific Tailwind CSS documentation and updated code examples. Never rely on training data.
 - IMPORTANT: Activate `tailwindcss-development` every time you're working with a Tailwind CSS or styling-related task.
 </laravel-boost-guidelines>
+
+## Reglas de dominio: Inscripciones
+
+- `users.id = 1` es el ADMIN obligatorio. No resolverlo por nombre ni rol.
+- En `/inscriptions`, el catálogo del ADMIN son filas de `inscriptions` con `user_id = 1`; las selecciones de estudiantes usan su propio `user_id`.
+- `value` es texto libre (fechas, letras, palabras o listas separadas por coma). No asumir formato de fecha.
+- `type` es `csv-1` (una opción) o `csv-n` (varias opciones). El tipo se define en el catálogo del ADMIN, por período y materia; no en el cliente.
+- `csv-n` se persiste como string separado por comas, sin duplicados ni vacíos.
+- Contrato completo: `docs/inscripciones.md`.
+
+> Nota: este bloque puede ser regenerado por `php artisan boost:update`; la fuente de verdad es `docs/inscripciones.md`.

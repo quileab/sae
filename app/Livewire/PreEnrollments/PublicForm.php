@@ -6,6 +6,7 @@ use App\Models\Career;
 use App\Models\PreEnrollment;
 use App\Services\AcademicCycle;
 use App\Services\PreEnrollmentPdfService;
+use App\Services\PreEnrollmentSettings;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -15,6 +16,8 @@ use Livewire\Component;
 class PublicForm extends Component
 {
     public int $step = 1;
+
+    public bool $closed = false;
 
     // Step 1: Carrera
     public $career_id = '';
@@ -112,6 +115,11 @@ class PublicForm extends Component
 
     public $referido = '';
 
+    public function mount(): void
+    {
+        $this->closed = ! PreEnrollmentSettings::isOpen();
+    }
+
     public function nextStep(): void
     {
         $this->step = min(4, $this->step + 1);
@@ -185,6 +193,12 @@ class PublicForm extends Component
 
     public function save(): void
     {
+        if ($this->closed || ! PreEnrollmentSettings::isOpen()) {
+            $this->closed = true;
+
+            return;
+        }
+
         try {
             $this->validate([
                 'career_id' => 'required|exists:careers,id',

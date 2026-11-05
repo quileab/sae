@@ -7,6 +7,9 @@ use App\Models\Config as ConfigModel;
 use App\Models\Inscription;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\InscriptionPdfService;
+use App\Services\SubjectOptions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -58,21 +61,23 @@ class InscriptionList extends Component
         }
 
         if ($this->user->hasRole('teacher')) {
-            $this->subjects = Subject::whereHas('classSessions', function ($query) {
-                $query->where('teacher_id', $this->user->id);
-            })->get();
-
             // Intentar recuperar de la sesión si no hay selección
             if (! $this->subject_id) {
                 $this->subject_id = session('current_subject_id');
             }
 
-            if ($this->subjects->isNotEmpty()) {
+            $this->subjects = app(SubjectOptions::class)
+                ->searchWith($this->teacherSubjectsQuery(), '', [$this->subject_id]);
+
+            if ($this->subjects !== []) {
+                $subjectIds = array_column($this->subjects, 'id');
+
                 // Si la materia de la sesión no es válida para este profesor, elegir la primera
-                if (! $this->subject_id || ! $this->subjects->contains('id', $this->subject_id)) {
-                    $this->subject_id = $this->subjects->first()->id;
+                if (! $this->subject_id || ! in_array((int) $this->subject_id, $subjectIds, true)) {
+                    $this->subject_id = $this->subjects[0]['id'];
                 }
-                $this->career_id = $this->subjects->find($this->subject_id)->career_id;
+
+                $this->career_id = Subject::find($this->subject_id)?->career_id;
                 session()->put('current_subject_id', $this->subject_id);
             }
         } else {
@@ -114,7 +119,7 @@ class InscriptionList extends Component
         $search = Str::of($this->search)->lower()->ascii();
         // search inscriptions by configs_id order by user_id
         $query = Inscription::with('user', 'subject')
-            ->where('user_id', '>', 1000)
+            ->where('user_id', '!=', Inscription::CATALOG_USER_ID)
             ->where('configs_id', $this->inscription_id);
 
         if ($this->user->hasRole('teacher')) {
@@ -158,13 +163,45 @@ class InscriptionList extends Component
             $query->orderBy($this->sortBy['column'], $this->sortBy['direction']);
         }
 
-        return $query->get();
+        return $query->get()->each(function (Inscription $inscription): void {
+            $inscription->pdf_file = InscriptionPdfService::fileName(
+                $inscription->user_id,
+                (int) $this->career_id,
+                (string) $this->inscription_id,
+            );
+            $inscription->pdf_exists = InscriptionPdfService::exists(
+                $inscription->user_id,
+                (int) $this->career_id,
+                (string) $this->inscription_id,
+            );
+        });
     }
 
     public function updatedCareerId($value): void
     {
-        $this->subjects = Subject::where('career_id', $value)->get();
         $this->subject_id = null;
+        $this->searchSubjects();
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $service = app(SubjectOptions::class);
+
+        $query = $this->user->hasRole('teacher')
+            ? $this->teacherSubjectsQuery()
+            : $service->queryFor($this->user);
+
+        if ($this->career_id && ! $this->user->hasRole('teacher')) {
+            $query->where('career_id', $this->career_id);
+        }
+
+        $this->subjects = $service->searchWith($query, $value, [$this->subject_id]);
+    }
+
+    protected function teacherSubjectsQuery(): Builder
+    {
+        return Subject::query()
+            ->whereHas('classSessions', fn (Builder $query) => $query->where('teacher_id', $this->user->id));
     }
 
     public function deleteSelected(): void

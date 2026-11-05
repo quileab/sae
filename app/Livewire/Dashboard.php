@@ -3,8 +3,11 @@
 namespace App\Livewire;
 
 use App\Models\Config as ConfigModel;
+use App\Models\Event;
+use App\Models\Subject;
 use App\Models\User;
 use App\Models\UserPayment;
+use App\Services\SubjectOptions;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -23,6 +26,9 @@ class Dashboard extends Component
 
     public $subject_id;
 
+    /** @var array<int, array{id: int, name: string}> */
+    public array $subjectOptions = [];
+
     public $mp_key = null;
 
     public $mp_token = null;
@@ -35,6 +41,12 @@ class Dashboard extends Component
         $this->mp_token = config('mercadopago.access_token');
 
         $user = Auth::user();
+
+        if ($user && $user->role === 'tutor') {
+            $this->redirect(route('family.portal'), navigate: true);
+
+            return;
+        }
 
         // Cycle ID initialization (URL > Session > Default)
         if (! $this->cycle_id) {
@@ -50,16 +62,28 @@ class Dashboard extends Component
 
         // Subject context persistence
         $this->subject_id = session('current_subject_id');
+        $this->subjectOptions = app(SubjectOptions::class)->search($user, '', null, [$this->subject_id]);
 
-        if (! $this->subject_id && $this->subjects->isNotEmpty()) {
-            $this->subject_id = $this->subjects->first()->id;
+        if (! $this->subject_id || ! in_array((int) $this->subject_id, array_column($this->subjectOptions, 'id'), true)) {
+            $this->subject_id = $this->subjectOptions[0]['id'] ?? null;
         }
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $this->subjectOptions = app(SubjectOptions::class)->search(
+            Auth::user(),
+            $value,
+            null,
+            [$this->subject_id],
+        );
     }
 
     public function updatedSubjectId($value): void
     {
         session()->put('current_subject_id', $value);
-        $this->success('Materia seleccionada: '.$this->subjects->find($value)->name, position: 'toast-bottom toast-end');
+        $name = Subject::find($value)?->name ?? 'Materia';
+        $this->success('Materia seleccionada: '.$name, position: 'toast-bottom toast-end');
     }
 
     #[Computed]
@@ -83,7 +107,7 @@ class Dashboard extends Component
     #[Computed]
     public function studentStats(): array
     {
-        if (! Auth::user()?->isStaff()) {
+        if (! Auth::user()?->isAdministrative()) {
             return [
                 'total' => 0,
                 'without_career' => 0,
@@ -136,15 +160,26 @@ class Dashboard extends Component
     #[Computed]
     public function inscriptionsStatus()
     {
-        return Cache::remember('configs_inscriptions', 3600, function () {
-            return ConfigModel::where('group', 'inscriptions')->get();
-        });
+        return ConfigModel::getGroup('inscriptions');
     }
 
-    #[Computed(persist: true)]
-    public function subjects()
+    #[Computed]
+    public function recentAnnouncements()
     {
-        return Auth::user()->subjects()->with('career')->get();
+        $user = Auth::user();
+
+        if (! $user) {
+            return collect();
+        }
+
+        return Event::query()
+            ->announcements()
+            ->published()
+            ->forUser($user)
+            ->with(['user', 'career', 'subject'])
+            ->latest('published_at')
+            ->limit(4)
+            ->get();
     }
 
     #[Computed]

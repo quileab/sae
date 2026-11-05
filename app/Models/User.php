@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -31,6 +32,7 @@ class User extends Authenticatable
         'firstname',
         'email',
         'phone',
+        'birth_date',
         'status',
     ];
     // protected $guarded = [];
@@ -55,6 +57,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'birth_date' => 'date',
             'enabled' => 'boolean',
             'status' => UserStatus::class,
         ];
@@ -157,6 +160,84 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->hasAnyRole(RoleGroups::values(RoleGroups::STAFF));
+    }
+
+    public function isAdministrative(): bool
+    {
+        return $this->hasAnyRole(RoleGroups::values(RoleGroups::ADMINISTRATIVE));
+    }
+
+    public function isTutor(): bool
+    {
+        return $this->role === UserRole::Tutor->value;
+    }
+
+    public function students(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'student_tutor', 'tutor_id', 'student_id')
+            ->withPivot(['relationship', 'is_emergency_contact', 'is_authorized_pickup', 'notes'])
+            ->withTimestamps();
+    }
+
+    public function tutors(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'student_tutor', 'student_id', 'tutor_id')
+            ->withPivot(['relationship', 'is_emergency_contact', 'is_authorized_pickup', 'notes'])
+            ->withTimestamps();
+    }
+
+    public function medicalRecord(): HasOne
+    {
+        return $this->hasOne(MedicalRecord::class);
+    }
+
+    public function isAdult(): bool
+    {
+        return $this->birth_date ? $this->birth_date->age >= 18 : false;
+    }
+
+    public function isTertiaryStudent(): bool
+    {
+        if (! method_exists($this, 'careers')) {
+            return false;
+        }
+
+        return $this->careers()->where('level', 'tertiary')->exists();
+    }
+
+    public function canManageOwnMedicalRecord(): bool
+    {
+        if ($this->isStaff()) {
+            return true;
+        }
+
+        if ($this->isAdult()) {
+            return true;
+        }
+
+        if ($this->isTertiaryStudent()) {
+            return true;
+        }
+
+        // If user has no specific secondary-only career assigned, default to tertiary institute autonomy
+        $hasOnlySecondary = method_exists($this, 'careers')
+            && $this->careers()->where('level', 'secondary')->exists()
+            && ! $this->careers()->where('level', 'tertiary')->exists();
+
+        return ! $hasOnlySecondary;
+    }
+
+    public function authoredAnnouncements(): HasMany
+    {
+        return $this->hasMany(Event::class, 'user_id')->where('type', 'announcement');
+    }
+
+    public function receivedAnnouncements(): BelongsToMany
+    {
+        return $this->belongsToMany(Event::class, 'event_user', 'user_id', 'event_id')
+            ->where('events.type', 'announcement')
+            ->withPivot(['read_at', 'acknowledged_at'])
+            ->withTimestamps();
     }
 
     // full name attribute

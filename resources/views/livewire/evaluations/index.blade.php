@@ -1,8 +1,8 @@
 <?php
 
 use App\Models\OnlineEvaluation;
-use App\Models\Subject;
 use App\Services\Evaluations\StudentEvaluationState;
+use App\Services\SubjectOptions;
 use Illuminate\Support\Collection;
 use Livewire\Volt\Component;
 use Livewire\Attributes\Computed;
@@ -41,19 +41,29 @@ new class extends Component {
 
         $this->authorize('viewAny', OnlineEvaluation::class);
 
-        if ($user->hasAnyRole(['admin', 'principal', 'director', 'administrative'])) {
-            $this->subjects = Subject::orderBy('name')->get();
-        } else {
-            $this->subjects = $user->subjects()->orderBy('name')->get();
+        if (! $this->subject_id) {
+            $this->subject_id = session('current_subject_id');
         }
 
-        if (! $this->subject_id && $this->subjects->count() > 0) {
-            $this->subject_id = session('current_subject_id') ?? $this->subjects->first()->id;
+        $this->subjects = app(SubjectOptions::class)->search($user, '', null, [$this->subject_id]);
+
+        if (! $this->subject_id || ! in_array((int) $this->subject_id, array_column($this->subjects, 'id'), true)) {
+            $this->subject_id = $this->subjects[0]['id'] ?? null;
         }
 
         if ($this->subject_id) {
             session()->put('current_subject_id', $this->subject_id);
         }
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $this->subjects = app(SubjectOptions::class)->search(
+            auth()->user(),
+            $value,
+            null,
+            [$this->subject_id],
+        );
     }
 
     public function updatedSubjectId()
@@ -292,7 +302,7 @@ new class extends Component {
         {{-- STAFF VIEW --}}
         <x-header title="Evaluaciones Online" subtitle="Gestiona las evaluaciones de tus materias">
             <x-slot:middle class="!justify-end">
-                <x-select
+                <x-choices
                     wire:model.live="subject_id"
                     :options="$subjects"
                     option-value="id"
@@ -300,6 +310,11 @@ new class extends Component {
                     placeholder="Seleccionar materia..."
                     icon="o-book-open"
                     class="min-w-64 bg-base-100"
+                    searchable
+                    search-function="searchSubjects"
+                    min-chars="2"
+                    single
+                    clearable
                 />
             </x-slot:middle>
             <x-slot:actions>

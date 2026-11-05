@@ -11,12 +11,18 @@ use ZipArchive;
 
 class MakeDeployZip extends Command
 {
-    protected $signature = 'make:deploy-zip {--name=deploy.zip} {--no-build} {--no-optimize} {--include-env}';
+    protected $signature = 'make:deploy-zip {--name=deploy.zip} {--no-build} {--no-optimize} {--include-env} {--include-brand}';
 
     protected $description = 'Genera un paquete ZIP para despliegue en hosting compartido';
 
     public function handle()
     {
+        $includeBrand = $this->option('include-brand');
+
+        if (! $includeBrand && ! $this->option('no-interaction')) {
+            $includeBrand = $this->confirm('¿Desea incluir los assets de marca/institución (public/imgs)?', false);
+        }
+
         $this->info('🚀 Iniciando proceso de empaquetado...');
 
         if (! $this->option('no-build')) {
@@ -90,6 +96,11 @@ class MakeDeployZip extends Command
                 $excludes[] = '.env';
             }
 
+            if (! $includeBrand) {
+                $excludes[] = 'public/imgs';
+                $excludes[] = 'public/imgs/*';
+            }
+
             file_put_contents($excludeFile, implode("\r\n", $excludes));
 
             $cmd = [
@@ -113,7 +124,8 @@ class MakeDeployZip extends Command
             @unlink($excludeFile);
 
             if (! $process->isSuccessful() || ! file_exists($finalPath)) {
-                $this->error('❌ Error al ejecutar 7-Zip: ' . $process->getErrorOutput());
+                $this->error('❌ Error al ejecutar 7-Zip: '.$process->getErrorOutput());
+
                 return 1;
             }
         } else {
@@ -155,6 +167,11 @@ class MakeDeployZip extends Command
                 if (Str::startsWith($zipPath, 'storage/') ||
                     Str::startsWith($zipPath, 'bootstrap/cache/') ||
                     $zipPath === 'public/hot') {
+                    continue;
+                }
+
+                // 2.1 Excluir assets de marca si no fueron solicitados
+                if (! $includeBrand && Str::startsWith($zipPath, 'public/imgs/')) {
                     continue;
                 }
 

@@ -2,6 +2,7 @@
 
 use App\Models\PreEnrollment;
 use App\Services\AcademicCycle;
+use App\Services\PreEnrollmentSettings;
 use App\Services\SecondaryPreEnrollmentPdfService;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
@@ -10,6 +11,7 @@ use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.public')] class extends Component {
     public int $step = 1;
+    public bool $closed = false;
     public int $career_id = 1; // NO SETEADO
     public ?int $pre_enrollment_id = null;
 
@@ -243,6 +245,12 @@ new #[Layout('components.layouts.public')] class extends Component {
 
     public function mount(): void
     {
+        if (! PreEnrollmentSettings::isOpen()) {
+            $this->closed = true;
+
+            return;
+        }
+
         $this->searchSchool();
     }
 
@@ -416,6 +424,12 @@ new #[Layout('components.layouts.public')] class extends Component {
 
     public function save(): void
     {
+        if (! PreEnrollmentSettings::isOpen()) {
+            $this->closed = true;
+
+            return;
+        }
+
         $fieldsToNormalize = ['fname', 'lname', 'fname1', 'lname1', 'fname2', 'lname2', 'fname3', 'lname3'];
         foreach ($fieldsToNormalize as $field) {
             if (!empty($this->$field)) {
@@ -571,7 +585,26 @@ new #[Layout('components.layouts.public')] class extends Component {
     <div class="absolute inset-0 bg-base-300/80 backdrop-blur-xs"></div>
 
     <div class="relative max-w-4xl mx-auto p-4 sm:p-8 bg-base-100/95 backdrop-blur-md rounded-2xl shadow-2xl border border-base-content/10">
-        @if($step === 6)
+        @if($closed)
+            <div class="text-center py-12 px-4">
+                <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-warning/15">
+                    <x-icon name="o-lock-closed" class="w-10 h-10 text-warning" />
+                </div>
+                <h2 class="text-3xl font-bold mt-6">La inscripción online está cerrada</h2>
+                <p class="mt-3 max-w-xl mx-auto text-base-content/70">
+                    El formulario de preinscripción a 1º año no está disponible en este momento.
+                    Si ya completaste tu trámite, podés consultar su estado con tu DNI.
+                </p>
+                <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 text-sm">
+                    <span class="inline-flex items-center gap-2 rounded-full bg-base-200 px-4 py-2 font-medium">
+                        <x-icon name="o-envelope" class="w-4 h-4 text-primary" /> rv8206@gmail.com
+                    </span>
+                    <span class="inline-flex items-center gap-2 rounded-full bg-base-200 px-4 py-2 font-medium">
+                        <x-icon name="o-phone" class="w-4 h-4 text-primary" /> 3482-550035
+                    </span>
+                </div>
+            </div>
+        @elseif($step === 6)
             <div class="text-center py-12">
                 <x-icon name="o-check-circle" class="w-24 h-24 mx-auto text-success" />
                 <h2 class="text-3xl font-bold mt-6">¡Preinscripción completada!</h2>

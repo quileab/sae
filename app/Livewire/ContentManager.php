@@ -6,9 +6,9 @@ use App\Models\Resource;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Models\Unit;
+use App\Services\SubjectOptions;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Facades\DB;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Mary\Traits\Toast;
@@ -70,11 +70,8 @@ class ContentManager extends Component
 
     public $subject_id;
 
-    #[Computed]
-    public function subjects()
-    {
-        return auth()->user()->subjects;
-    }
+    /** @var array<int, array{id: int, name: string}> */
+    public array $subjectOptions = [];
 
     public function mount($subject = null)
     {
@@ -82,7 +79,8 @@ class ContentManager extends Component
 
         // Si recibimos 0 o null (desde el menú lateral), intentamos resolver la materia
         if (! $subject || (is_numeric($subject) && $subject == 0) || (is_object($subject) && ! $subject->exists)) {
-            $sid = session('current_subject_id') ?? ($user->subjects->first()->id ?? null);
+            $this->subjectOptions = app(SubjectOptions::class)->search($user);
+            $sid = session('current_subject_id') ?? ($this->subjectOptions[0]['id'] ?? null);
 
             if (! $sid) {
                 $this->error('Debe seleccionar una materia primero.');
@@ -98,9 +96,25 @@ class ContentManager extends Component
 
         $this->isStudent = auth()->user()->hasRole('student');
         $this->subject_id = $this->subject->id;
+        $this->subjectOptions = app(SubjectOptions::class)->search($user, '', null, [$this->subject_id]);
         session()->put('current_subject_id', $this->subject_id);
         $this->authorizeSubject($this->subject_id);
 
+        $this->seedSelection();
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $this->subjectOptions = app(SubjectOptions::class)->search(
+            auth()->user(),
+            $value,
+            null,
+            [$this->subject_id],
+        );
+    }
+
+    protected function seedSelection(): void
+    {
         // Preseleccionar la primera unidad visible y el último tema de esa unidad
         $firstUnit = $this->subject
             ->units()

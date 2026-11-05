@@ -9,6 +9,7 @@ use App\Models\Grade;
 use App\Models\Subject;
 use App\Models\User;
 use App\Services\EnrollmentAcademicStatusService;
+use App\Services\SubjectOptions;
 use App\Traits\AuthorizesAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -35,6 +36,9 @@ class RiskReport extends Component
     public bool $profileModal = false;
 
     public $studentProfile = null;
+
+    /** @var array<int, array{id: int, name: string}> */
+    public array $subjectOptions = [];
 
     public function viewProfile($userId): void
     {
@@ -76,6 +80,18 @@ class RiskReport extends Component
                 session()->put('current_subject_id', $this->subject_id);
             }
         }
+
+        $this->searchSubjects();
+    }
+
+    public function searchSubjects(string $value = ''): void
+    {
+        $this->subjectOptions = app(SubjectOptions::class)->search(
+            auth()->user(),
+            $value,
+            $this->career_id ? (int) $this->career_id : null,
+            [$this->subject_id],
+        );
     }
 
     public function updatedSubjectId($value): void
@@ -92,6 +108,7 @@ class RiskReport extends Component
         // Al cambiar de carrera, limpiar la materia seleccionada
         $this->subject_id = null;
         session()->forget('current_subject_id');
+        $this->searchSubjects();
     }
 
     public function updatedCycle(): void
@@ -100,6 +117,7 @@ class RiskReport extends Component
         $this->career_id = null;
         $this->subject_id = null;
         session()->forget('current_subject_id');
+        $this->searchSubjects();
     }
 
     #[Computed]
@@ -115,23 +133,6 @@ class RiskReport extends Component
             return $query->whereHas('subjects', function ($q) use ($teacherSubjectIds) {
                 $q->whereIn('id', $teacherSubjectIds);
             })->orderBy('name')->get();
-        }
-
-        return $query->orderBy('name')->get();
-    }
-
-    #[Computed]
-    public function subjects()
-    {
-        $user = auth()->user();
-        $query = Subject::query();
-
-        if ($this->career_id) {
-            $query->where('career_id', $this->career_id);
-        }
-
-        if ($user->hasRole('teacher')) {
-            $query->whereIn('id', $user->subjects->pluck('id'));
         }
 
         return $query->orderBy('name')->get();

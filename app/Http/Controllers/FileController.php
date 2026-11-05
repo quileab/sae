@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\InscriptionPdfService;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileController extends Controller
@@ -32,7 +33,7 @@ class FileController extends Controller
             }
         }
 
-        $path = storage_path('app/private/private/inscriptions/'.$file);
+        $path = InscriptionPdfService::absolutePath($file);
         if (! file_exists($path)) {
             abort(404);
         }

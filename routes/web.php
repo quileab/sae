@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\PreEnrollmentFormStatusController;
+use App\Http\Controllers\Api\PreEnrollmentStatusController;
+use App\Http\Controllers\PreEnrollmentMaterialsController;
 use App\Livewire\PreEnrollments\PublicForm;
 use App\Models\Career;
 use App\Models\PreEnrollment;
@@ -50,6 +53,24 @@ Route::post('/api/public/pre-enrollments', function (Request $request) {
 
     return response()->json($pre, 201);
 })->middleware('throttle:30,1');
+
+// Public status lookup for pre-enrollments (DNI + birthdate, shared API key)
+Route::get('/api/public/pre-enrollments/status', PreEnrollmentStatusController::class)
+    ->middleware(['verify.landing.key', 'throttle:pre-enrollment-status'])
+    ->name('api.pre-enrollments.status');
+
+// Public status of the pre-enrollment form (open/closed) for the landing
+Route::get('/api/public/pre-enrollments/form-status', PreEnrollmentFormStatusController::class)
+    ->middleware(['verify.landing.key', 'throttle:pre-enrollment-form-status'])
+    ->name('api.pre-enrollments.form-status');
+
+// Public materials area for accepted pre-enrollments (temporary signed links)
+Route::get('/preinsc/materiales/{preEnrollment}', [PreEnrollmentMaterialsController::class, 'show'])
+    ->middleware(['signed', 'throttle:30,1'])
+    ->name('preinsc.materials');
+Route::get('/preinsc/materiales/{preEnrollment}/descargar/{material}', [PreEnrollmentMaterialsController::class, 'download'])
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('preinsc.materials.download');
 
 // Redirect root to dashboard
 Route::redirect('/', '/dashboard');

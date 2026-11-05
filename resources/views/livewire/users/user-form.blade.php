@@ -19,9 +19,10 @@
                 </div>
                 <x-input label="ID Name" type="text" wire:model="data.name" />
             </div>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
                 <x-input label="Apellido" type="text" wire:model="data.lastname" />
                 <x-input label="Nombres" type="text" wire:model="data.firstname" />
+                <x-input label="Fecha de Nacimiento" type="date" icon="o-calendar" wire:model="data.birth_date" />
             </div>
             <div class="grid grid-cols-1 gap-2 md:grid-cols-4">
                 <x-input label="E-mail" type="email" wire:model="data.email" />
@@ -42,13 +43,21 @@
     @if(!empty($data['id']))
         <x-card title="Carreras asignadas" shadow class="mt-2">
             <div class="bg-white/10 dark:bg-black/10 p-4 rounded-md mb-2">
-                @foreach ($data['careers'] as $career)
-                    <x-dropdown label="{{ $career->name }}" class="btn-primary">
-                        {{-- para click wire:click.stop='action' --}}
-                        <x-menu-item title="BORRAR" icon="o-trash" class="bg-error"
-                            wire:click.stop="removeCareer({{ $career->id }})" />
-                    </x-dropdown>
-                @endforeach
+                @if(!empty($data['careers']) && count($data['careers']) > 0)
+                    @foreach ($data['careers'] as $career)
+                        @php
+                            $careerId = is_array($career) ? ($career['id'] ?? null) : ($career->id ?? null);
+                            $careerName = is_array($career) ? ($career['name'] ?? '') : ($career->name ?? '');
+                        @endphp
+                        <x-dropdown label="{{ $careerName }}" class="btn-primary">
+                            {{-- para click wire:click.stop='action' --}}
+                            <x-menu-item title="BORRAR" icon="o-trash" class="bg-error"
+                                wire:click.stop="removeCareer({{ $careerId }})" />
+                        </x-dropdown>
+                    @endforeach
+                @else
+                    <p class="text-xs text-base-content/60 italic">Sin carreras asignadas.</p>
+                @endif
             </div>
 
             <x-form wire:submit.prevent="assignCareer" no-separator>
@@ -62,7 +71,15 @@
         </x-card>
     @endif
 
-    @if(!empty($data['id']) && $data['role'] === 'student')
+    @if(!empty($data['id']) && in_array($data['role'] ?? '', ['student', 'tutor']))
+        @livewire('users.tutors-manager', ['userId' => $data['id']], key('tutors-'.$data['id']))
+    @endif
+
+    @if(!empty($data['id']) && ($data['role'] ?? '') === 'student')
+        @livewire('users.medical-record-manager', ['userId' => $data['id']], key('medical-'.$data['id']))
+    @endif
+
+    @if(!empty($data['id']) && in_array($data['role'] ?? '', ['student', 'teacher']))
         <x-card title="Justificaciones (Certificados / Licencias)" shadow class="mt-4">
             {{-- Formulario para agregar una nueva justificación --}}
             <x-form wire:submit.prevent="addJustifiedAbsence" no-separator class="mb-4">
@@ -84,7 +101,8 @@
                             <tr>
                                 <th>Desde</th>
                                 <th>Hasta</th>
-                                <th>Descripción / Motivo</th>
+                                <th>Artículo / Motivo</th>
+                                <th>Estado</th>
                                 <th class="w-16">Acciones</th>
                             </tr>
                         </thead>
@@ -93,7 +111,31 @@
                                 <tr class="hover:bg-base-200/50">
                                     <td class="whitespace-nowrap">{{ \Carbon\Carbon::parse($ja['start_date'])->format('d/m/Y') }}</td>
                                     <td class="whitespace-nowrap">{{ \Carbon\Carbon::parse($ja['end_date'])->format('d/m/Y') }}</td>
-                                    <td>{{ $ja['description'] }}</td>
+                                    <td>
+                                        @if(!empty($ja['article']))
+                                            <span class="font-semibold text-primary">[{{ $ja['article'] }}]</span>
+                                        @endif
+                                        {{ $ja['description'] ?: ($ja['custom_article'] ?? '-') }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $badgeClass = match($ja['status'] ?? 'approved') {
+                                                'pending' => 'badge-warning',
+                                                'approved' => 'badge-success text-white',
+                                                'rejected' => 'badge-error text-white',
+                                                default => 'badge-ghost',
+                                            };
+                                            $statusText = match($ja['status'] ?? 'approved') {
+                                                'pending' => 'Pendiente',
+                                                'approved' => 'Aprobada',
+                                                'rejected' => 'Rechazada',
+                                                default => $ja['status'] ?? 'Aprobada',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $badgeClass }} badge-xs">
+                                            {{ $statusText }}
+                                        </span>
+                                    </td>
                                     <td>
                                         <x-button icon="o-trash" class="btn-error btn-xs btn-square" wire:click="deleteJustifiedAbsence({{ $ja['id'] }})" spinner="deleteJustifiedAbsence({{ $ja['id'] }})" />
                                     </td>
@@ -105,7 +147,7 @@
             @else
                 <div class="text-center py-6 text-base-content/50 border-2 border-dashed border-base-300 rounded-xl">
                     <x-icon name="o-document-text" class="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p class="text-xs">No hay justificaciones registradas para este estudiante.</p>
+                    <p class="text-xs">No hay justificaciones registradas para este usuario.</p>
                 </div>
             @endif
         </x-card>
